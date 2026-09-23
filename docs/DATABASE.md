@@ -1,6 +1,15 @@
 # Base de datos
 
-PostgreSQL 16 · Prisma · migraciones con `prisma migrate` (nunca `db push` fuera de prototipos locales).
+PostgreSQL 16 · Prisma 7 (cliente `prisma-client` + adaptador `@prisma/adapter-pg`) · migraciones con
+`prisma migrate` (nunca `db push`).
+
+Archivos: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/`, `apps/api/prisma.config.ts`
+(URL de la BD, ruta de migraciones y seed; Prisma 7 ya no lee la URL desde `schema.prisma`).
+
+| Migración | Contenido |
+|---|---|
+| `20260923231000_init` | Tablas, enums, índices y FKs compuestas generadas por Prisma. |
+| `20260923231001_db_constraints` | SQL escrito a mano: `btree_gist`, exclusion constraint, CHECKs, índices únicos parciales. |
 
 ## 1. Convenciones
 
@@ -44,22 +53,25 @@ Tenant 1─* AuditLog, NotificationOutbox, IdempotencyKey, Session(vía User)
 
 ### Location
 `id, tenantId, name, address?, mapsUrl?, whatsapp? (E.164), isDefault bool, active bool`.
-Índice único parcial: un solo `isDefault=true` por tenant. Se crea uno al crear el tenant.
+Índice único parcial `Location_one_default_per_tenant`: un solo `isDefault=true` por tenant. Se crea uno al crear el tenant.
 
 ### User
-`id, tenantId, email (citext), passwordHash, role (Role), active, lastLoginAt?`.
-`@@unique([tenantId, email])`. `Role = ADMIN | PROFESSIONAL` (enum ampliable).
+`id, tenantId, email, passwordHash, role (Role), active, lastLoginAt?`.
+`@@unique([tenantId, email])`. El email se normaliza a minúsculas en la app y un CHECK
+(`email = lower(email)`) lo garantiza, así la unicidad no distingue mayúsculas sin depender de `citext`.
+`Role = ADMIN | PROFESSIONAL` (enum ampliable).
 
 ### Session
 `id, userId, tokenHash (unique), expiresAt, createdAt, ip?, userAgent?`. Se guarda solo el hash
 (SHA-256) del token de la cookie.
 
 ### Professional
-`id, tenantId, userId? (unique), displayName, title?, bio?, photoUrl?, active, sortOrder`.
+`id, tenantId, userId? (unique; FK compuesta a User), displayName, title?, bio?, photoUrl?, active, sortOrder`.
 
 ### Service
 `id, tenantId, name, description?, category?, durationMinutes (5–600), bufferAfterMinutes (0–120, def. 0),
-priceCents (≥0), active, sortOrder`. `@@unique([tenantId, name])` (entre activos, índice parcial).
+priceCents (≥0), active, sortOrder`. Índice único parcial `Service_active_name_per_tenant` sobre
+`(tenantId, lower(name)) WHERE active`: los archivados pueden repetir nombre.
 
 ### ProfessionalService
 `tenantId, professionalId, serviceId` — PK `(professionalId, serviceId)`.
@@ -108,30 +120,46 @@ attempts, nextAttemptAt, lastError?`.
 `tenantId, key, requestHash, responseStatus, responseBody jsonb, createdAt` — PK `(tenantId, key)`,
 caduca a las 24 h.
 
-## 3. Protección contra doble reserva (SQL en la migración)
+## 3. Reglas en SQL (migración `db_constraints`)
 
-Prisma no modela exclusion constraints; se añaden en SQL dentro de la migración generada
-(`prisma migrate dev --create-only` y se edita el `migration.sql`):
+Prisma no modela exclusion constraints, CHECKs ni índices parciales; viven en la migración
+`20260923231001_db_constraints`. Comprobado: `prisma migrate dev` y `prisma migrate diff` **no**
+intentan borrarlos (se generan migraciones vacías). `test/db-constraints.test.ts` verifica que existen.
+
+### Doble reserva
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
 ALTER TABLE "Booking"
-  ADD CONSTRAINT booking_no_overlap
+  ADD CONSTRAINT "Booking_no_overlap"
   EXCLUDE USING gist (
     "professionalId" WITH =,
     tstzrange("startAt", "endAt", '[)') WITH &&
   ) WHERE (status IN ('PENDING', 'CONFIRMED'));
-
-ALTER TABLE "Booking" ADD CONSTRAINT booking_time_order CHECK ("startAt" < "endAt");
 ```
 
 - `[)` → una cita que termina a las 10:00 no choca con otra que empieza a las 10:00.
 - `COMPLETED` y `NO_SHOW` quedan fuera del constraint (ya pasaron); `CANCELLED` libera el hueco.
 - Una transición `CANCELLED → CONFIRMED` vuelve a pasar por el constraint (y por `checkSlot`).
-- Violación → código `23P01`, que la app traduce a `409 SLOT_UNAVAILABLE`.
-- Como `schema.prisma` no conoce el constraint, un test de integración verifica que existe tras
-  aplicar migraciones (evita que se pierda en una migración futura).
+- Violación → SQLSTATE `23P01`, que la app traduce a `409 SLOT_UNAVAILABLE`
+  (`pgErrorCode()` en `src/db.ts` extrae el código del error envuelto por Prisma).
+
+### CHECKs
+
+| Constraint | Regla |
+|---|---|
+| `Booking_time_order_check` | `startAt < endAt` |
+| `Booking_end_covers_duration_check` | `endAt >= startAt + durationMinutesSnapshot` |
+| `Booking_price_check`, `Booking_duration_check`, `Booking_currency_check`, `Booking_notes_length_check` | precio ≥ 0, duración 5–600, moneda ISO, notas ≤ 300 |
+| `Tenant_slug_format_check` | `^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$` |
+| `Tenant_default_status_check` | estado inicial solo `PENDING` o `CONFIRMED` |
+| `Tenant_slot_interval_check`, `Tenant_lead_check`, `Tenant_horizon_check`, `Tenant_currency_check`, `Tenant_country_code_check` | rangos de configuración |
+| `User_email_lowercase_check` | email en minúsculas |
+| `Service_duration_check`, `Service_buffer_check`, `Service_price_check` | 5–600 min, buffer 0–120, precio ≥ 0 |
+| `WorkingHour_weekday_check`, `WorkingHour_range_check` | día 0–6; `0 ≤ start < end ≤ 1440` |
+| `TimeBlock_time_order_check` | `startAt < endAt` |
+| `Customer_phone_e164_check` | `^\+[1-9][0-9]{6,14}$` |
 
 ## 4. Índices principales
 
@@ -143,8 +171,11 @@ ALTER TABLE "Booking" ADD CONSTRAINT booking_time_order CHECK ("startAt" < "endA
 
 ## 5. Migraciones
 
-- Desarrollo: `prisma migrate dev --name <cambio>`; revisar el SQL generado antes de commitear.
-- CI y producción: `prisma migrate deploy`. CI comprueba además `prisma migrate diff` contra el
-  esquema para detectar drift.
+- Desarrollo: `npm run db:migrate -- --name <cambio>` (`prisma migrate dev`); revisar el SQL generado
+  antes de commitear. Para SQL a mano: `--create-only`, editar, y aplicar.
+- CI y producción: `prisma migrate deploy`. CI ejecuta además `npm run db:check-drift`
+  (`prisma migrate diff --from-migrations … --to-schema … --exit-code`, usa `SHADOW_DATABASE_URL`).
 - Las migraciones se commitean y nunca se editan una vez aplicadas en un entorno compartido.
-- Seed (`prisma db seed`) solo para desarrollo/test: dos tenants de ejemplo (A y B) para probar aislamiento.
+- Seed (`npm run db:seed`) solo para desarrollo: `barberia-a` (São Paulo, BRL) y `barberia-b` (Madrid, EUR),
+  con local, 3 servicios, 2 profesionales y horario partido. Se niega a correr con `NODE_ENV=production`.
+  Los usuarios se añaden en la Fase 3.

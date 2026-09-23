@@ -9,18 +9,31 @@ Herramienta: **Vitest**. Tres niveles:
 | Concurrencia | reservas simultáneas contra la BD real | PostgreSQL real |
 
 No se mockea PostgreSQL: la protección contra doble reserva y las FKs compuestas solo se prueban
-con la BD real. `docker-compose.yml` tendrá un servicio `postgres-test`; cada ejecución aplica
-`prisma migrate deploy` a una BD limpia y cada archivo de test usa un esquema o trunca tablas.
+con la BD real. `test/helpers/global-setup.ts` borra el esquema de `TEST_DATABASE_URL` y aplica
+`prisma migrate deploy` (igual que producción) al inicio de cada ejecución; cada archivo trunca las
+tablas en `beforeEach`. Los archivos se ejecutan en serie (`fileParallelism: false`).
 
-## Comandos (a partir de la Fase 2)
+## Comandos
 
 ```
-npm run lint         # ESLint
-npm run typecheck    # tsc --noEmit en todos los workspaces
-npm test             # vitest run (unit + integración)
-npm run test:unit
-npm run test:int     # requiere DATABASE_URL de test
+npm run db:up           # PostgreSQL en Docker (crea reservas_dev, reservas_test, reservas_shadow)
+npm run db:migrate      # prisma migrate dev sobre DATABASE_URL
+npm run db:seed         # datos de desarrollo
+npm run lint            # ESLint (TypeScript con type-checking)
+npm run typecheck       # prisma generate + tsc --noEmit
+npm test                # vitest run (unit + integración, requiere TEST_DATABASE_URL)
+npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABASE_URL)
 ```
+
+CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
+
+## Estado actual (Fase 2)
+
+| Archivo | Cubre |
+|---|---|
+| `test/db-constraints.test.ts` | existencia de extensión/constraints/índices; solape, hora exacta, contiguas, otro profesional, cancelada libera y no se reactiva sobre hueco ocupado, COMPLETED/NO_SHOW fuera; **20 inserciones concurrentes → 1**; CHECKs de horario, teléfono, email, slug, estado inicial, nombre de servicio |
+| `test/db-tenant-isolation.test.ts` | FKs compuestas: cita, servicio de profesional, horario, bloqueo y usuario de otro tenant rechazados; mismo teléfono/email en tenants distintos permitido y único dentro del tenant; un local por defecto por tenant |
+| `test/config.test.ts` | validación de env sin filtrar secretos; extracción del SQLSTATE |
 
 ## Matriz obligatoria
 
@@ -74,7 +87,7 @@ npm run test:int     # requiere DATABASE_URL de test
 - Errores 500 no filtran stack ni mensajes de Prisma.
 
 ### Migraciones
-- `migrate deploy` desde cero funciona; el constraint `booking_no_overlap` y la extensión `btree_gist` existen.
+- `migrate deploy` desde cero funciona; el constraint `Booking_no_overlap` y la extensión `btree_gist` existen.
 - No hay drift entre `schema.prisma` y las migraciones.
 
 ### No romper el generador

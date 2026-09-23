@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fase 0 y Fase 1 completadas** (auditoría + documentación). Aún no hay código de backend.
+Estado: **Fases 0, 1 y 2 completadas.** Siguiente: Fase 3 (tenants + autenticación + roles).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -127,20 +127,23 @@ Nada en el repositorio contradice estas decisiones.
 - Sesiones del panel: cookie `httpOnly` + tabla `Session` en BD (revocables). Sin JWT en v1.
 - Rate limiting con `@fastify/rate-limit` (memoria en v1; Redis cuando haya >1 instancia).
 - IDs UUID. Dinero en céntimos (`Int`).
+- Prisma 7.10 (estable; la etiqueta `latest` de npm apunta a una 8.0 RC que no se usa) y TypeScript 6.0
+  (typescript-eslint aún no soporta TS 7). Se ejecuta TypeScript directamente con `tsx` en desarrollo;
+  la estrategia de build de producción se fija en la Fase 16.
 - Monorepo con npm workspaces (`apps/api`, `apps/admin`, `packages/shared`); SPA con Vite.
 - Notificaciones vía tabla **outbox** (se escribe en la misma transacción que la cita; un worker envía).
 
-## 4. Decisiones abiertas — confirmar antes de la Fase 2
+## 4. Decisiones adicionales (aprobadas antes de la Fase 2)
 
-Estas son difíciles de revertir y no están en la sección 2. Propuesta por defecto entre paréntesis.
+Las tres propuestas se aceptaron tal cual:
 
 1. **Alta de tenants**: ¿registro self-service público o alta por el operador de la plataforma?
-   (Propuesta: v1 por CLI/rol `PLATFORM_ADMIN`; self-service más adelante.)
+   **Aprobado:** v1 por CLI del operador; self-service más adelante.
 2. **Aislamiento en BD**: ¿solo capa de aplicación + claves foráneas compuestas `(tenantId, id)`,
-   o además **Row-Level Security** de PostgreSQL? (Propuesta: FKs compuestas + scoping obligatorio
-   ahora; RLS como defensa en profundidad en la Fase 15. Ver [SECURITY](SECURITY.md) §2.)
+   o además **Row-Level Security** de PostgreSQL? **Aprobado:** FKs compuestas + scoping obligatorio
+   ahora; RLS como defensa en profundidad en la Fase 15. Ver [SECURITY](SECURITY.md) §2.
 3. **Gestión de la cita por el cliente** (cancelar/reprogramar desde un enlace con token): ¿v1 o
-   posterior? (Propuesta: modelar `manageTokenHash` ya; endpoints en fase posterior.)
+   posterior? **Aprobado:** `Booking.manageTokenHash` ya está en el modelo; endpoints en fase posterior.
 
 ---
 
@@ -153,7 +156,7 @@ que el generador (que no se toca) sigue igual.
 |---|---|---|
 | 0 | Auditoría | Este documento §1. ✅ |
 | 1 | Arquitectura y docs | `/docs/*.md`. ✅ |
-| 2 | PostgreSQL + Prisma + migraciones | `schema.prisma`, migración inicial con `btree_gist` + exclusion constraint en SQL, docker-compose para dev/test, script de seed. |
+| 2 | PostgreSQL + Prisma + migraciones | `schema.prisma`, migración inicial con `btree_gist` + exclusion constraint en SQL, docker-compose para dev/test, script de seed. ✅ |
 | 3 | Tenants + auth + roles | Login/logout, sesiones, `requireRole`, resolución de tenant, tests de aislamiento base. |
 | 4 | Profesionales + servicios | CRUD admin, `ProfessionalService`, tests cruzados de tenant. |
 | 5 | Horarios + bloqueos | `WorkingHour` (varios intervalos, validación de solapes), `TimeBlock`. |

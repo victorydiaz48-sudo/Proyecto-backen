@@ -128,8 +128,9 @@ hay, los primeros de los siguientes días hasta un límite.
 
 ## 7. Autenticación y roles
 
-- Roles: `ADMIN`, `PROFESSIONAL` (enum ampliable: `RECEPTIONIST`, `OWNER`…). `PLATFORM_ADMIN` es
-  una marca aparte para el operador de la plataforma, no pertenece a un tenant (pendiente §4.1 del plan).
+- Roles: `ADMIN`, `PROFESSIONAL` (enum ampliable: `RECEPTIONIST`, `OWNER`…). El operador de la
+  plataforma no es un usuario de la API en v1: crea tenants y su primer ADMIN con un CLI que se
+  ejecuta en el servidor (decisión §4.1 del plan).
 - Un `User` pertenece a un único tenant (email único por tenant). Un usuario `PROFESSIONAL` se
   vincula 1:1 a un `Professional`.
 - Autorización por política: `can(user, action, resource)`; `PROFESSIONAL` solo sus citas,

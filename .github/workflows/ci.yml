@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: reservas
+          POSTGRES_PASSWORD: reservas
+          POSTGRES_DB: reservas_dev
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U reservas" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://reservas:reservas@localhost:5432/reservas_dev
+      TEST_DATABASE_URL: postgresql://reservas:reservas@localhost:5432/reservas_test
+      SHADOW_DATABASE_URL: postgresql://reservas:reservas@localhost:5432/reservas_shadow
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Crear BDs de test y sombra
+        run: |
+          PGPASSWORD=reservas psql -h localhost -U reservas -d reservas_dev -c 'CREATE DATABASE reservas_test' -c 'CREATE DATABASE reservas_shadow'
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run db:check-drift
+      - run: npm test
+      - name: Migraciones desde cero (como en producción)
+        run: npm run db:deploy -w apps/api
+      - name: El generador HTML no cambia hasta la Fase 13
+        run: git diff --exit-code origin/main -- generador-pagina-contacto.html
+        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
