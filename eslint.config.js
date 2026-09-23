@@ -17,6 +17,8 @@ export default tseslint.config(
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/consistent-type-imports': 'error',
+      // Fastify usa funciones async para plugins y hooks aunque no esperen nada (así señalan que no usan done()).
+      '@typescript-eslint/require-await': 'off',
       'no-restricted-syntax': [
         'error',
         {
@@ -25,6 +27,15 @@ export default tseslint.config(
           message: 'Prohibido SQL sin parametrizar. Usa $queryRaw`...` / $executeRaw`...`.',
         },
       ],
+    },
+  },
+  {
+    // En los tests, res.json() devuelve `any` a propósito: se comprueba la forma con expect().
+    files: ['**/test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-unsafe-member-access': 'off',
+      '@typescript-eslint/no-unsafe-assignment': 'off',
+      '@typescript-eslint/no-unsafe-argument': 'off',
     },
   },
   {

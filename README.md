@@ -18,7 +18,14 @@ npm run db:up                                   # PostgreSQL en Docker (opcional
 cp apps/api/.env.example apps/api/.env          # ajusta las URLs si hace falta
 npm run db:migrate                              # aplica las migraciones a la BD de desarrollo
 npm run db:seed                                 # barberia-a y barberia-b de ejemplo
+npm run dev -w apps/api                         # API en http://localhost:3000
 
 npm run typecheck && npm run lint && npm test   # lo mismo que ejecuta CI
 npm run db:check-drift                          # schema.prisma coincide con las migraciones
 ```
+
+Usuarios del seed: `admin@barberia-a.test` (ADMIN) y `carlos@barberia-a.test` (PROFESSIONAL), igual
+para `barberia-b`; contraseña `dev-password-123`. Solo para desarrollo.
+
+Alta de un negocio real (operador de la plataforma): `npm run tenant:create -w apps/api -- …`,
+ver el ejemplo completo en [docs/API.md](docs/API.md) §3.

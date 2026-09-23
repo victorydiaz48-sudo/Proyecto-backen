@@ -1,0 +1,101 @@
+import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
+import type { Db } from '../db.ts';
+import type { Role } from '../generated/prisma/enums.ts';
+import { sha256 } from '../lib/crypto.ts';
+import { AppError, forbidden, unauthenticated } from '../lib/errors.ts';
+
+export const SESSION_COOKIE = 'sid';
+export const SESSION_IDLE_MS = 7 * 24 * 60 * 60 * 1000; // caducidad deslizante
+export const SESSION_ABSOLUTE_MS = 30 * 24 * 60 * 60 * 1000; // caducidad absoluta desde el login
+const TOUCH_EVERY_MS = 5 * 60 * 1000;
+
+/** Todo lo que una ruta autenticada necesita saber. Sale de la BD vía la sesión, nunca del cliente. */
+export interface AuthContext {
+  sessionId: string;
+  user: { id: string; email: string; role: Role; professionalId: string | null };
+  tenant: { id: string; slug: string; name: string; timezone: string };
+}
+
+declare module 'fastify' {
+  interface FastifyRequest {
+    auth: AuthContext | null;
+  }
+}
+
+export interface AuthOptions {
+  db: Db;
+  now: () => Date;
+}
+
+/** Carga la sesión desde la cookie en cada petición (o deja `request.auth = null`). */
+export function registerAuth(app: FastifyInstance, { db, now }: AuthOptions): void {
+  app.decorateRequest('auth', null);
+
+  app.addHook('onRequest', async (request) => {
+    const token = request.cookies[SESSION_COOKIE];
+    if (!token || token.length > 100) return;
+    const session = await db.session.findUnique({
+      where: { tokenHash: sha256(token) },
+      include: { user: { include: { tenant: true, professional: { select: { id: true } } } } },
+    });
+    if (!session) return;
+    const t = now().getTime();
+    const { user } = session;
+    const expired =
+      session.expiresAt.getTime() <= t || session.createdAt.getTime() + SESSION_ABSOLUTE_MS <= t;
+    if (expired || !user.active || user.tenant.status !== 'ACTIVE') return;
+
+    if (t - session.lastSeenAt.getTime() > TOUCH_EVERY_MS) {
+      const expiresAt = new Date(Math.min(t + SESSION_IDLE_MS, session.createdAt.getTime() + SESSION_ABSOLUTE_MS));
+      await db.session.update({ where: { id: session.id }, data: { lastSeenAt: new Date(t), expiresAt } });
+    }
+
+    request.auth = {
+      sessionId: session.id,
+      user: { id: user.id, email: user.email, role: user.role, professionalId: user.professional?.id ?? null },
+      tenant: { id: user.tenant.id, slug: user.tenant.slug, name: user.tenant.name, timezone: user.tenant.timezone },
+    };
+  });
+}
+
+/** Contexto autenticado o 401. Úsalo en los handlers en vez de leer `request.auth` directamente. */
+export function requireAuthContext(request: FastifyRequest): AuthContext {
+  if (!request.auth) throw unauthenticated();
+  return request.auth;
+}
+
+export const requireAuth: preHandlerAsyncHookHandler = async (request) => {
+  requireAuthContext(request);
+};
+
+export function requireRole(...roles: Role[]): preHandlerAsyncHookHandler {
+  return async (request) => {
+    const auth = requireAuthContext(request);
+    if (!roles.includes(auth.user.role)) throw forbidden();
+  };
+}
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/**
+ * Protección CSRF para las rutas con cookie (panel y auth). Además de SameSite=Strict, las peticiones
+ * que modifican estado deben venir del mismo origen según Sec-Fetch-Site u Origin. Los clientes que no
+ * son navegadores no envían esas cabeceras y no pueden ser víctimas de CSRF.
+ */
+export async function sameOriginGuard(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
+  if (SAFE_METHODS.has(request.method)) return;
+  const site = request.headers['sec-fetch-site'];
+  if (site && site !== 'same-origin' && site !== 'none') throw csrfError();
+  const origin = request.headers.origin;
+  if (origin) {
+    let host: string;
+    try {
+      host = new URL(origin).host;
+    } catch {
+      throw csrfError();
+    }
+    if (host !== request.host) throw csrfError();
+  }
+}
+
+const csrfError = (): AppError => new AppError(403, 'CSRF_REJECTED', 'Origen de la petición no permitido.');

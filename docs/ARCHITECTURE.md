@@ -45,7 +45,8 @@
       repo.ts                       acceso a datos, siempre filtrado por tenantId
       schemas.ts                    Zod
     domain/availability/            motor puro: sin I/O, sin Prisma, 100% testeable
-    lib/                            tiempo (Luxon), teléfono, dinero, errores
+    lib/                            errores, contraseñas, tokens, validación, tiempo, teléfono, dinero
+    cli/                            tareas del operador (tenant-create)
   test/                             unit + integración (BD real)
 /apps/admin/                        React + Vite (SPA admin y profesional)
 /packages/shared/                   tipos y esquemas Zod compartidos

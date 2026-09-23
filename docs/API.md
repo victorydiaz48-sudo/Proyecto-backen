@@ -14,12 +14,17 @@ además, donde ayuda al frontend, se incluye la hora local del tenant (`localDat
 | HTTP | code | Cuándo |
 |---|---|---|
 | 400 | `VALIDATION_ERROR` | cuerpo/query inválidos (`details.fields`) |
+| 400 | `INVALID_CURRENT_PASSWORD` | cambio de contraseña con la actual incorrecta |
 | 401 | `UNAUTHENTICATED` | sin sesión válida |
+| 401 | `INVALID_CREDENTIALS` | login fallido (mismo mensaje exista o no el usuario o el negocio) |
+| 403 | `CSRF_REJECTED` | petición con cookie que modifica estado desde otro origen |
 | 403 | `FORBIDDEN` | rol sin permiso |
 | 404 | `NOT_FOUND` | recurso inexistente **o de otro tenant** (nunca se distingue) |
 | 409 | `SLOT_UNAVAILABLE` | hueco ocupado; incluye `details.alternatives` |
 | 409 | `CONFLICT` | otros conflictos (nombre duplicado, transición inválida) |
 | 422 | `SLOT_INVALID` | la hora no es reservable (fuera de horario, excede cierre…); `details.reason` + `alternatives` |
+| 413 | `PAYLOAD_TOO_LARGE` | cuerpo > 16 KB |
+| 415 | `UNSUPPORTED_MEDIA_TYPE` | cuerpo que no es `application/json` |
 | 429 | `RATE_LIMITED` | con `Retry-After` |
 | 500 | `INTERNAL` | mensaje genérico |
 
@@ -101,14 +106,27 @@ final por WhatsApp como aviso al negocio. La cita ya existe en el backend.
     { "startAt": "…", "localDate": "2026-09-24", "localTime": "09:30", "professionalIds": ["…"] } ] } } }
 ```
 
-## 3. Autenticación (panel)
+## 3. Autenticación (panel) — implementado (Fase 3)
 
 | Método | Ruta | Notas |
 |---|---|---|
-| POST | `/auth/login` | `{ tenantSlug, email, password }` → cookie `sid` (httpOnly, Secure, SameSite=Strict). Respuesta genérica en fallo. |
-| POST | `/auth/logout` | revoca la sesión |
-| GET | `/auth/me` | `{ user: { id, email, role, professionalId? }, tenant: { slug, name, … } }` |
-| POST | `/auth/password` | cambio de contraseña (requiere la actual); revoca otras sesiones |
+| POST | `/auth/login` | `{ tenantSlug, email, password }` (estricto). `200` → cuerpo igual que `/auth/me` + cookie `sid` (`HttpOnly; SameSite=Strict; Path=/`, `Secure` en producción). Fallo → `401 INVALID_CREDENTIALS`. 5 fallos por negocio+email en 15 min → `429`; 20 peticiones por IP en 15 min → `429`. |
+| POST | `/auth/logout` | `204`; borra la sesión en BD y la cookie |
+| GET | `/auth/me` | `{ user: { id, email, role, professionalId }, tenant: { id, slug, name, timezone } }` |
+| POST | `/auth/password` | `{ currentPassword, newPassword }` → `204`; cierra las demás sesiones del usuario |
+
+Email y slug no distinguen mayúsculas. El mismo email puede existir en negocios distintos: por eso
+el login pide el `tenantSlug`.
+
+Alta de negocios: no hay endpoint público (decisión §4.1 del plan). El operador ejecuta en el servidor:
+
+```bash
+npm run tenant:create -w apps/api -- --slug barbearia-central --name "Barbearia Central" \
+  --timezone America/Sao_Paulo --country 55 --currency BRL --locale pt-BR --admin-email dono@exemplo.com
+```
+
+Crea tenant + local por defecto + primer ADMIN en una transacción. La contraseña inicial sale de
+`TENANT_ADMIN_PASSWORD` o se genera y se muestra una sola vez.
 
 ## 4. API de administración
 
@@ -117,7 +135,7 @@ Permisos: A = ADMIN, P = PROFESSIONAL (solo sus propios recursos).
 
 | Recurso | Endpoints | Roles |
 |---|---|---|
-| Tenant settings | `GET/PATCH /admin/settings` | A |
+| Tenant settings ✅ | `GET/PATCH /admin/settings` (`name`, `timezone`, `defaultCountryCode`, `currency`, `locale`, `slotIntervalMinutes`, `defaultBookingStatus` ∈ {PENDING, CONFIRMED}, `bookingLeadMinutes`, `bookingHorizonDays`; el slug no se cambia) | A |
 | Locations | `GET/POST /admin/locations`, `GET/PATCH/DELETE /admin/locations/:id` | A (GET: A,P) |
 | Users | `GET/POST /admin/users`, `PATCH /admin/users/:id` | A |
 | Professionals | `GET/POST /admin/professionals`, `GET/PATCH/DELETE /:id`, `PUT /:id/services` | A (GET: A,P) |

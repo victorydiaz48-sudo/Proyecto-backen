@@ -27,13 +27,17 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (Fase 2)
+## Estado actual (hasta la Fase 3)
 
 | Archivo | Cubre |
 |---|---|
 | `test/db-constraints.test.ts` | existencia de extensión/constraints/índices; solape, hora exacta, contiguas, otro profesional, cancelada libera y no se reactiva sobre hueco ocupado, COMPLETED/NO_SHOW fuera; **20 inserciones concurrentes → 1**; CHECKs de horario, teléfono, email, slug, estado inicial, nombre de servicio |
 | `test/db-tenant-isolation.test.ts` | FKs compuestas: cita, servicio de profesional, horario, bloqueo y usuario de otro tenant rechazados; mismo teléfono/email en tenants distintos permitido y único dentro del tenant; un local por defecto por tenant |
 | `test/config.test.ts` | validación de env sin filtrar secretos; extracción del SQLSTATE |
+| `test/auth.test.ts` | login (cookie, hash del token, mayúsculas, mismo error para todo fallo, usuario inactivo, tenant suspendido), bloqueo tras 5 fallos y por IP, campos extra → 400, `text/plain` → 415, caducidad deslizante/absoluta con reloj falso, logout, cambio de contraseña cierra otras sesiones, CSRF, 404/health |
+| `test/roles-and-tenant-isolation.test.ts` | 401 sin sesión, PROFESSIONAL → 403 en ajustes, `professionalId` desde la BD, auditoría antes/después, validación de ajustes; mismo email en A y B ve solo su negocio; `tenantId` en body → 400; query/cabecera no cambian el tenant; credenciales de A no entran en B; un 500 no filtra detalles |
+| `test/provision.test.ts` | alta por CLI: tenant + local + ADMIN Argon2id + auditoría sin secretos; slug duplicado en paralelo sin datos a medias; validaciones |
+| `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria
 

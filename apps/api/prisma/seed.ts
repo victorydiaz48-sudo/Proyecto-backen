@@ -1,8 +1,12 @@
 // Datos de desarrollo: dos barberías casi idénticas (A y B) para probar el aislamiento a mano.
-// Solo desarrollo. Los usuarios (con contraseña) se añaden en la Fase 3.
+// Solo desarrollo. Usuarios: admin@<slug>.test (ADMIN) y carlos@<slug>.test (PROFESSIONAL),
+// contraseña SEED_PASSWORD (por defecto "dev-password-123").
 import 'dotenv/config';
 import { loadConfig } from '../src/config.ts';
 import { createDb, type Db } from '../src/db.ts';
+import { hashPassword } from '../src/lib/password.ts';
+
+const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'dev-password-123';
 
 const SEED_TENANTS = [
   { slug: 'barberia-a', name: 'Barbería A', timezone: 'America/Sao_Paulo', defaultCountryCode: '55', currency: 'BRL', locale: 'pt-BR' },
@@ -14,8 +18,10 @@ async function seedTenant(db: Db, t: (typeof SEED_TENANTS)[number]): Promise<voi
     console.log(`= ${t.slug} ya existe, se omite`);
     return;
   }
+  const passwordHash = await hashPassword(SEED_PASSWORD);
   await db.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({ data: t });
+    await tx.user.create({ data: { tenantId: tenant.id, email: `admin@${t.slug}.test`, passwordHash, role: 'ADMIN' } });
     const location = await tx.location.create({ data: { tenantId: tenant.id, name: 'Principal', isDefault: true } });
     const corte = await tx.service.create({ data: { tenantId: tenant.id, name: 'Corte', durationMinutes: 30, priceCents: 4500 } });
     const barba = await tx.service.create({ data: { tenantId: tenant.id, name: 'Barba', durationMinutes: 20, priceCents: 3000 } });
@@ -25,7 +31,15 @@ async function seedTenant(db: Db, t: (typeof SEED_TENANTS)[number]): Promise<voi
       { name: 'André', services: [corte] },
     ];
     for (const [i, p] of pros.entries()) {
-      const pro = await tx.professional.create({ data: { tenantId: tenant.id, displayName: p.name, sortOrder: i } });
+      const user =
+        i === 0
+          ? await tx.user.create({
+              data: { tenantId: tenant.id, email: `carlos@${t.slug}.test`, passwordHash, role: 'PROFESSIONAL' },
+            })
+          : null;
+      const pro = await tx.professional.create({
+        data: { tenantId: tenant.id, displayName: p.name, sortOrder: i, userId: user?.id ?? null },
+      });
       await tx.professionalService.createMany({
         data: p.services.map((s) => ({ tenantId: tenant.id, professionalId: pro.id, serviceId: s.id })),
       });

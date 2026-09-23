@@ -23,15 +23,19 @@
    Trade-off: protege ante bugs de scoping, pero exige que *toda* consulta vaya dentro de una
    transacción con el tenant fijado (Prisma lo complica con el pool) y añade coste a los tests.
 
-## 3. Autenticación
+## 3. Autenticación (implementado en la Fase 3)
 
-- Contraseñas: Argon2id (m=19 MiB, t=2, p=1 como mínimo, parámetros OWASP), longitud 10–128,
-  comprobación contra lista de contraseñas comunes.
-- Login: mensaje genérico, tiempo constante (se hashea contra un hash ficticio si el usuario no
-  existe), rate limit por IP y por `tenantSlug+email`, bloqueo progresivo.
-- Sesión: token aleatorio de 32 bytes en cookie `sid` `HttpOnly; Secure; SameSite=Strict; Path=/`;
-  en BD solo su SHA-256. Expiración deslizante (7 días) y absoluta (30 días). Rotación al hacer login.
-  Logout y cambio de contraseña revocan sesiones.
+- Contraseñas: Argon2id (`@node-rs/argon2`, m=19 MiB, t=2, p=1, parámetros OWASP), longitud 10–128,
+  rechazo de contraseñas comunes/repetitivas y de las que contienen el email (`src/lib/password.ts`).
+- Login (`src/modules/auth/service.ts`): mensaje genérico `INVALID_CREDENTIALS`; si el usuario no
+  existe se verifica contra un hash ficticio para igualar el tiempo; `FailureLimiter` bloquea 15 min
+  tras 5 fallos por negocio+email; `@fastify/rate-limit` limita a 20 intentos/15 min por IP.
+  Los fallos se auditan (sin la contraseña).
+- Sesión (`src/plugins/auth.ts`): token aleatorio de 32 bytes en cookie `sid`
+  `HttpOnly; SameSite=Strict; Path=/` y `Secure` (obligatorio en producción: `COOKIE_SECURE` no puede
+  desactivarse con `NODE_ENV=production`). En BD solo su SHA-256. Caducidad deslizante de 7 días y
+  absoluta de 30. Usuario desactivado o tenant suspendido → la sesión deja de valer al instante.
+  Logout borra la sesión; el cambio de contraseña cierra las demás.
 
 ## 4. Autorización
 
@@ -55,8 +59,9 @@
   y desde `file://` (Origin `null`). Como no hay cookies ni credenciales en estas rutas, `*` no
   expone datos de sesión. Las respuestas públicas nunca incluyen datos personales de otros clientes.
 - **Rutas admin/auth**: sin cabeceras CORS (solo mismo origen). Cookie `SameSite=Strict` +
-  verificación de `Origin`/`Sec-Fetch-Site` en métodos que modifican estado + exigir
-  `Content-Type: application/json`.
+  `sameOriginGuard` (rechaza con `403 CSRF_REJECTED` si `Sec-Fetch-Site` no es `same-origin`/`none`
+  u `Origin` no coincide con el host) + solo `application/json` (el parser `text/plain` de Fastify
+  está desactivado, así un formulario o `fetch` "simple" de otro sitio recibe `415`).
 
 ## 7. Abuso de la API pública
 
@@ -72,7 +77,7 @@
   concatena strings.
 - Errores: handler global; en producción solo `code`, `message` genérico y `requestId`. Logs
   estructurados (pino) con redacción de `password`, `cookie`, `authorization`, teléfonos parcialmente.
-- Cabeceras: `@fastify/helmet` con CSP estricta para la SPA.
+- Cabeceras: `@fastify/helmet` global (CSP, HSTS, nosniff…); se ajustará la CSP al servir la SPA.
 - Secretos por variables de entorno (`DATABASE_URL`, `SESSION_SECRET`, credenciales de WhatsApp),
   validados al arrancar; `.env` en `.gitignore`, `.env.example` sin valores reales.
 - Audit log de: login (éxito/fallo), cambios de usuarios/roles, servicios, precios, horarios,
@@ -86,7 +91,7 @@
 - [ ] Ningún esquema de entrada acepta `tenantId`, `price*`, `duration*`, `role`, `status` donde no corresponda.
 - [ ] Exclusion constraint presente tras `migrate deploy`.
 - [ ] Rate limits activos en producción.
-- [ ] Cookies `Secure` en producción; HTTPS obligatorio.
+- [x] Cookies `Secure` en producción (el arranque falla si se intenta desactivar); HTTPS obligatorio en el despliegue.
 - [ ] Errores 500 sin detalles internos.
 - [ ] `npm audit` sin vulnerabilidades altas.
 - [ ] Revisión de RLS (si se aprueba).
