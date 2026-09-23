@@ -850,6 +850,13 @@ function autoPersona(d,cp){
 const ALT={premium:['champagne','ivory','forest'],luxury:['luxury-black','burgundy','editorial'],modern:['azure','slate','coral','ivory'],minimal:['mono','ivory','slate'],corporate:['slate','azure','ivory'],natural:['sage','forest','champagne'],creative:['ink','coral','editorial'],friendly:['coral','sage','azure'],editorial:['editorial','champagne','ivory']};
 const crL=(a,b)=>(Math.max(a,b)+.05)/(Math.min(a,b)+.05);
 
+/* Caja del logo ajustada al contenido: lo llena por ancho o por alto (lo que toque antes). */
+function fitBox(ar,maxW,maxH,minH){
+  let w=Math.min(maxW,maxH*ar),h=w/ar;
+  if(h<minH){h=minH;w=Math.min(maxW,h*ar);h=w/ar;}
+  return {w:w,h:h};
+}
+const LOGO_H=[236,132,42];   /* caja máxima del logo en la cabecera (ancho, alto, alto mínimo), en px CSS */
 /* Decisiones de diseño a partir de los datos. Todo es automático salvo lo que el usuario fije. */
 function designOf(d){
   const cp=CATP[d.cat]||CATP.general;
@@ -916,13 +923,8 @@ function designOf(d){
   /* Caja ajustada al contenido real: el logo llena la caja por ancho o por alto (lo que toque antes),
      nunca los dos a medias. Así un logo cuadrado no queda diminuto dentro de una caja pensada para uno
      horizontal, y uno vertical no queda aplastado dentro de una caja pensada para uno ancho. */
-  const fitBox=(ar,maxW,maxH,minH)=>{
-    let w=Math.min(maxW,maxH*ar),h=w/ar;
-    if(h<minH){h=minH;w=Math.min(maxW,h*ar);h=w/ar;}
-    return {w:w,h:h};
-  };
   const padOf=fr=>fr==='plate'?1:0;
-  const hFit=fitBox(lar,236,132,42),sFit=fitBox(lar,176,104,32),xFit=fitBox(lar,112,34,22);
+  const hFit=fitBox(lar,LOGO_H[0],LOGO_H[1],LOGO_H[2]),sFit=fitBox(lar,176,104,32),xFit=fitBox(lar,112,34,22);
   const hPad=14*padOf(frame),sPad=10*padOf(frame),xPad=5*padOf(frameX);
   const hw=hFit.w+2*hPad,hh=hFit.h+2*hPad,sw=sFit.w+2*sPad,sh=sFit.h+2*sPad,xw=xFit.w+2*xPad,xh=xFit.h+2*xPad;
   const place=(hero==='full'||hero==='editorial')?'s':'h';
@@ -1597,7 +1599,7 @@ function heroCss(m){
 .rule{display:block;width:40px;height:1px;margin:20px auto 16px;background:var(--accent)}
 .mono{--mono:calc(88px*var(--lk))}.arch+.lgo,.arch+.mono{margin-top:${half};position:relative;z-index:2}`,
     editorial:`.edimg{position:relative;width:100%;max-height:440px;overflow:hidden;border-radius:0 0 var(--r-media) var(--r-media)}
-.edimg .ph{display:block;width:100%;height:100%;object-fit:cover;object-position:var(--pos)}
+.edimg .ph{position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:cover;object-position:var(--pos)}
 .id{padding:0}
 .edtxt{display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:0 var(--pr) 0 var(--pl)}
 .edtxt .lgo,.edtxt .mono{margin:${half} 0 16px;position:relative;z-index:1}
@@ -1904,7 +1906,7 @@ function pgHtml(m,opt){
     B.team=group('ht',T.teamH,'<ul class="list team">'+m.team.map(x=>'<li class="row tm"><span class="mono'+(x.photo?' has-ph':'')+'" aria-hidden="true">'+(x.photo?'<img src="'+esc(x.photo)+'" width="88" height="88" alt="" decoding="async" loading="lazy">':esc(initialsOf(x.n)))+'</span><span class="txt"><span class="t">'+esc(x.n)+(x.r?' <span class="tr">'+esc(x.r)+'</span>':'')+'</span>'+(x.bio?'<span class="s">'+esc(x.bio)+'</span>':'')+'</span></li>').join('')+'</ul>');
   }
   if(m.gallery.length){
-    B.gallery=group('hg',T.galleryH,'<div class="gal" data-n="'+Math.min(m.gallery.length,6)+'">'+m.gallery.map((g,gi)=>'<span class="gi"><img src="'+esc(g.src)+'" width="'+g.w+'" height="'+g.h+'" alt="'+esc(g.alt)+'" decoding="async"'+(gi>1?' loading="lazy"':'')+'></span>').join('')+'</div>');
+    B.gallery=group('hg',T.galleryH,'<div class="gal" data-n="'+Math.min(m.gallery.length,6)+'">'+m.gallery.map(g=>'<span class="gi"><img src="'+esc(g.src)+'" width="'+g.w+'" height="'+g.h+'" alt="'+esc(g.alt)+'" decoding="async" loading="lazy"></span>').join('')+'</div>');
   }
   const H=m.hours;
   const locBlock=(loc,idx)=>{
@@ -2156,7 +2158,7 @@ es:{
   t_big_json:'El archivo es demasiado grande para ser un archivo de datos de esta herramienta.',
   t_fail:'No se pudo generar el archivo. Inténtalo de nuevo.',
   t_need_name:'Escribe el nombre del negocio para poder descargar.',
-  t_logo_ok:'Logo cargado.',t_photo_ok:'Foto cargada.',
+  t_logo_ok:'Logo cargado ({kb} KB).',t_photo_ok:'Foto cargada ({kb} KB).',
   c_clear:'¿Borrar todos los datos del formulario? Esta acción no se puede deshacer.',
   pub_sum:'Cómo publicar la página',
   pub_1:'Sube el archivo descargado a un hosting estático gratuito (Cloudflare Pages, Netlify u otro).',
@@ -2193,7 +2195,7 @@ es:{
   auw_seo:'Sin descripción: se usará una frase genérica.',auw_og:'Añade la URL definitiva para incluir la imagen de vista previa.',
   auw_schema:'Faltan datos (teléfono, dirección, web…) para generarlos.',auw_cta:'Añade WhatsApp, un teléfono o un enlace principal.',
   auw_wa:'Sin WhatsApp. Es lo que más se usa para contactar.',auw_vcard:'El contacto guardado solo tendrá el nombre (faltan teléfono, e-mail o web).',
-  auw_weight:'Es más pesado de lo normal. Revisa el logo.',auw_deps:'Usa un recurso externo (fuentes web).',auw_fav:'No se pudo generar el favicon.',
+  auw_weight:'Es más pesado de lo normal. Lo que más pesa: {w} ({wkb} KB).',auw_deps:'Usa un recurso externo (fuentes web).',auw_fav:'No se pudo generar el favicon.',
   aw_text:'texto',aw_muted:'texto secundario',aw_button:'botón principal',aw_icons:'iconos',
   i_cta_wa:'Elegiste WhatsApp como acción principal, pero falta un número válido. Se usará otra acción.',
   i_cta_call:'Elegiste “Llamar” como acción principal, pero falta un teléfono válido. Se usará otra acción.',
@@ -2328,7 +2330,7 @@ pt:{
   t_big_json:'O arquivo é grande demais para ser um arquivo de dados desta ferramenta.',
   t_fail:'Não foi possível gerar o arquivo. Tente novamente.',
   t_need_name:'Escreva o nome do negócio para poder baixar.',
-  t_logo_ok:'Logo carregado.',t_photo_ok:'Foto carregada.',
+  t_logo_ok:'Logo carregado ({kb} KB).',t_photo_ok:'Foto carregada ({kb} KB).',
   c_clear:'Apagar todos os dados do formulário? Esta ação não pode ser desfeita.',
   pub_sum:'Como publicar a página',
   pub_1:'Envie o arquivo baixado para uma hospedagem estática gratuita (Cloudflare Pages, Netlify ou outra).',
@@ -2365,7 +2367,7 @@ pt:{
   auw_seo:'Sem descrição: será usada uma frase genérica.',auw_og:'Adicione a URL definitiva para incluir a imagem de prévia.',
   auw_schema:'Faltam dados (telefone, endereço, site…) para gerá-los.',auw_cta:'Adicione WhatsApp, um telefone ou um link principal.',
   auw_wa:'Sem WhatsApp. É o canal mais usado para contato.',auw_vcard:'O contato salvo terá só o nome (faltam telefone, e-mail ou site).',
-  auw_weight:'Está mais pesado que o normal. Revise o logo.',auw_deps:'Usa um recurso externo (fontes web).',auw_fav:'Não foi possível gerar o favicon.',
+  auw_weight:'Está mais pesado que o normal. O que mais pesa: {w} ({wkb} KB).',auw_deps:'Usa um recurso externo (fontes web).',auw_fav:'Não foi possível gerar o favicon.',
   aw_text:'texto',aw_muted:'texto secundário',aw_button:'botão principal',aw_icons:'ícones',
   i_cta_wa:'Você escolheu o WhatsApp como ação principal, mas falta um número válido. Será usada outra ação.',
   i_cta_call:'Você escolheu “Ligar” como ação principal, mas falta um telefone válido. Será usada outra ação.',
@@ -2788,9 +2790,10 @@ function auditItems(){
   const ids=Array.prototype.map.call(doc.querySelectorAll('[id]'),e=>e.id);
   const imgOk=Array.prototype.every.call(doc.images,i=>i.hasAttribute('alt')&&i.getAttribute('width')&&i.getAttribute('height'));
   const htmlOk=!!doc.title&&!!doc.documentElement.lang&&doc.querySelectorAll('h1').length===1&&!!doc.querySelector('main')&&!!doc.querySelector('meta[name=viewport]')&&imgOk&&new Set(ids).size===ids.length;
-  const badLinks=Array.prototype.filter.call(doc.querySelectorAll('a[href]'),a=>{const h=a.getAttribute('href');return !h||h==='#'||/^javascript:/i.test(h);}).length;
+  /* los enlaces de los diálogos (reserva, carrito) empiezan en "#" y el runtime los completa al confirmar */
+  const badLinks=Array.prototype.filter.call(doc.querySelectorAll('a[href]'),a=>{const h=a.getAttribute('href');return !a.closest('dialog')&&(!h||h==='#'||/^javascript:/i.test(h));}).length;
   const warns=Object.keys(m.iss).filter(k=>m.iss[k].level==='warn').length;
-  const kb=Math.round(new Blob([s.html]).size/1024),logoKb=d.logo?Math.round(d.logo.length*3/4/1024):0,photoKb=d.photo?Math.round(d.photo.length*3/4/1024):0;
+  const kb=Math.round(new Blob([s.html]).size/1024),logoKb=kbOf(d.logo),photoKb=kbOf(d.photo);
   const cbad=[];
   if(cr(tk.text,tk.bg)<4.5)cbad.push(t('aw_text'));
   if(cr(tk.muted,tk.s2)<4.5)cbad.push(t('aw_muted'));
@@ -2820,7 +2823,10 @@ function auditItems(){
   it('sample',m.sample.length?[['sample',{w:m.sample.map(f=>t('l_'+f)||f).join(', ')}]]:[]);
   it('js',(jsErr||!htmlOk)?[[jsErr?'js':'html',{w:jsErr}]]:[]);
   it('fav',/<link rel="icon"/.test(s.html)?[]:[['fav']]);
-  it('weight',kb>150?[['weight',{kb:kb}]]:[]);
+  /* el aviso de peso nombra lo que más pesa, no siempre el logo (casi siempre es la galería) */
+  const sumKb=o=>Object.keys(o).reduce((a,k)=>a+kbOf(o[k]),0);
+  const heavy=[['l_logo',logoKb],['l_foto',photoKb],['sec_gallery',d.gallery.reduce((a,g)=>a+kbOf(g.src),0)],['l_teamPhotos',sumKb(d.teamPhotos)],['sec_menuPhotos',sumKb(d.menuPhotos)]].sort((a,b)=>b[1]-a[1])[0];
+  it('weight',kb>150?[['weight',{kb:kb,w:t(heavy[0]),wkb:heavy[1]}]]:[]);
   it('deps',/<script[^>]+src=|<link[^>]+rel=["']?stylesheet|@import|url\(\s*["']?https?:/i.test(s.html)?[['deps']]:[]);
   return out;
 }
@@ -3016,6 +3022,25 @@ function smartLogo(src,doTrim){
   }
   return finishLogo(out,1-(cw*ch)/(w*h));
 }
+/* Tamaño justo del logo: el doble (pantallas retina) de la caja más grande donde se muestra, que depende
+   de su proporción. Un logo cuadrado no necesita los mismos píxeles que uno horizontal. Mínimo 300 px por
+   la imagen para compartir; máximo 384 px. Tope de peso por debajo del aviso del checkup (40 KB). */
+const LOGO_MAX=54000,PHOTO_MAX=130000;
+const kbOf=u=>u?Math.round(u.length*3/4/1024):0;
+function fitLogo(src,alpha){
+  const b=fitBox(src.width/src.height,LOGO_H[0],LOGO_H[1],LOGO_H[2]);
+  let size=Math.round(clamp(2*Math.max(b.w,b.h),300,384)),c=scaleCanvas(src,size),url=encodeCanvas(c,alpha),g=0;
+  while(url.length>LOGO_MAX&&size>96&&g++<6){size=Math.round(size/1.25);c=scaleCanvas(src,size);url=encodeCanvas(c,alpha);}
+  return {c:c,url:url};
+}
+/* Foto principal: 900 px de lado mayor (la tarjeta mide como mucho 520 px CSS, también en escritorio),
+   bajando tamaño y calidad hasta caber en el tope de peso. */
+const photoEnc=(c,q)=>{const w=c.toDataURL('image/webp',q);return w.indexOf('data:image/webp')===0?w:c.toDataURL('image/jpeg',q);};
+function fitPhoto(img){
+  let size=900,q=.72,c=rasterize(img,size,false),url=photoEnc(c,q),g=0;
+  while(url.length>PHOTO_MAX&&g++<6){size=Math.round(size*.86);q=Math.max(.55,q-.03);c=rasterize(img,size,false);url=photoEnc(c,q);}
+  return {c:c,url:url};
+}
 function handleLogo(file){
   const myGen=++assetGen;
   logoErr='';logoNote='';
@@ -3025,16 +3050,14 @@ function handleLogo(file){
   const doTrim=$('logoTrim').checked;
   let tmp='';
   (isSvg?readText(file).then(svgUrl):Promise.resolve(URL.createObjectURL(file))).then(u=>{tmp=u;return loadImg(u);}).then(img=>{
-    const r=smartLogo(rasterize(img,768,isSvg),doTrim);
-    let c=r.canvas,url=encodeCanvas(c,r.alpha),size=Math.max(c.width,c.height),g=0;
-    while(url.length>60000&&size>96&&g++<6){size=Math.round(size/1.25);c=scaleCanvas(r.canvas,size);url=encodeCanvas(c,r.alpha);}
+    const r=smartLogo(rasterize(img,768,isSvg),doTrim),fl=fitLogo(r.canvas,r.alpha),c=fl.c,url=fl.url;
     if(url.length>400000)throw new Error('big');
     if(myGen!==assetGen)return;   /* se subió otro logo, se limpió o se cargó otro negocio mientras tanto */
     const st=imgStats(c);
     logo=url;logoDom=st?st.dom:'';logoMeta=c.width+','+c.height+','+r.p10.toFixed(3)+','+r.p90.toFixed(3)+','+(r.alpha?1:0);
     logoBg=(r.alpha&&r.p10>.55)?'dark':'light';logoErr='';
     logoNote=r.removed>.08?t('logo_trimmed',{n:Math.round(r.removed*100)}):'';
-    regenIcon();update();toast(t('t_logo_ok'));
+    regenIcon();update();toast(t('t_logo_ok',{kb:kbOf(url)}));
   }).catch(()=>{if(myGen===assetGen){logoErr='logoFail';update();}}).then(()=>{if(tmp)try{URL.revokeObjectURL(tmp);}catch(e){}});
 }
 /* Colores dominantes, luminosidad de la zona inferior y si parece foto de producto (fondo claro y uniforme) */
@@ -3074,19 +3097,16 @@ function handlePhoto(file){
   if(!(/^image\/(png|jpeg|webp)$/.test(file.type)||/\.(png|jpe?g|webp)$/i.test(file.name))){photoErr='photoType';update();return;}
   if(file.size>15*1024*1024){photoErr='photoBig';update();return;}
   const u=URL.createObjectURL(file);
-  const enc2=(c,q)=>{const w=c.toDataURL('image/webp',q);return w.indexOf('data:image/webp')===0?w:c.toDataURL('image/jpeg',q);};
   loadImg(u).then(img=>{
-    let size=900,q=.72,c=rasterize(img,size,false),url=enc2(c,q),g=0;
-    while(url.length>130000&&g++<6){size=Math.round(size*.86);q=Math.max(.55,q-.03);c=rasterize(img,size,false);url=enc2(c,q);}
+    const fp=fitPhoto(img),c=fp.c,url=fp.url;
     if(url.length>500000)throw new Error('big');
     if(myGen!==assetGen)return;   /* se subió otra foto, se limpió o se cargó otro negocio mientras tanto */
     const st=imgStats(c);
     photo=url;photoDom=st?st.dom:'';photoMeta=st?metaStr(st,c):'';photoTiny=tinyOf(c);photoErr='';
-    update();toast(t('t_photo_ok'));
+    update();toast(t('t_photo_ok',{kb:kbOf(url)}));
   }).catch(()=>{if(myGen===assetGen){photoErr='photoFail';update();}}).then(()=>{try{URL.revokeObjectURL(u);}catch(e){}});
 }
 /* ---------- Galería (múltiples imágenes del negocio) ---------- */
-const galEnc=(c,q)=>{const w=c.toDataURL('image/webp',q);return w.indexOf('data:image/webp')===0?w:c.toDataURL('image/jpeg',q);};
 function addGalleryFiles(files){
   const myGen=++assetGen;
   galleryErr='';
@@ -3099,8 +3119,8 @@ function addGalleryFiles(files){
     if(file.size>15*1024*1024)return Promise.resolve(null);
     const u=URL.createObjectURL(file);
     return loadImg(u).then(img=>{
-      let size=760,q=.68,c=rasterize(img,size,false),url=galEnc(c,q),g=0;
-      while(url.length>85000&&g++<6){size=Math.round(size*.86);q=Math.max(.5,q-.03);c=rasterize(img,size,false);url=galEnc(c,q);}
+      let size=760,q=.68,c=rasterize(img,size,false),url=photoEnc(c,q),g=0;
+      while(url.length>85000&&g++<6){size=Math.round(size*.86);q=Math.max(.5,q-.03);c=rasterize(img,size,false);url=photoEnc(c,q);}
       if(url.length>150000)throw new Error('big');
       return {src:url,alt:'',w:c.width,h:c.height};
     }).catch(()=>null).then(r=>{try{URL.revokeObjectURL(u);}catch(e){}return r;});
@@ -3133,8 +3153,8 @@ function setTeamPhoto(name,file){
   if(file.size>15*1024*1024){toast(t('i_photoBig'),'err');return;}
   const u=URL.createObjectURL(file);
   loadImg(u).then(img=>{
-    let size=320,q=.7,c=rasterize(img,size,false),url=galEnc(c,q),g=0;
-    while(url.length>90000&&g++<5){size=Math.round(size*.85);q=Math.max(.55,q-.03);c=rasterize(img,size,false);url=galEnc(c,q);}
+    let size=320,q=.7,c=rasterize(img,size,false),url=photoEnc(c,q),g=0;
+    while(url.length>90000&&g++<5){size=Math.round(size*.85);q=Math.max(.55,q-.03);c=rasterize(img,size,false);url=photoEnc(c,q);}
     if(url.length>128000)throw new Error('big');
     if(myGen!==assetGen)return;   /* se cargó otro negocio o se editó el equipo mientras se procesaba */
     teamPhotos=Object.assign({},teamPhotos);teamPhotos[name]=url;
@@ -3168,8 +3188,8 @@ function setMenuPhoto(name,file){
   if(file.size>15*1024*1024){toast(t('i_photoBig'),'err');return;}
   const u=URL.createObjectURL(file);
   loadImg(u).then(img=>{
-    let size=380,q=.7,c=rasterize(img,size,false),url=galEnc(c,q),g=0;
-    while(url.length>95000&&g++<5){size=Math.round(size*.85);q=Math.max(.55,q-.03);c=rasterize(img,size,false);url=galEnc(c,q);}
+    let size=380,q=.7,c=rasterize(img,size,false),url=photoEnc(c,q),g=0;
+    while(url.length>95000&&g++<5){size=Math.round(size*.85);q=Math.max(.55,q-.03);c=rasterize(img,size,false);url=photoEnc(c,q);}
     if(url.length>128000)throw new Error('big');
     if(myGen!==assetGen)return;   /* se cargó otro negocio o se editó la carta mientras se procesaba */
     menuPhotos=Object.assign({},menuPhotos);menuPhotos[name]=url;
@@ -3190,16 +3210,24 @@ function paintMenuPhotos(){
       (ph?'<button type="button" class="btn small ghost" data-mndel="'+esc2+'">'+t('logo_del')+'</button>':'')+'</div>';
   }).join('');
 }
-/* Datos guardados sin análisis (JSON importado, borrador antiguo): se calculan una vez */
+/* Datos guardados sin análisis (JSON importado, borrador antiguo): se calculan una vez. Si la imagen
+   pesa más de lo que produciría hoy el optimizador (JSON de una versión anterior), se reoptimiza aquí
+   mismo, sin pedir al usuario que la vuelva a subir. */
 function ensureMeta(){
   const myGen=assetGen,myPhoto=photo,myLogo=logo;
-  if(photo&&(!photoMeta||!photoTiny))loadImg(photo).then(img=>{
+  const heavyPhoto=photo.length>PHOTO_MAX*1.1,heavyLogo=logo.length>LOGO_MAX*1.1;
+  if(photo&&(!photoMeta||!photoTiny||heavyPhoto))loadImg(photo).then(img=>{
     if(myGen!==assetGen||photo!==myPhoto)return;   /* la foto cambió (otro negocio) mientras se analizaba */
-    const c=rasterize(img,900,false),st=imgStats(c);if(st){photoDom=photoDom||st.dom;photoMeta=metaStr(st,c);}photoTiny=tinyOf(c);schedule();
+    let c=rasterize(img,900,false);
+    if(heavyPhoto){const fp=fitPhoto(img);if(fp.url.length<photo.length){c=fp.c;photo=fp.url;}}
+    const st=imgStats(c);
+    if(st){photoDom=photoDom||st.dom;photoMeta=metaStr(st,c);}photoTiny=tinyOf(c);schedule();
   }).catch(()=>{});
-  if(logo&&(!logoDom||!logoMeta))loadImg(logo).then(img=>{
+  if(logo&&(!logoDom||!logoMeta||heavyLogo))loadImg(logo).then(img=>{
     if(myGen!==assetGen||logo!==myLogo)return;   /* el logo cambió (otro negocio) mientras se analizaba */
-    const c=rasterize(img,384,false),st=imgStats(c),ls=logoStats(c);
+    let c=rasterize(img,384,false);
+    const st=imgStats(c),ls=logoStats(c);
+    if(heavyLogo){const fl=fitLogo(c,ls.alpha);if(fl.url.length<logo.length){c=fl.c;logo=fl.url;regenIcon();}}
     if(st)logoDom=st.dom;
     logoMeta=c.width+','+c.height+','+ls.p10.toFixed(3)+','+ls.p90.toFixed(3)+','+(ls.alpha?1:0);
     schedule();
