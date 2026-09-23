@@ -1267,6 +1267,28 @@ function cardRuntime(R,C){
     },{root:C.scroller||null});
     io.observe(target);obs.push(io);
   }
+  /* Los cuatro diálogos comparten la apertura y el cierre animados (hoja que sube en el móvil). El cierre
+     espera a que termine la animación; Esc pasa por el mismo camino. En la vista previa (sin showModal)
+     el diálogo se ancla a la parte visible del teléfono, no a toda la página. */
+  var noMotion=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function sheet(dlg){
+    var modal=typeof dlg.showModal==='function'&&!C.preview,tm=0;
+    var shut=function(){clearTimeout(tm);dlg.classList.remove('out');try{modal?dlg.close():dlg.removeAttribute('open');}catch(e){dlg.removeAttribute('open');}};
+    dlg.addEventListener('cancel',function(e){e.preventDefault();api.close();});
+    var api={
+      open:function(){
+        clearTimeout(tm);dlg.classList.remove('out');
+        if(C.preview&&C.scroller){dlg.style.top=C.scroller.scrollTop+'px';dlg.style.bottom='auto';dlg.style.height=C.scroller.clientHeight+'px';}
+        try{modal?dlg.showModal():dlg.setAttribute('open','');}catch(e){dlg.setAttribute('open','');}
+      },
+      close:function(){
+        if(!dlg.hasAttribute('open')||dlg.classList.contains('out'))return;
+        if(noMotion){shut();return;}
+        dlg.classList.add('out');tm=setTimeout(shut,210);
+      }
+    };
+    return api;
+  }
   watch(q('.hero'),q('.topbar'),false);
   watch(q('.cta')||q('.hero'),q('.fab'),true);
   /* Reserva por WhatsApp: formulario -> validación -> resumen -> WhatsApp. Todos los datos (nombre del
@@ -1293,14 +1315,15 @@ function cardRuntime(R,C){
         if(keep&&list.some(function(x){return x.n===keep;}))proEl0.value=keep;
       });
     }
-    var canModal=typeof bk.showModal==='function'&&!C.preview;   /* en la vista previa (Shadow DOM) el modal nativo
-      se pintaría por encima de todo el generador, no solo del teléfono: ahí se usa el mismo panel sin showModal() */
+    /* en la vista previa (Shadow DOM) el modal nativo se pintaría por encima de todo el generador, no solo
+       del teléfono: ahí sheet() usa el mismo panel sin showModal() */
+    var bkS=sheet(bk);
     var openBk=function(){
       review.hidden=true;form.hidden=false;
-      try{canModal?bk.showModal():bk.setAttribute('open','');}catch(e){bk.setAttribute('open','');}
-      var f=q('#bkName');if(f)f.focus();
+      bkS.open();
+      var f=q('#bkName');if(f){try{f.focus({preventScroll:true});}catch(e){f.focus();}}   /* la hoja aún está entrando: sin esto el navegador desplaza la página */
     };
-    var closeBk=function(){try{canModal?bk.close():bk.removeAttribute('open');}catch(e){bk.removeAttribute('open');}};
+    var closeBk=bkS.close;
     var openers=R.querySelectorAll('[data-bkopen]');
     for(var oi=0;oi<openers.length;oi++)openers[oi].addEventListener('click',openBk);
     var xBtn=q('[data-bkclose]');if(xBtn)xBtn.addEventListener('click',closeBk);
@@ -1354,9 +1377,7 @@ function cardRuntime(R,C){
         ctNotes=q('#ctNotes'),ctTotalRow=q('#ctTotalRow'),ctTotalEl=q('#ctTotal'),ctSend=q('#ctSend'),
         ctDelivBlock=q('#ctDelivBlock'),ctAddress=q('#ctAddress'),ctChangeBlock=q('#ctChangeBlock'),ctChange=q('#ctChange'),
         ctChangeAmtWrap=q('#ctChangeAmtWrap'),ctTableBlock=q('#ctTableBlock'),ctTable=q('#ctTable'),needsChange=false;
-    var canModal2=typeof ctDlg.showModal==='function'&&!C.preview;
-    var openCt=function(){try{canModal2?ctDlg.showModal():ctDlg.setAttribute('open','');}catch(e){ctDlg.setAttribute('open','');}};
-    var closeCt=function(){try{canModal2?ctDlg.close():ctDlg.removeAttribute('open');}catch(e){ctDlg.removeAttribute('open');}};
+    var ctS=sheet(ctDlg),openCt=ctS.open,closeCt=ctS.close;
     var priceNum=function(p){
       var m=/([\d.,]+)/.exec(p||'');if(!m)return null;
       var s=m[1];
@@ -1489,9 +1510,7 @@ function cardRuntime(R,C){
        foto, descripción, precio o tamaños y cantidad, y desde ahí se añade al carrito. */
     var mnDlg=q('#mnDlg'),mdDlg=q('#mdDlg');
     if(mnDlg){
-      var canModal4=typeof mnDlg.showModal==='function'&&!C.preview;
-      var openMenu=function(){try{canModal4?mnDlg.showModal():mnDlg.setAttribute('open','');}catch(e){mnDlg.setAttribute('open','');}};
-      var closeMenu=function(){try{canModal4?mnDlg.close():mnDlg.removeAttribute('open');}catch(e){mnDlg.removeAttribute('open');}};
+      var mnS=sheet(mnDlg),openMenu=mnS.open,closeMenu=mnS.close;
       var mnOpeners=R.querySelectorAll('[data-menuopen]');
       for(var moi=0;moi<mnOpeners.length;moi++)mnOpeners[moi].addEventListener('click',openMenu);
       var mnx=q('[data-menuclose]');if(mnx)mnx.addEventListener('click',closeMenu);
@@ -1502,9 +1521,7 @@ function cardRuntime(R,C){
           mdOptWrap=q('#mdOptWrap'),mdOpts=q('#mdOpts'),mdPrice=q('#mdPrice'),
           mdQtyLbl=q('#mdQtyLbl'),mdQn=q('#mdQn'),mdQm=q('#mdQm'),mdQp=q('#mdQp'),mdAdd=q('#mdAdd'),
           mdPending=-1,mdQty=1,mdFromMenu=false;
-      var canModal5=typeof mdDlg.showModal==='function'&&!C.preview;
-      var openDetail=function(){try{canModal5?mdDlg.showModal():mdDlg.setAttribute('open','');}catch(e){mdDlg.setAttribute('open','');}};
-      var closeDetail=function(){try{canModal5?mdDlg.close():mdDlg.removeAttribute('open');}catch(e){mdDlg.removeAttribute('open');}};
+      var mdS=sheet(mdDlg),openDetail=mdS.open,closeDetail=mdS.close;
       R.addEventListener('click',function(e){
         var b=e.target.closest?e.target.closest('[data-mdopen]'):null;if(!b)return;
         var pi3=b.getAttribute('data-mdopen'),it=ck.items[pi3];if(!it)return;
@@ -1638,10 +1655,16 @@ function deskCss(m,pv){
 .body{padding:var(--gap) 28px 34px}
 ${['editorial','full'].indexOf(m.des.hero)<0?'.id{padding-left:28px;padding-right:28px}':''}
 .edtxt,.fltxt{padding-left:28px;padding-right:28px}
-.fab{display:none}
+.fab:not(.ctfab){display:none}
 .tb{max-width:440px}
-.bkdlg{border-radius:0;align-items:center}
-.bkpanel{border-radius:20px;max-height:min(85vh,640px)}
+.bkdlg{border-radius:0;align-items:center;padding:14px}
+.bkpanel{border-radius:20px;max-height:min(85vh,640px);box-shadow:var(--shadow)}
+.bkpanel::before{display:none}
+.bkhead{padding-top:16px}
+.bkdlg[open] .bkpanel{animation-name:dkIn;animation-duration:.24s}
+.bkdlg.out .bkpanel{animation-name:dkOut;animation-duration:.16s}
+@keyframes dkIn{from{opacity:0;transform:translateY(12px) scale(.98)}}
+@keyframes dkOut{to{opacity:0;transform:translateY(8px) scale(.98)}}
 .bkrow{grid-template-columns:1fr 1fr}`;
 }
 function pageCss(m,opt){
@@ -1818,11 +1841,20 @@ footer{text-align:center;font-size:.8125rem;color:var(--text-muted);overflow-wra
 .fab.on{opacity:1;visibility:visible;transform:none}
 .ctfab{opacity:1;visibility:visible;transform:none}
 .fab svg{width:26px;height:26px}
-.bkdlg{position:fixed;inset:0;z-index:20;width:100%;max-width:none;height:100%;max-height:none;margin:0;padding:14px 14px max(14px,env(safe-area-inset-bottom,0px)) 14px;border:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center}
+.bkdlg{position:fixed;inset:0;z-index:20;width:100%;max-width:none;height:100%;max-height:none;margin:0;padding:max(24px,calc(env(safe-area-inset-top,0px) + 12px)) 0 0;border:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;overscroll-behavior:contain}
 .bkdlg[open]{display:flex}
 .pv .bkdlg{position:absolute}
-.bkpanel{width:100%;max-width:560px;max-height:min(88vh,720px);margin:0;color:var(--text);background:var(--surface);border-radius:22px;box-shadow:var(--shadow);display:flex;flex-direction:column;overflow:hidden}
-.bkhead{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px var(--pr) 12px var(--pl);border-bottom:1px solid var(--border);flex:none}
+.bkpanel{position:relative;width:100%;max-width:560px;max-height:100%;margin:0;color:var(--text);background:var(--surface);border-radius:22px 22px 0 0;box-shadow:0 -12px 40px -16px rgba(0,0,0,.45);display:flex;flex-direction:column;overflow:hidden}
+.bkpanel::before{content:"";position:absolute;top:7px;left:50%;width:38px;height:4px;margin-left:-19px;border-radius:4px;background:var(--text-muted);opacity:.35;pointer-events:none}
+.bkhead{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px var(--pr) 12px var(--pl);border-bottom:1px solid var(--border);flex:none}
+.bkdlg[open]{animation:shFade .28s ease both}
+.bkdlg[open] .bkpanel{animation:shUp .34s cubic-bezier(.2,.8,.2,1) both}
+.bkdlg.out{animation:shFadeOut .22s ease both}
+.bkdlg.out .bkpanel{animation:shDown .22s cubic-bezier(.4,0,1,1) both}
+@keyframes shFade{from{background-color:rgba(0,0,0,0)}}
+@keyframes shFadeOut{to{background-color:rgba(0,0,0,0)}}
+@keyframes shUp{from{transform:translateY(100%)}}
+@keyframes shDown{to{transform:translateY(100%)}}
 .bkhead h2{margin:0;font:700 1.125rem/1.25 var(--fh)}
 .bkx{flex:none;display:grid;place-items:center;width:36px;height:36px;border-radius:50%;border:0;background:var(--surface-2);color:var(--text);cursor:pointer}
 .bkx svg{width:18px;height:18px}
@@ -1854,7 +1886,7 @@ ${P.ring?'.lgo.plate{box-shadow:var(--shadow),0 0 0 5px var(--background),0 0 0 
 ${P.inset?'.list>li+li{border-top:0;background:linear-gradient(var(--border),var(--border)) right top/calc(100% - 66px) 1px no-repeat}.svc li+li{background-size:calc(100% - 32px) 1px}':''}
 ${P.prem?'.ph{filter:saturate(.94) contrast(1.03)}.kind{letter-spacing:.14em}.desc{line-height:1.65}footer{padding-top:14px;position:relative}footer::before{content:"";display:block;width:28px;height:1px;margin:0 auto 14px;background:var(--line)}':''}
 ${P.sheen?'.cta{position:relative;overflow:hidden}.cta::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.28) 50%,transparent 62%);transform:translateX(-130%);transition:transform .9s ease;pointer-events:none}@media(hover:hover){.cta:hover::after{transform:translateX(130%)}}':''}
-@media(prefers-reduced-motion:reduce){.rv{animation:none}.pg *,.pg *::after{transition:none!important}}
+@media(prefers-reduced-motion:reduce){.rv{animation:none}.pg *,.pg *::after{transition:none!important}.bkdlg,.bkdlg .bkpanel{animation:none!important}}
 ${pv?(desk?deskCss(m,true)+'.pv .fab,.pv .topbar{display:none}':'.pv .fab{position:sticky;right:auto;bottom:16px;margin:-72px 16px 16px auto}.pv .topbar{position:sticky;top:0;margin-bottom:-56px;padding-top:0;height:56px}'):`@media(min-width:600px){${deskCss(m,false)}}`}`;
   return css.replace(/\n\s*/g,'');
 }
