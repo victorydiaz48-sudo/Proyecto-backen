@@ -138,8 +138,8 @@ Permisos: A = ADMIN, P = PROFESSIONAL (solo sus propios recursos).
 | Tenant settings ✅ | `GET/PATCH /admin/settings` (`name`, `timezone`, `defaultCountryCode`, `currency`, `locale`, `slotIntervalMinutes`, `defaultBookingStatus` ∈ {PENDING, CONFIRMED}, `bookingLeadMinutes`, `bookingHorizonDays`; el slug no se cambia) | A |
 | Locations | `GET/POST /admin/locations`, `GET/PATCH/DELETE /admin/locations/:id` | A (GET: A,P) |
 | Users | `GET/POST /admin/users`, `PATCH /admin/users/:id` | A |
-| Professionals | `GET/POST /admin/professionals`, `GET/PATCH/DELETE /:id`, `PUT /:id/services` | A (GET: A,P) |
-| Services | `GET/POST /admin/services`, `GET/PATCH/DELETE /:id` | A (GET: A,P) |
+| Professionals ✅ | `GET /admin/professionals?includeInactive&serviceId`, `POST`, `GET/PATCH/DELETE /:id`, `PUT /:id/services` | A (GET: A,P) |
+| Services ✅ | `GET /admin/services?includeInactive`, `POST`, `GET/PATCH/DELETE /:id` | A (GET: A,P) |
 | Working hours | `GET/PUT /admin/professionals/:id/working-hours` (reemplazo completo de la semana) | A; P solo lectura de lo suyo |
 | Time blocks | `GET/POST /admin/time-blocks`, `DELETE /:id` | A; P solo los suyos |
 | Customers | `GET /admin/customers?search=`, `GET/PATCH /:id` | A; P solo clientes con citas suyas (lectura) |
@@ -148,6 +148,34 @@ Permisos: A = ADMIN, P = PROFESSIONAL (solo sus propios recursos).
 | Audit | `GET /admin/audit-logs` | A |
 
 `DELETE` es borrado lógico en entidades referenciadas por citas.
+
+### Servicios y profesionales (Fase 4)
+
+**Servicio** (`POST` / `PATCH`, cuerpo estricto):
+
+| Campo | Regla |
+|---|---|
+| `name` | 1–80, único entre los activos del negocio sin distinguir mayúsculas (`409 CONFLICT`) |
+| `description` | ≤ 200, `""` → `null` |
+| `category` | ≤ 40, `""` → `null` (equivale a `## Categoría` del generador) |
+| `durationMinutes` | entero 5–600 |
+| `bufferAfterMinutes` | entero 0–120, por defecto 0 (limpieza entre citas) |
+| `priceCents` | entero ≥ 0 (R$ 45,00 → `4500`); moneda = la del negocio |
+| `sortOrder` | entero ≥ 0 |
+| `active` | solo en `PATCH`; `DELETE` = `active: false` |
+
+Cambiar precio o duración no afecta a citas existentes (guardan copia). Respuesta: el servicio con
+`id, …, active, createdAt, updatedAt`; listados `{ items }` ordenados por `sortOrder`, `name`.
+
+**Profesional**: `displayName` (1–80), `title` (≤ 80), `bio` (≤ 400), `photoUrl` (solo `https://`),
+`sortOrder`, `active` (PATCH); en `POST` opcionalmente `serviceIds`. Respuesta con `serviceIds` y
+`userId` (la vinculación con un usuario PROFESSIONAL llegará con la gestión de usuarios, Fase 10).
+
+- `PUT /admin/professionals/:id/services { serviceIds }` reemplaza la lista completa (duplicados se ignoran).
+  Un id inexistente o de otro negocio → `400 VALIDATION_ERROR` con el mismo mensaje en ambos casos.
+- Desactivar (`DELETE` o `PATCH { active: false }`) con citas `PENDING`/`CONFIRMED` que aún no han
+  terminado → `409 CONFLICT` con `details.futureBookings`.
+- Todos los cambios se auditan con antes/después.
 
 **Transiciones de estado** (`POST /admin/bookings/:id/status { status, reason? }`):
 ```

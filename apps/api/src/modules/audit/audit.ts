@@ -46,3 +46,11 @@ export async function writeAudit(db: Writer, e: AuditEntry): Promise<void> {
     },
   });
 }
+
+/** Datos comunes de auditoría para una acción de un usuario autenticado. */
+export function userActor(
+  auth: { tenant: { id: string }; user: { id: string } },
+  request: { ip: string; id: string },
+): Pick<AuditEntry, 'tenantId' | 'actorType' | 'actorUserId' | 'ip' | 'requestId'> {
+  return { tenantId: auth.tenant.id, actorType: 'USER', actorUserId: auth.user.id, ip: request.ip, requestId: request.id };
+}

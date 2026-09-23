@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–3 completadas.** Siguiente: Fase 4 (profesionales + servicios).
+Estado: **Fases 0–4 completadas.** Siguiente: Fase 5 (horarios laborales + bloqueos).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -158,7 +158,7 @@ que el generador (que no se toca) sigue igual.
 | 1 | Arquitectura y docs | `/docs/*.md`. ✅ |
 | 2 | PostgreSQL + Prisma + migraciones | `schema.prisma`, migración inicial con `btree_gist` + exclusion constraint en SQL, docker-compose para dev/test, script de seed. ✅ |
 | 3 | Tenants + auth + roles | Login/logout, sesiones, `requireRole`, resolución de tenant, tests de aislamiento base. ✅ |
-| 4 | Profesionales + servicios | CRUD admin, `ProfessionalService`, tests cruzados de tenant. |
+| 4 | Profesionales + servicios | CRUD admin, `ProfessionalService`, tests cruzados de tenant. ✅ |
 | 5 | Horarios + bloqueos | `WorkingHour` (varios intervalos, validación de solapes), `TimeBlock`. |
 | 6 | Clientes + reservas | `Customer` E.164 único por tenant, `Booking` con snapshot de precio/duración, máquina de estados. |
 | 7 | Motor de disponibilidad | Módulo puro (sin BD) + adaptador; tests de cierre, solapes, TZ/DST. |

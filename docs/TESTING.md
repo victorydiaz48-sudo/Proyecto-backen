@@ -27,7 +27,7 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 3)
+## Estado actual (hasta la Fase 4)
 
 | Archivo | Cubre |
 |---|---|
@@ -37,6 +37,7 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/auth.test.ts` | login (cookie, hash del token, mayúsculas, mismo error para todo fallo, usuario inactivo, tenant suspendido), bloqueo tras 5 fallos y por IP, campos extra → 400, `text/plain` → 415, caducidad deslizante/absoluta con reloj falso, logout, cambio de contraseña cierra otras sesiones, CSRF, 404/health |
 | `test/roles-and-tenant-isolation.test.ts` | 401 sin sesión, PROFESSIONAL → 403 en ajustes, `professionalId` desde la BD, auditoría antes/después, validación de ajustes; mismo email en A y B ve solo su negocio; `tenantId` en body → 400; query/cabecera no cambian el tenant; credenciales de A no entran en B; un 500 no filtra detalles |
 | `test/provision.test.ts` | alta por CLI: tenant + local + ADMIN Argon2id + auditoría sin secretos; slug duplicado en paralelo sin datos a medias; validaciones |
+| `test/services-professionals.test.ts` | CRUD de servicios y profesionales con auditoría; nombre duplicado (también al reactivar); validación de duración/precio/URL y campos prohibidos; el cambio de precio no toca citas existentes; no se desactiva con citas futuras; PROFESSIONAL solo lee; con ids de B → 404 en las 7 rutas y B intacto; servicios de B no asignables (mismo error que id inexistente); listados sin filas de B |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria

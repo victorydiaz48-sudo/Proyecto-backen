@@ -26,3 +26,26 @@ export const zCountryCode = z.string().trim().regex(/^[1-9]\d{0,2}$/, 'Código d
 export const zCurrency = z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, 'Código ISO 4217, p. ej. BRL.');
 export const zLocale = z.string().trim().regex(/^[a-z]{2}(-[A-Z]{2})?$/, 'Formato como pt-BR o es-ES.');
 export const zEmail = z.string().trim().toLowerCase().max(254).pipe(z.email('Email inválido.'));
+
+export const zIdParams = z.object({ id: z.uuid('Identificador inválido.') });
+
+/** Texto opcional: cadena vacía o solo espacios → null (para poder borrar un campo con PATCH). */
+export const zOptionalText = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .transform((s) => (s === '' ? null : s))
+    .nullable();
+
+export const zHttpsUrl = z
+  .string()
+  .trim()
+  .max(1000)
+  .refine((s) => {
+    try {
+      return new URL(s).protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }, 'Debe ser una URL https://');
