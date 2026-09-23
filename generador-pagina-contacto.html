@@ -231,7 +231,7 @@ body.pvd .pvscroll{overflow-x:hidden}
 /* ============ Textos de la tarjeta (idioma de la página) ============ */
 const PAGE={
   pt:{htmlLang:'pt-BR',og:'pt_BR',fileFb:'contato',ph:'Nome do negócio',
-    wa:'Falar no WhatsApp',call:'Ligar',callNow:'Ligar agora',mail:'E-mail',web:'Site',map:'Como chegar',rev:'Deixar uma avaliação',revSub:'Google',ctaLink:'Saiba mais',
+    wa:'Falar no WhatsApp',call:'Ligar',callNow:'Ligar agora',mail:'E-mail',web:'Site',map:'Como chegar',rev:'Deixar uma avaliação',revSub:'Google',rateOne:'avaliação',rateMany:'avaliações',rateAria:'Nota {r} de 5',ctaLink:'Saiba mais',
     contactH:'Contato',socialH:'Redes sociais',infoH:'Informações',moreH:'Mais',servicesH:'Serviços',teamH:'Equipe',galleryH:'Galeria',zoneH:'Zona de atendimento',hours:'Horário',closed:'Fechado',h24:'24 horas',openNow:'Aberto agora',closedNow:'Fechado agora',
     save:'Salvar contato',saved:'Baixado. Abra o arquivo para adicionar.',fab:'Abrir WhatsApp',
     book:'Agendar atendimento',bookTitle:'Agendar atendimento',bookClose:'Fechar',
@@ -256,7 +256,7 @@ const PAGE={
     days:['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'],
     ex:{name:'Barbearia Central',desc:'Cortes e barba desde 2015',city:'Curitiba, PR',note:'Feriados: fechado',credit:'Placa NFC por Sua Marca',dir:'Rua XV de Novembro, 100 - Curitiba',email:'contato@negocio.com.br',web:'www.negocio.com.br',ig:'@barbeariacentral',fb:'facebook.com/barbeariacentral',cta:'Agendar horário',svc:'Corte | R$ 45\nBarba | R$ 30\nCorte + barba | R$ 65',team:'Carlos | Barbeiro sênior | Especialista em cortes clássicos\nAndré | Barbeiro | Cortes modernos e degradês | Corte, Corte + barba',zone:'Curitiba e região metropolitana'}},
   es:{htmlLang:'es',og:'es_LA',fileFb:'contacto',ph:'Nombre del negocio',
-    wa:'Hablar por WhatsApp',call:'Llamar',callNow:'Llamar ahora',mail:'Correo',web:'Sitio web',map:'Cómo llegar',rev:'Dejar una reseña',revSub:'Google',ctaLink:'Más información',
+    wa:'Hablar por WhatsApp',call:'Llamar',callNow:'Llamar ahora',mail:'Correo',web:'Sitio web',map:'Cómo llegar',rev:'Dejar una reseña',revSub:'Google',rateOne:'reseña',rateMany:'reseñas',rateAria:'Calificación {r} de 5',ctaLink:'Más información',
     contactH:'Contacto',socialH:'Redes sociales',infoH:'Información',moreH:'Más',servicesH:'Servicios',teamH:'Equipo',galleryH:'Galería',zoneH:'Zona de atención',hours:'Horario',closed:'Cerrado',h24:'24 horas',openNow:'Abierto ahora',closedNow:'Cerrado ahora',
     save:'Guardar contacto',saved:'Descargado. Abre el archivo para añadirlo.',fab:'Abrir WhatsApp',
     book:'Reservar cita',bookTitle:'Reservar cita',bookClose:'Cerrar',
@@ -355,13 +355,13 @@ const DEF={nombre:'',cat:'general',ciudad:'',desc:'',lang:'pt',
   cta:'auto',ctaText:'',ctaUrl:'',
   cc:'55',wa:'',waMsg:'',tel:'',email:'',
   ig:'',fb:'',tiktok:'',youtube:'',linkedin:'',
-  web:'',l1t:'',l1u:'',l2t:'',l2u:'',review:'',
+  web:'',l1t:'',l1u:'',l2t:'',l2u:'',review:'',rating:'',reviews:'',
   servicios:'',zona:'',team:'',teamPhotos:{},menuPhotos:{},gallery:[],locName:'',locations:'',modeDelivery:false,modePickup:false,modeDine:false,
   dir:'',mapsUrl:'',tz:'America/Sao_Paulo',hd0:'',hd1:'',hd2:'',hd3:'',hd4:'',hd5:'',hd6:'',horario:'',
   color:'#0f766e',bg:'#ffffff',floatWa:true,
   canonical:'',ogImage:'',credito:'',
   logo:'',logoBg:'light',logoDom:'',logoMeta:'',logoFrame:'auto',photo:'',photoDom:'',photoMeta:'',photoTiny:'',photoFit:'auto'};
-const MAX={nombre:80,ciudad:60,desc:200,ctaText:40,ctaUrl:1000,wa:40,waMsg:300,tel:40,email:120,ig:200,fb:400,tiktok:200,youtube:400,linkedin:400,web:400,l1t:40,l1u:1000,l2t:40,l2u:1000,review:1000,servicios:2400,zona:120,team:400,locName:40,locations:1400,dir:200,mapsUrl:1000,horario:300,canonical:300,ogImage:500,credito:120};
+const MAX={nombre:80,ciudad:60,desc:200,ctaText:40,ctaUrl:1000,wa:40,waMsg:300,tel:40,email:120,ig:200,fb:400,tiktok:200,youtube:400,linkedin:400,web:400,l1t:40,l1u:1000,l2t:40,l2u:1000,review:1000,rating:5,reviews:12,servicios:2400,zona:120,team:400,locName:40,locations:1400,dir:200,mapsUrl:1000,horario:300,canonical:300,ogImage:500,credito:120};
 
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const enc=s=>{try{return encodeURIComponent(s);}catch(e){return '';}};
@@ -1048,6 +1048,15 @@ function analyze(raw){
   if(rv.bad)add('review','warn');
   else if(rv.ok)rev={k:'rev',href:rv.href,t:T.rev,s:T.revSub,src:'review'};
 
+  /* Valoración opcional junto al hero: solo con una nota real entre 1 y 5 escrita por el usuario. */
+  let rating=null;
+  const rm=/^([1-5])(?:[.,](\d))?$/.exec(d.rating),rn=d.reviews.replace(/[\s.,]/g,'');
+  if(d.rating&&(!rm||(+rm[1]===5&&+(rm[2]||0)>0)))add('rating','warn','rating');
+  else if(rm){
+    const v=+rm[1]+(+(rm[2]||0))/10,n=/^\d{1,9}$/.test(rn)?parseInt(rn,10):0;
+    if(d.reviews&&!n)add('reviews','warn','reviews');
+    rating={v:v,txt:v.toFixed(1).replace('.',','),n:n,ntxt:String(n).replace(/\B(?=(\d{3})+(?!\d))/g,'.')};
+  }else if(d.reviews)add('rating','warn','rating_need');
   const services=(()=>{let cat='';return d.servicios.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,120).map(l=>{
     const cm=/^##\s*(.+)/.exec(l);
     if(cm){cat=clean(cm[1],40);return null;}
@@ -1183,7 +1192,7 @@ function analyze(raw){
   return {
     d:d,T:T,name:name,shown:shown,des:des,th:des.tk,iss:iss,
     kind:[catLabel,city].filter(Boolean).join(' · '),
-    cta:cta,quick:quickFinal,sample:sampleHits(d),waHref:R.wa?R.wa.href:'',waNum:waNum,contact:contactFinal,socials:socials,place:place,extras:extras,services:services,featured:featured,menuCats:menuCats,cartOn:cartOn,orderModes:orderModes,team:team,gallery:d.gallery,zone:d.zona,hours:hours,locations:locations,order:cp.o,
+    cta:cta,quick:quickFinal,sample:sampleHits(d),waHref:R.wa?R.wa.href:'',waNum:waNum,contact:contactFinal,socials:socials,place:place,extras:extras,services:services,featured:featured,menuCats:menuCats,cartOn:cartOn,orderModes:orderModes,team:team,rating:rating,gallery:d.gallery,zone:d.zona,hours:hours,locations:locations,order:cp.o,
     canonical:cn.ok?cn.href:'',ogUrl:ogUrl,
     facts:{tel:telNum||(waNum?'+'+waNum:''),email:e.ok?e.addr:'',web:wb.ok?wb.href:'',same:same,map:mp.ok?mp.href:'',dir:dir,city:city},
     vcard:buildVcard({name:shown,wa:waNum,tel:telNum,email:e.ok?e.addr:'',web:wb.ok?wb.href:'',dir:dir,city:city}),
@@ -1698,6 +1707,15 @@ h1{margin:18px 0 0;max-width:100%;font:var(--ttl-w) calc(var(--ttl)*var(--kt))/1
 .kind{margin:8px 0 0;font-size:.8125rem;font-weight:650;letter-spacing:.06em;text-transform:uppercase;color:var(--accent-text);overflow-wrap:anywhere}
 .edtxt .kind,.fltxt .kind{margin:0 0 10px}
 .desc{margin:12px 0 0;max-width:36ch;font-size:.9375rem;color:var(--text-muted);overflow-wrap:anywhere;text-wrap:balance}
+.rating{display:inline-flex;flex-wrap:wrap;align-items:center;justify-content:var(--al);gap:4px 8px;margin:10px 0 0;font-size:.875rem;line-height:1.3;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.rating strong{font-weight:700;color:var(--text)}
+.rst{position:relative;display:inline-block;flex:none;line-height:0;color:var(--accent-text)}
+.rst svg{display:inline-block;width:15px;height:15px;margin-right:1px;stroke-width:1.6}
+.rs0{display:block;white-space:nowrap;opacity:.45}
+.rs1{position:absolute;top:0;left:0;height:100%;overflow:hidden;white-space:nowrap}
+.fltxt .rating,.fltxt .rating strong,.fltxt .rst{color:var(--on-photo)}
+.fltxt .rating{margin:10px 0 0}
+.edtxt .rating{margin-top:10px}
 .orn{display:block;position:relative;width:64px;height:8px;margin:16px auto 0;background:linear-gradient(var(--line),var(--line)) 0 50%/24px 1px no-repeat,linear-gradient(var(--line),var(--line)) 100% 50%/24px 1px no-repeat}
 .orn::after{content:"";position:absolute;left:50%;top:50%;width:5px;height:5px;background:var(--accent);transform:translate(-50%,-50%) rotate(45deg)}
 .acts{display:flex;flex-direction:column;gap:10px}
@@ -1911,14 +1929,18 @@ function pgHtml(m,opt){
   const photo=d.photo?'<img class="ph" src="'+esc(d.photo)+'" alt=""'+wh+' decoding="async" fetchpriority="high">':'';
   const fit=D.fit==='contain'?' data-fit="contain"':'';
   const name='<h1>'+esc(m.shown)+'</h1>',kind=m.kind?'<p class="kind">'+esc(m.kind)+'</p>':'',desc=d.desc?'<p class="desc">'+esc(d.desc)+'</p>':'';
+  const R=m.rating,starF=ICONS.rev.replace('fill="none"','fill="currentColor"');
+  const rate=R?'<p class="rating" role="img" aria-label="'+esc(T.rateAria.replace('{r}',R.txt)+(R.n?' · '+R.ntxt+' '+(R.n===1?T.rateOne:T.rateMany):''))+'">'+
+    '<span class="rst" aria-hidden="true"><span class="rs0">'+ICONS.rev.repeat(5)+'</span><span class="rs1" style="width:'+Math.round(R.v/5*1000)/10+'%">'+starF.repeat(5)+'</span></span>'+
+    '<strong aria-hidden="true">'+R.txt+'</strong>'+(R.n?'<span class="rn" aria-hidden="true">· '+esc(R.ntxt+' '+(R.n===1?T.rateOne:T.rateMany))+'</span>':'')+'</p>':'';
   const orn=(P.orn&&P.align==='center'&&h!=='luxury')?'<span class="orn" aria-hidden="true"></span>':'';
   let hero='';
-  if(h==='band')hero='<div class="cover" aria-hidden="true"></div><header '+A('id hero')+'>'+logo+name+kind+orn+desc+'</header>';
-  else if(h==='minimal')hero='<header '+A('id hero')+'>'+logo+name+kind+orn+desc+'</header>';
-  else if(h==='luxury')hero='<header '+A('id hero')+'>'+(photo?'<div class="arch"'+fit+'>'+photo+'</div>':'')+logo+'<span class="rule" aria-hidden="true"></span>'+name+kind+desc+'</header>';
-  else if(h==='editorial')hero='<header '+A('id hero')+'>'+(photo?'<div class="edimg"'+fit+'><span class="rt"></span>'+photo+'</div>':'<div class="noimg"></div>')+'<div class="edtxt">'+logo+kind+name+'<span class="rule" aria-hidden="true"></span>'+desc+'</div></header>';
-  else if(h==='gradient')hero='<div class="grimg"'+fit+'><span class="rt"></span>'+photo+'</div><header '+A('id hero')+'>'+logo+name+kind+orn+desc+'</header>';
-  else hero='<header '+A('id hero')+'><div class="flimg"'+fit+'><span class="rt"></span>'+photo+'<div class="fltxt">'+logo+kind+name+desc+'</div></div></header>';
+  if(h==='band')hero='<div class="cover" aria-hidden="true"></div><header '+A('id hero')+'>'+logo+name+kind+rate+orn+desc+'</header>';
+  else if(h==='minimal')hero='<header '+A('id hero')+'>'+logo+name+kind+rate+orn+desc+'</header>';
+  else if(h==='luxury')hero='<header '+A('id hero')+'>'+(photo?'<div class="arch"'+fit+'>'+photo+'</div>':'')+logo+'<span class="rule" aria-hidden="true"></span>'+name+kind+rate+desc+'</header>';
+  else if(h==='editorial')hero='<header '+A('id hero')+'>'+(photo?'<div class="edimg"'+fit+'><span class="rt"></span>'+photo+'</div>':'<div class="noimg"></div>')+'<div class="edtxt">'+logo+kind+name+rate+'<span class="rule" aria-hidden="true"></span>'+desc+'</div></header>';
+  else if(h==='gradient')hero='<div class="grimg"'+fit+'><span class="rt"></span>'+photo+'</div><header '+A('id hero')+'>'+logo+name+kind+rate+orn+desc+'</header>';
+  else hero='<header '+A('id hero')+'><div class="flimg"'+fit+'><span class="rt"></span>'+photo+'<div class="fltxt">'+logo+kind+name+rate+desc+'</div></div></header>';
   /* barra compacta con logo pequeño: aparece al pasar el hero */
   const isBook=!m.locations&&m.cta&&m.cta.k==='book';
   const isMenuCta=!m.locations&&m.cta&&m.cta.k==='menu';
@@ -2170,7 +2192,13 @@ es:{
   h_mapsUrl:'Si lo dejas vacío, el enlace se genera desde la dirección.',
   h_horario:'Una línea por día o tramo.',
   h_ig:'Usuario o enlace, con o sin @.',h_fb:'Usuario o enlace de tu página.',h_web:'Con o sin https://.',
-  h_review:'Pega el enlace completo. El botón solo aparece si lo llenas.',h_credito:'Por ejemplo, tu marca. Aparece al final de la página.',
+  h_review:'Pega el enlace completo. El botón solo aparece si lo llenas.',
+  l_rating:'Calificación en Google',l_reviews:'Número de reseñas',
+  h_rating:'La nota real de tu ficha, de 1 a 5 (ej. formato 4,8). Si la dejas vacía no se muestra ninguna valoración.',
+  h_reviews:'Cuántas reseñas tiene tu ficha. Se muestra junto a la calificación.',
+  i_rating:'La calificación debe ser un número entre 1 y 5, con un decimal como máximo.',
+  i_rating_need:'Escribe también la calificación: sin ella no se muestra la valoración.',
+  i_reviews:'El número de reseñas debe ser un número entero, sin letras.',h_credito:'Por ejemplo, tu marca. Aparece al final de la página.',
   logo_up:'Subir logo',logo_change:'Cambiar logo',logo_del:'Quitar logo',
   logo_hint:'PNG, JPG, WEBP o SVG. Se reduce y optimiza automáticamente. Sin logo se usan las iniciales del negocio.',
   logo_bg:'Fondo del logo',logo_light:'Claro',logo_dark:'Oscuro',
@@ -2342,7 +2370,13 @@ pt:{
   h_mapsUrl:'Se ficar vazio, o link é gerado a partir do endereço.',
   h_horario:'Uma linha por dia ou período.',
   h_ig:'Usuário ou link, com ou sem @.',h_fb:'Usuário ou link da sua página.',h_web:'Com ou sem https://.',
-  h_review:'Cole o link completo. O botão só aparece se você preencher.',h_credito:'Por exemplo, sua marca. Aparece no fim da página.',
+  h_review:'Cole o link completo. O botão só aparece se você preencher.',
+  l_rating:'Nota no Google',l_reviews:'Número de avaliações',
+  h_rating:'A nota real do seu perfil, de 1 a 5 (ex. formato 4,8). Se ficar vazia, nenhuma avaliação é exibida.',
+  h_reviews:'Quantas avaliações seu perfil tem. Aparece ao lado da nota.',
+  i_rating:'A nota deve ser um número entre 1 e 5, com no máximo uma casa decimal.',
+  i_rating_need:'Escreva também a nota: sem ela a avaliação não é exibida.',
+  i_reviews:'O número de avaliações deve ser um número inteiro, sem letras.',h_credito:'Por exemplo, sua marca. Aparece no fim da página.',
   logo_up:'Enviar logo',logo_change:'Trocar logo',logo_del:'Remover logo',
   logo_hint:'PNG, JPG, WEBP ou SVG. É reduzido e otimizado automaticamente. Sem logo, usamos as iniciais do negócio.',
   logo_bg:'Fundo do logo',logo_light:'Claro',logo_dark:'Escuro',
@@ -2501,9 +2535,9 @@ pt:{
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_DRAFT='gpc-draft',LS_UI='gpc-ui';
-const FIELDS=['nombre','cat','ciudad','desc','lang','persona','pal','hero','btn','photoPos','photoFit','logoFrame','cta','ctaText','ctaUrl','cc','wa','waMsg','tel','email','ig','fb','tiktok','youtube','linkedin','web','l1t','l1u','l2t','l2u','review','servicios','team','zona','dir','mapsUrl','locName','locations','tz','horario','color','bg','canonical','ogImage','credito'];
+const FIELDS=['nombre','cat','ciudad','desc','lang','persona','pal','hero','btn','photoPos','photoFit','logoFrame','cta','ctaText','ctaUrl','cc','wa','waMsg','tel','email','ig','fb','tiktok','youtube','linkedin','web','l1t','l1u','l2t','l2u','review','rating','reviews','servicios','team','zona','dir','mapsUrl','locName','locations','tz','horario','color','bg','canonical','ogImage','credito'];
 const CHK=['premium','floatWa','webFonts','modeDelivery','modePickup','modeDine'];
-const MSG_FIELDS=['nombre','cta','ctaUrl','cc','wa','tel','email','ig','fb','tiktok','youtube','linkedin','web','l1u','l2u','review','mapsUrl','color','canonical','ogImage'];
+const MSG_FIELDS=['nombre','cta','ctaUrl','cc','wa','tel','email','ig','fb','tiktok','youtube','linkedin','web','l1u','l2u','review','rating','reviews','mapsUrl','color','canonical','ogImage'];
 const MI={
   error:'<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   warn:'<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 2.5l8 14H2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 8v3.5M10 14v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
@@ -2625,6 +2659,7 @@ function buildForm(){
     '<div class="grid2">'+fld('l1t',{max:40,cap:'sentences'})+fld('l1u',{max:1000,im:'url',hint:1})+'</div>'+
     '<div class="grid2">'+fld('l2t',{max:40,cap:'sentences'})+fld('l2u',{max:1000,im:'url',hint:1})+'</div>'+
     '<div style="height:16px"></div>'+fld('review',{max:1000,im:'url',hint:1})+
+    '<div class="grid2">'+fld('rating',{max:5,im:'decimal',hint:1})+fld('reviews',{max:12,im:'numeric',hint:1})+'</div>'+
   '</section>'+
   '<section class="card" aria-labelledby="s8"><h2 id="s8" data-t="sec_place"></h2><p class="sec-sub" data-t="sd_place"></p>'+
     fld('dir',{max:200,hint:1,cap:'words'})+fld('mapsUrl',{max:1000,im:'url',hint:1})+
@@ -2664,7 +2699,7 @@ function applyUi(){
 function applyPh(){
   const T=PAGE[$('lang').value]||PAGE.pt,x=T.ex,cp=CATP[$('cat').value]||CATP.general,l1=(CT[cp.g]&&CT[cp.g].l1)||['Catálogo','Catálogo'];
   const ph={nombre:x.name,ciudad:x.city,desc:x.desc,ctaText:(state&&state.m.cta&&state.m.cta.t)||T.wa,ctaUrl:'https://…/agenda',cc:'55',wa:'41 99999-9999',waMsg:T.waMsg,tel:'41 3333-3333',email:x.email,
-    ig:x.ig,fb:x.fb,tiktok:'@barbearia',youtube:'@barbearia',linkedin:'linkedin.com/company/negocio',web:x.web,l1t:l1[$('lang').value==='es'?0:1],l1u:'www.negocio.com.br/agenda',l2t:'',l2u:'',review:'https://g.page/r/…',
+    ig:x.ig,fb:x.fb,tiktok:'@barbearia',youtube:'@barbearia',linkedin:'linkedin.com/company/negocio',web:x.web,l1t:l1[$('lang').value==='es'?0:1],l1u:'www.negocio.com.br/agenda',l2t:'',l2u:'',review:'https://g.page/r/…',rating:'1–5',reviews:'',
     servicios:x.svc,team:x.team,zona:x.zone,dir:x.dir,mapsUrl:'https://maps.app.goo.gl/…',locName:'Centro',
     locations:'Batel | Rua Comendador Araújo, 500 - Batel | 09:00-20:00,09:00-20:00,09:00-20:00,09:00-20:00,09:00-20:00,09:00-18:00, | https://maps.app.goo.gl/… | 41 98888-7777',
     horario:x.note,canonical:'https://negocio.com.br/tarjeta.html',ogImage:'https://negocio.com.br/og.png',credito:x.credit};
@@ -2703,7 +2738,7 @@ function write(raw,fresh){
   regenIcon();ensureMeta();paintGallery();paintTeamPhotos();paintMenuPhotos();
   return s;
 }
-function hasContent(s){return ['nombre','ciudad','desc','wa','waMsg','tel','email','dir','mapsUrl','horario','ig','fb','tiktok','youtube','linkedin','web','review','l1u','ctaUrl','credito','canonical','servicios','team','zona','locName','locations'].some(k=>s[k])||!!s.logo||!!s.photo||s.gallery.length>0||Object.keys(s.teamPhotos).length>0||Object.keys(s.menuPhotos).length>0||[0,1,2,3,4,5,6].some(i=>s['hd'+i]);}
+function hasContent(s){return ['nombre','ciudad','desc','wa','waMsg','tel','email','dir','mapsUrl','horario','ig','fb','tiktok','youtube','linkedin','web','review','rating','reviews','l1u','ctaUrl','credito','canonical','servicios','team','zona','locName','locations'].some(k=>s[k])||!!s.logo||!!s.photo||s.gallery.length>0||Object.keys(s.teamPhotos).length>0||Object.keys(s.menuPhotos).length>0||[0,1,2,3,4,5,6].some(i=>s['hd'+i]);}
 function markFilled(s){Object.keys(s).forEach(k=>{if(s[k])touched[k]=true;});}
 
 /* ---------- Avisos y estado ---------- */
