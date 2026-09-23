@@ -1,10 +1,9 @@
 import { PgErrorCode, pgErrorCode, type Db } from '../../db.ts';
 import type { Prisma } from '../../generated/prisma/client.ts';
 import { conflict, notFound } from '../../lib/errors.ts';
-import { writeAudit, type AuditEntry } from '../audit/audit.ts';
+import { toAuditJson as toJson, writeAudit, type Actor } from '../audit/audit.ts';
 import { SERVICE_SELECT } from './schemas.ts';
 
-type Actor = Pick<AuditEntry, 'tenantId' | 'actorType' | 'actorUserId' | 'ip' | 'requestId'>;
 export type ServiceDto = Prisma.ServiceGetPayload<{ select: typeof SERVICE_SELECT }>;
 
 const duplicateName = () => conflict('Ya existe un servicio activo con ese nombre.');
@@ -68,4 +67,3 @@ export class ServicesService {
   }
 }
 
-const toJson = (o: object): Prisma.InputJsonValue => JSON.parse(JSON.stringify(o)) as Prisma.InputJsonValue;

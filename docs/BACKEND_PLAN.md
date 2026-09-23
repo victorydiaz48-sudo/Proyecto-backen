@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–4 completadas.** Siguiente: Fase 5 (horarios laborales + bloqueos).
+Estado: **Fases 0–5 completadas.** Siguiente: Fase 6 (clientes + reservas).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -120,7 +120,8 @@ Nada en el repositorio contradice estas decisiones.
 
 ## 3. Decisiones de implementación tomadas (rutinarias)
 
-- Validación con **Zod** (`fastify-type-provider-zod`), tipos compartidos backend/SPA.
+- Validación con **Zod** (`fastify-type-provider-zod`), tipos compartidos backend/SPA. Ojo: en Zod 4 los
+  `.refine()` de objeto se ejecutan aunque un campo haya fallado; deben comprobar los tipos antes de usarlos.
 - Fechas/zonas con **Luxon** (IANA tz, DST correcto). Todo se guarda en UTC (`timestamptz`).
 - Teléfonos con **libphonenumber-js** → E.164.
 - Hash de contraseñas con **Argon2id** (`@node-rs/argon2`, binarios precompilados).
@@ -159,7 +160,7 @@ que el generador (que no se toca) sigue igual.
 | 2 | PostgreSQL + Prisma + migraciones | `schema.prisma`, migración inicial con `btree_gist` + exclusion constraint en SQL, docker-compose para dev/test, script de seed. ✅ |
 | 3 | Tenants + auth + roles | Login/logout, sesiones, `requireRole`, resolución de tenant, tests de aislamiento base. ✅ |
 | 4 | Profesionales + servicios | CRUD admin, `ProfessionalService`, tests cruzados de tenant. ✅ |
-| 5 | Horarios + bloqueos | `WorkingHour` (varios intervalos, validación de solapes), `TimeBlock`. |
+| 5 | Horarios + bloqueos | `WorkingHour` (varios intervalos, validación de solapes), `TimeBlock`. Incluye CRUD de locales. ✅ |
 | 6 | Clientes + reservas | `Customer` E.164 único por tenant, `Booking` con snapshot de precio/duración, máquina de estados. |
 | 7 | Motor de disponibilidad | Módulo puro (sin BD) + adaptador; tests de cierre, solapes, TZ/DST. |
 | 8 | Doble reserva | Exclusion constraint + transacción; test concurrente con N peticiones simultáneas. |

@@ -136,12 +136,12 @@ Permisos: A = ADMIN, P = PROFESSIONAL (solo sus propios recursos).
 | Recurso | Endpoints | Roles |
 |---|---|---|
 | Tenant settings ✅ | `GET/PATCH /admin/settings` (`name`, `timezone`, `defaultCountryCode`, `currency`, `locale`, `slotIntervalMinutes`, `defaultBookingStatus` ∈ {PENDING, CONFIRMED}, `bookingLeadMinutes`, `bookingHorizonDays`; el slug no se cambia) | A |
-| Locations | `GET/POST /admin/locations`, `GET/PATCH/DELETE /admin/locations/:id` | A (GET: A,P) |
+| Locations ✅ | `GET /admin/locations?includeInactive`, `POST`, `GET/PATCH/DELETE /:id` | A (GET: A,P) |
 | Users | `GET/POST /admin/users`, `PATCH /admin/users/:id` | A |
 | Professionals ✅ | `GET /admin/professionals?includeInactive&serviceId`, `POST`, `GET/PATCH/DELETE /:id`, `PUT /:id/services` | A (GET: A,P) |
 | Services ✅ | `GET /admin/services?includeInactive`, `POST`, `GET/PATCH/DELETE /:id` | A (GET: A,P) |
-| Working hours | `GET/PUT /admin/professionals/:id/working-hours` (reemplazo completo de la semana) | A; P solo lectura de lo suyo |
-| Time blocks | `GET/POST /admin/time-blocks`, `DELETE /:id` | A; P solo los suyos |
+| Working hours ✅ | `GET/PUT /admin/professionals/:id/working-hours` (reemplazo completo de la semana) | A; P solo lectura de lo suyo |
+| Time blocks ✅ | `GET /admin/time-blocks?from&to&professionalId&locationId`, `POST`, `DELETE /:id` | A; P solo los suyos (y ve los generales) |
 | Customers | `GET /admin/customers?search=`, `GET/PATCH /:id` | A; P solo clientes con citas suyas (lectura) |
 | Bookings | `GET /admin/bookings?from&to&professionalId&status`, `POST`, `GET /:id`, `PATCH /:id` (reprogramar), `POST /:id/status` | A; P solo las suyas |
 | Availability | `GET /admin/availability` (igual que la pública, sin límite de antelación) | A,P |
@@ -176,6 +176,49 @@ Cambiar precio o duración no afecta a citas existentes (guardan copia). Respues
 - Desactivar (`DELETE` o `PATCH { active: false }`) con citas `PENDING`/`CONFIRMED` que aún no han
   terminado → `409 CONFLICT` con `details.futureBookings`.
 - Todos los cambios se auditan con antes/después.
+
+### Locales, horarios y bloqueos (Fase 5)
+
+**Local**: `name` (1–40), `address` (≤ 200), `mapsUrl` (`https://`), `whatsapp` (se normaliza a E.164
+con el país del negocio; inválido → 400), `sortOrder`, `isDefault`, `active` (PATCH).
+- Siempre hay exactamente un local por defecto y activo: marcar otro como predeterminado desmarca el
+  anterior; quitarle la marca o desactivar el predeterminado → `409`.
+- Desactivar un local con horarios o citas pendientes → `409` con `details { workingHours, futureBookings }`.
+
+**Horario laboral** — `PUT /admin/professionals/:id/working-hours`:
+
+```json
+{ "intervals": [
+  { "locationId": "…", "weekday": 1, "start": "09:00", "end": "13:00" },
+  { "locationId": "…", "weekday": 1, "start": "14:00", "end": "19:00" },
+  { "locationId": "…", "weekday": 5, "start": "18:00", "end": "24:00" },
+  { "locationId": "…", "weekday": 6, "start": "00:00", "end": "02:00" } ] }
+```
+
+- `weekday`: 0 = domingo … 6 = sábado (igual que el generador). Horas locales del negocio `HH:MM`;
+  `end` admite `24:00`. Un horario que cruza medianoche se envía como dos intervalos (se unen al calcular).
+- Reemplaza la semana completa. Máx. 70 intervalos. Contiguos permitidos; solapados el mismo día → 400,
+  aunque sean en locales distintos. Local inexistente, de otro negocio o inactivo → 400.
+- Si el nuevo horario deja fuera alguna cita `PENDING`/`CONFIRMED` que aún no terminó (en su local) →
+  `409` con `details.bookingsOutsideHours`.
+- `GET` devuelve `{ items: [{ id, locationId, weekday, start, end }] }` ordenados.
+
+**Bloqueo** — `POST /admin/time-blocks`:
+
+```json
+{ "professionalId": "…" | null, "locationId": "…" | null,
+  "startAt": "2026-10-01T14:00:00-03:00", "endAt": "2026-10-01T16:00:00-03:00", "reason": "Médico" }
+```
+
+- `professionalId: null` = todos los profesionales (del `locationId` si se indica, o de todo el negocio).
+- Fechas ISO 8601 **con zona** (sin zona → 400). Máx. 366 días.
+- Choca con citas activas → `409` con `details.conflictingBookings` (cancelar o mover antes). Contiguo sí.
+- PROFESSIONAL: solo su agenda (`professionalId` omitido o el suyo; otro, `null` o `locationId` → 403).
+  Ve sus bloqueos y los generales; borrar uno ajeno → 404.
+- `GET` sin `from`/`to`: desde ahora, 60 días. Rango máx. 366 días.
+
+Cambios de horario, bloqueos (y más adelante citas) bloquean la fila del profesional
+(`SELECT … FOR UPDATE`) dentro de su transacción, así no se pisan entre sí.
 
 **Transiciones de estado** (`POST /admin/bookings/:id/status { status, reason? }`):
 ```

@@ -27,7 +27,7 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 4)
+## Estado actual (hasta la Fase 5)
 
 | Archivo | Cubre |
 |---|---|
@@ -38,6 +38,9 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/roles-and-tenant-isolation.test.ts` | 401 sin sesión, PROFESSIONAL → 403 en ajustes, `professionalId` desde la BD, auditoría antes/después, validación de ajustes; mismo email en A y B ve solo su negocio; `tenantId` en body → 400; query/cabecera no cambian el tenant; credenciales de A no entran en B; un 500 no filtra detalles |
 | `test/provision.test.ts` | alta por CLI: tenant + local + ADMIN Argon2id + auditoría sin secretos; slug duplicado en paralelo sin datos a medias; validaciones |
 | `test/services-professionals.test.ts` | CRUD de servicios y profesionales con auditoría; nombre duplicado (también al reactivar); validación de duración/precio/URL y campos prohibidos; el cambio de precio no toca citas existentes; no se desactiva con citas futuras; PROFESSIONAL solo lee; con ids de B → 404 en las 7 rutas y B intacto; servicios de B no asignables (mismo error que id inexistente); listados sin filas de B |
+| `test/locations.test.ts` | WhatsApp → E.164, URL https; un único local por defecto (no se quita ni se desactiva); no se desactiva con horarios o citas pendientes; PROFESSIONAL solo lee; locales de B → 404 y fuera de los listados |
+| `test/schedule.test.ts` | horario con varios intervalos/día, contiguos, hasta 24:00; solapes en locales distintos → 400; validación y locales de B/inactivos; no deja citas futuras fuera de horario (ignora pasadas/canceladas, respeta el local); cita que cruza medianoche; permisos de PROFESSIONAL; horario de B → 404. Bloqueos: por profesional/local/negocio, PROFESSIONAL solo los suyos, choque con citas (contiguo sí), fechas sin zona → 400, refs de B, listado por rango y visibilidad, borrado por rol, sin filas de B |
+| `test/time-phone.test.ts` | HH:MM y 24:00, día de la semana, misma hora local en São Paulo vs Madrid, cambio de hora de Madrid (hora inexistente y repetida), unión de tramos y cruce de medianoche, teléfonos a E.164 |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria

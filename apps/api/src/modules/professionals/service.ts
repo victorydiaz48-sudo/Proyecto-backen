@@ -1,17 +1,14 @@
-import type { Db } from '../../db.ts';
+import type { Db, Tx } from '../../db.ts';
 import type { Prisma } from '../../generated/prisma/client.ts';
 import { conflict, notFound, validationError } from '../../lib/errors.ts';
-import { writeAudit, type AuditEntry } from '../audit/audit.ts';
+import { toAuditJson as toJson, writeAudit, type Actor } from '../audit/audit.ts';
 import { PROFESSIONAL_SELECT } from './schemas.ts';
 
-type Actor = Pick<AuditEntry, 'tenantId' | 'actorType' | 'actorUserId' | 'ip' | 'requestId'>;
-type Tx = Parameters<Parameters<Db['$transaction']>[0]>[0];
 type Row = Prisma.ProfessionalGetPayload<{ select: typeof PROFESSIONAL_SELECT }>;
 
 export type ProfessionalDto = Omit<Row, 'services'> & { serviceIds: string[] };
 
 const toDto = ({ services, ...rest }: Row): ProfessionalDto => ({ ...rest, serviceIds: services.map((s) => s.serviceId) });
-const toJson = (o: object): Prisma.InputJsonValue => JSON.parse(JSON.stringify(o)) as Prisma.InputJsonValue;
 
 /** Profesionales de un tenant. Todas las consultas filtran por tenantId. */
 export class ProfessionalsService {

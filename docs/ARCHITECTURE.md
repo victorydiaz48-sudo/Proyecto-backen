@@ -118,6 +118,18 @@ NOT_WORKING_THAT_DAY | OUTSIDE_WORKING_HOURS | EXCEEDS_CLOSING_TIME | OVERLAPS_B
 Alternativas: hasta N slots libres más cercanos a la hora pedida (antes y después) ese día; si no
 hay, los primeros de los siguientes días hasta un límite.
 
+## 5b. Concurrencia de la agenda
+
+`lockProfessionals()` (`src/modules/schedule/locks.ts`) hace `SELECT … FOR UPDATE` sobre las filas de
+los profesionales afectados, ordenadas por id. La usan: cambio de horario (1 profesional), bloqueo
+(1 profesional, o todos los del negocio si es general) y, desde la Fase 8, la creación de citas.
+Así una cita no puede colarse mientras se recorta un horario o se crea un bloqueo, y viceversa.
+El exclusion constraint sigue siendo la garantía final entre citas.
+
+Tiempo: `src/lib/time.ts` (Luxon). `workingRanges(intervalos, desde, hasta, tz)` convierte el horario
+semanal en tramos reales (instantes UTC) uniendo los contiguos, también a través de medianoche; es la
+base del motor de disponibilidad (Fase 7).
+
 ## 6. Multi-local
 
 - Cada `WorkingHour` pertenece a un `Location`. Un profesional puede trabajar en varios locales en

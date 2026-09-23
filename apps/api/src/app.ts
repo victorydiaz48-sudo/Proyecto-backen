@@ -9,7 +9,9 @@ import type { Db } from './db.ts';
 import { FailureLimiter } from './lib/failure-limiter.ts';
 import { authRoutes } from './modules/auth/routes.ts';
 import { AuthService } from './modules/auth/service.ts';
+import { locationAdminRoutes } from './modules/locations/routes.admin.ts';
 import { professionalAdminRoutes } from './modules/professionals/routes.admin.ts';
+import { scheduleAdminRoutes } from './modules/schedule/routes.admin.ts';
 import { serviceAdminRoutes } from './modules/services/routes.admin.ts';
 import { tenantAdminRoutes } from './modules/tenants/routes.admin.ts';
 import { registerAuth, requireAuth, sameOriginGuard } from './plugins/auth.ts';
@@ -69,6 +71,8 @@ export async function buildApp({ config, db, now = () => new Date() }: AppDeps):
           await admin.register(tenantAdminRoutes, { db });
           await admin.register(serviceAdminRoutes, { db });
           await admin.register(professionalAdminRoutes, { db, now });
+          await admin.register(locationAdminRoutes, { db, now });
+          await admin.register(scheduleAdminRoutes, { db, now });
         },
         { prefix: '/admin' },
       );

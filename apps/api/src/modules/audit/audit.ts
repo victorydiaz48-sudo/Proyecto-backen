@@ -54,3 +54,8 @@ export function userActor(
 ): Pick<AuditEntry, 'tenantId' | 'actorType' | 'actorUserId' | 'ip' | 'requestId'> {
   return { tenantId: auth.tenant.id, actorType: 'USER', actorUserId: auth.user.id, ip: request.ip, requestId: request.id };
 }
+
+export type Actor = ReturnType<typeof userActor>;
+
+/** Copia serializable (fechas → ISO) para guardar en before/after. */
+export const toAuditJson = (o: object): Prisma.InputJsonValue => JSON.parse(JSON.stringify(o)) as Prisma.InputJsonValue;

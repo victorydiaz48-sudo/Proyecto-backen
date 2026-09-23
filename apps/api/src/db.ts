@@ -2,6 +2,8 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from './generated/prisma/client.ts';
 
 export type Db = InstanceType<typeof PrismaClient>;
+/** Cliente dentro de `db.$transaction(async (tx) => …)`. */
+export type Tx = Parameters<Parameters<Db['$transaction']>[0]>[0];
 
 export function createDb(databaseUrl: string): Db {
   return new PrismaClient({ adapter: new PrismaPg({ connectionString: databaseUrl }) });
