@@ -1,4 +1,5 @@
 import cookie from '@fastify/cookie';
+import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 import Fastify, { type FastifyInstance } from 'fastify';
@@ -14,6 +15,7 @@ import { bookingAdminRoutes } from './modules/bookings/routes.admin.ts';
 import { customerAdminRoutes } from './modules/customers/routes.admin.ts';
 import { locationAdminRoutes } from './modules/locations/routes.admin.ts';
 import { professionalAdminRoutes } from './modules/professionals/routes.admin.ts';
+import { publicRoutes } from './modules/public/routes.ts';
 import { scheduleAdminRoutes } from './modules/schedule/routes.admin.ts';
 import { serviceAdminRoutes } from './modules/services/routes.admin.ts';
 import { tenantAdminRoutes } from './modules/tenants/routes.admin.ts';
@@ -66,21 +68,40 @@ export async function buildApp({ config, db, now = () => new Date() }: AppDeps):
   const auth = new AuthService(db, new FailureLimiter(5, 15 * 60 * 1000, () => now().getTime()), now);
   await app.register(
     async (scope) => {
-      scope.addHook('preHandler', sameOriginGuard);
-      await scope.register(authRoutes, { prefix: '/auth', auth, cookieSecure: config.COOKIE_SECURE });
+      // Rutas con cookie de sesión (panel): protección CSRF por origen. No se aplica a /public.
+      await scope.register(async (session) => {
+        session.addHook('preHandler', sameOriginGuard);
+        await session.register(authRoutes, { prefix: '/auth', auth, cookieSecure: config.COOKIE_SECURE });
+        await session.register(
+          async (admin) => {
+            admin.addHook('preHandler', requireAuth);
+            await admin.register(tenantAdminRoutes, { db });
+            await admin.register(serviceAdminRoutes, { db });
+            await admin.register(professionalAdminRoutes, { db, now });
+            await admin.register(locationAdminRoutes, { db, now });
+            await admin.register(scheduleAdminRoutes, { db, now });
+            await admin.register(customerAdminRoutes, { db });
+            await admin.register(bookingAdminRoutes, { db, now });
+            await admin.register(availabilityAdminRoutes, { db, now });
+          },
+          { prefix: '/admin' },
+        );
+      });
+      // API pública: las páginas generadas pueden abrirse desde cualquier dominio o desde file://
+      // (Origin: null). Sin cookies ni credenciales, así que '*' no expone ninguna sesión.
       await scope.register(
-        async (admin) => {
-          admin.addHook('preHandler', requireAuth);
-          await admin.register(tenantAdminRoutes, { db });
-          await admin.register(serviceAdminRoutes, { db });
-          await admin.register(professionalAdminRoutes, { db, now });
-          await admin.register(locationAdminRoutes, { db, now });
-          await admin.register(scheduleAdminRoutes, { db, now });
-          await admin.register(customerAdminRoutes, { db });
-          await admin.register(bookingAdminRoutes, { db, now });
-          await admin.register(availabilityAdminRoutes, { db, now });
+        async (pub) => {
+          await pub.register(cors, {
+            origin: '*',
+            methods: ['GET', 'POST', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Idempotency-Key'],
+            exposedHeaders: ['Idempotent-Replayed', 'Retry-After'],
+            credentials: false,
+            maxAge: 600,
+          });
+          await pub.register(publicRoutes, { db, now });
         },
-        { prefix: '/admin' },
+        { prefix: '/public' },
       );
     },
     { prefix: '/api/v1' },

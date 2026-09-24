@@ -112,10 +112,11 @@ export class BookingsService {
    * todos, la respuesta es la misma que con un profesional concreto: 409 SLOT_UNAVAILABLE (alguno estaba
    * ocupado) o 422 SLOT_INVALID (ninguno podía por reglas), con alternativas.
    */
-  async create(actor: Actor, viewer: Viewer, input: CreateBookingInput, opts: CreateOptions = {}): Promise<BookingDto> {
-    if (viewer.role !== 'ADMIN' && viewer.professionalId !== input.professionalId) throw forbidden();
+  /** `viewer: null` = web pública (sin usuario): puede usar "sin preferencia" como un ADMIN. */
+  async create(actor: Actor, viewer: Viewer | null, input: CreateBookingInput, opts: CreateOptions = {}): Promise<BookingDto> {
+    if (viewer && viewer.role !== 'ADMIN' && viewer.professionalId !== input.professionalId) throw forbidden();
     const publicRules = opts.publicRules ?? false;
-    const source = opts.source ?? (viewer.role === 'ADMIN' ? 'ADMIN' : 'PROFESSIONAL');
+    const source = opts.source ?? (!viewer ? 'PUBLIC_WEB' : viewer.role === 'ADMIN' ? 'ADMIN' : 'PROFESSIONAL');
     const tenant = await this.tenant(this.db, actor.tenantId);
     const phoneE164 = input.customer ? normalizePhoneOrThrow(input.customer.phone, tenant.defaultCountryCode, 'body.customer.phone') : null;
     const alt = { serviceId: input.serviceId, professionalId: input.professionalId, date: input.date, time: input.time, locationId: input.locationId };

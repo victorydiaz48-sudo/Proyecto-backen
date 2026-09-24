@@ -54,8 +54,10 @@
 
 ## 6. CORS y CSRF
 
-- **Rutas `/api/v1/public/*`**: `Access-Control-Allow-Origin: *`, sin `Allow-Credentials`, métodos
-  `GET, POST, OPTIONS`, cabeceras `Content-Type, Idempotency-Key`. Funciona desde cualquier dominio
+- **Rutas `/api/v1/public/*`** (implementado en la Fase 9, `@fastify/cors` solo en ese ámbito):
+  `Access-Control-Allow-Origin: *`, sin `Allow-Credentials`, métodos `GET, POST, OPTIONS`, cabeceras
+  `Content-Type, Idempotency-Key`. La guarda CSRF del panel se registra solo en el ámbito `/auth` y
+  `/admin`, nunca en `/public` (un test lo comprueba). Funciona desde cualquier dominio
   y desde `file://` (Origin `null`). Como no hay cookies ni credenciales en estas rutas, `*` no
   expone datos de sesión. Las respuestas públicas nunca incluyen datos personales de otros clientes.
 - **Rutas admin/auth**: sin cabeceras CORS (solo mismo origen). Cookie `SameSite=Strict` +
@@ -65,9 +67,13 @@
 
 ## 7. Abuso de la API pública
 
-- Rate limit: disponibilidad ~60 req/min/IP; creación de citas ~5/min/IP y ~30/h por teléfono por tenant.
-- Límite de citas futuras activas por teléfono por tenant (configurable, def. 3).
-- `Idempotency-Key` para reintentos.
+- Rate limit por IP (Fase 9): lecturas 120/min, disponibilidad 60/min, creación de citas 10/min
+  (`@fastify/rate-limit`, en memoria; con varias instancias hay que moverlo a Redis).
+- Máximo 3 citas futuras activas por teléfono y negocio → `429 BOOKING_LIMIT_REACHED`
+  (constante `MAX_ACTIVE_BOOKINGS_PER_PHONE`; hacerlo configurable por negocio es trabajo futuro).
+- `Idempotency-Key` para reintentos (reserva atómica de la clave con `INSERT … ON CONFLICT`).
+- El tenant de la API pública sale solo del slug de la URL; los ids de otro negocio producen el mismo
+  error que un id inexistente.
 - Tamaño máximo del body 16 KB.
 - (Futuro) CAPTCHA opcional por tenant si hay spam; estado `PENDING` como mitigación.
 

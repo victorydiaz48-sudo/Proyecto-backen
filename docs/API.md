@@ -30,41 +30,49 @@ además, donde ayuda al frontend, se incluye la hora local del tenant (`localDat
 
 Paginación en listados admin: `?cursor=&limit=` (máx. 100) → `{ items, nextCursor }`.
 
-## 2. API pública
+## 2. API pública — implementada (Fase 9)
 
-Sin autenticación, sin cookies. CORS `Access-Control-Allow-Origin: *`. Rate limit por IP y por tenant.
-`:tenantSlug` resuelve un tenant `ACTIVE`; si no, 404. Solo se exponen entidades activas.
+Sin autenticación, sin cookies. CORS `Access-Control-Allow-Origin: *` (sin credenciales; preflight
+con `Content-Type` e `Idempotency-Key`, `max-age` 600 s). Funciona desde cualquier dominio y desde
+`file://` (`Origin: null`). No le aplica la protección CSRF del panel.
+
+`:tenantSlug` se resuelve antes de validar nada a un negocio `ACTIVE`; si no existe, es inválido o está
+suspendido → `404`. Solo se exponen entidades activas del propio negocio; nunca datos de otros clientes
+ni ids de usuarios.
+
+| Ruta | Rate limit por IP |
+|---|---|
+| `GET /public/:tenantSlug`, `/services`, `/professionals` | 120/min |
+| `GET /public/:tenantSlug/availability` | 60/min |
+| `POST /public/:tenantSlug/bookings` | 10/min (+ máx. 3 citas futuras activas por teléfono) |
 
 ### GET `/public/:tenantSlug`
 ```json
 { "name": "Barbearia Central", "slug": "barbearia-central", "timezone": "America/Sao_Paulo",
-  "currency": "BRL", "locale": "pt-BR", "slotIntervalMinutes": 15, "bookingHorizonDays": 60,
-  "today": "2026-09-23",
-  "locations": [{ "id": "…", "name": "Centro", "address": "…", "isDefault": true }] }
+  "currency": "BRL", "locale": "pt-BR", "slotIntervalMinutes": 15, "bookingLeadMinutes": 60,
+  "bookingHorizonDays": 60, "today": "2026-09-30",
+  "locations": [{ "id": "…", "name": "Centro", "address": "…", "mapsUrl": null, "isDefault": true }] }
 ```
-`today` es la fecha actual en la zona del tenant (el generador hoy usa el reloj del dispositivo).
+`today` es la fecha actual en la zona del negocio (el generador hoy usa el reloj del dispositivo).
 
 ### GET `/public/:tenantSlug/services`
 ```json
 { "items": [{ "id": "…", "name": "Corte", "description": null, "category": null,
-  "durationMinutes": 30, "priceCents": 4500, "currency": "BRL" }] }
+  "durationMinutes": 30, "priceCents": 4500, "currency": "BRL", "bookable": true }] }
 ```
+`bookable: false` si ningún profesional activo hace el servicio (se puede mostrar pero no reservar).
 
 ### GET `/public/:tenantSlug/professionals?serviceId=&locationId=`
 ```json
 { "items": [{ "id": "…", "displayName": "Carlos", "title": "Barbeiro sênior", "bio": null,
   "photoUrl": null, "serviceIds": ["…"] }] }
 ```
+`locationId` filtra a quienes tienen horario en ese local.
 
 ### GET `/public/:tenantSlug/availability`
-Query:
-| Param | Req. | Notas |
-|---|---|---|
-| serviceId | sí | uuid |
-| professionalId | sí | uuid o `any` |
-| date | sí* | `YYYY-MM-DD` en la zona del tenant |
-| from, to | no | rango de fechas (máx. 14 días) en lugar de `date` |
-| locationId | no | filtra |
+Mismos parámetros y formato que `GET /admin/availability` (§4): `serviceId`, `professionalId`
+(uuid o `any`), `date` o `from`+`to` (máx. 14 días, fechas locales), `locationId`. Aplica la antelación
+mínima y el horizonte del negocio. Servicio/profesional inválido o de otro negocio → `404`.
 
 ```json
 { "timezone": "America/Sao_Paulo", "serviceId": "…", "durationMinutes": 30,
@@ -72,11 +80,10 @@ Query:
     { "startAt": "2026-09-24T12:00:00.000Z", "localTime": "09:00", "locationId": "…",
       "professionalIds": ["…", "…"] } ] }] }
 ```
-Con `professionalId` concreto, `professionalIds` tiene un elemento. Nunca se devuelven datos de
-otras citas (ni nombres de clientes), solo huecos.
+Nunca se devuelven datos de otras citas, solo huecos.
 
 ### POST `/public/:tenantSlug/bookings`
-Cabecera opcional `Idempotency-Key: <uuid>` (recomendada).
+Cabecera opcional (recomendada) `Idempotency-Key`: 8–100 caracteres `[A-Za-z0-9_-]`.
 
 ```json
 { "serviceId": "…", "professionalId": "any", "date": "2026-09-24", "time": "09:00",
@@ -84,8 +91,8 @@ Cabecera opcional `Idempotency-Key: <uuid>` (recomendada).
   "customer": { "name": "João", "phone": "41 99876-5432", "email": null },
   "notes": "Degradê" }
 ```
-Nunca se aceptan `price`, `duration`, `endAt`, `status`, `tenantId` (los campos desconocidos se
-rechazan con 400).
+Cuerpo estricto: `price*`, `duration*`, `endAt`, `status`, `tenantId`, `source`, `customerId` → `400`.
+Estado inicial = el del negocio. Un cliente existente (mismo teléfono) no se renombra.
 
 `201`:
 ```json
@@ -94,17 +101,23 @@ rechazan con 400).
   "service": { "name": "Corte", "durationMinutes": 30, "priceCents": 4500, "currency": "BRL" },
   "professional": { "id": "…", "displayName": "Carlos" },
   "location": { "id": "…", "name": "Centro" } },
-  "whatsappUrl": "https://wa.me/55…?text=…" }
+  "whatsappUrl": "https://wa.me/5541999990000?text=…" }
 ```
-`whatsappUrl` (opcional, si el local/tenant tiene WhatsApp) permite a la página mantener el paso
-final por WhatsApp como aviso al negocio. La cita ya existe en el backend.
+`whatsappUrl` usa el WhatsApp del local de la cita (o del local por defecto); `null` si no hay. Sirve
+para que la página mantenga el aviso final por WhatsApp; la cita ya existe en el backend.
 
-`409 SLOT_UNAVAILABLE` / `422 SLOT_INVALID`:
-```json
-{ "error": { "code": "SLOT_UNAVAILABLE", "message": "…",
-  "details": { "reason": "OVERLAPS_BOOKING", "alternatives": [
-    { "startAt": "…", "localDate": "2026-09-24", "localTime": "09:30", "professionalIds": ["…"] } ] } } }
-```
+Errores específicos:
+
+| HTTP | code | Cuándo |
+|---|---|---|
+| 409 / 422 | `SLOT_UNAVAILABLE` / `SLOT_INVALID` | como en el panel, con `details.reason` y `details.alternatives` (incluye `TOO_SOON`, `BEYOND_HORIZON`) |
+| 429 | `BOOKING_LIMIT_REACHED` | el teléfono ya tiene 3 citas futuras activas en ese negocio |
+| 422 | `IDEMPOTENCY_KEY_REUSED` | misma clave con otro cuerpo |
+| 409 | `IDEMPOTENCY_IN_PROGRESS` | misma clave mientras la primera petición sigue en curso |
+
+**Idempotencia**: con la misma clave y el mismo cuerpo, un reintento tras el éxito devuelve la misma
+respuesta `201` con la cabecera `Idempotent-Replayed: true` y no crea otra cita. Solo se guardan
+respuestas de éxito (24 h); tras un error la clave se libera. Las claves son por negocio.
 
 ## 3. Autenticación (panel) — implementado (Fase 3)
 

@@ -59,3 +59,8 @@ export type Actor = ReturnType<typeof userActor>;
 
 /** Copia serializable (fechas → ISO) para guardar en before/after. */
 export const toAuditJson = (o: object): Prisma.InputJsonValue => JSON.parse(JSON.stringify(o)) as Prisma.InputJsonValue;
+
+/** Acción anónima desde la web pública de un negocio. */
+export function publicActor(tenantId: string, request: { ip: string; id: string }): Actor {
+  return { tenantId, actorType: 'PUBLIC', actorUserId: null, ip: request.ip, requestId: request.id };
+}

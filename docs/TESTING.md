@@ -27,7 +27,7 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 8)
+## Estado actual (hasta la Fase 9)
 
 | Archivo | Cubre |
 |---|---|
@@ -47,6 +47,7 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/slots.test.ts` | huecos cada N min donde cabe la duración completa (pausa y cierre), intervalo configurable, citas y bloqueos, pasado/antelación/horizonte, día sin horario, unión de profesionales ("sin preferencia"), locales, medianoche, Madrid con cambio de hora, **coherencia total con `checkSlot`**, `pickProfessional`, alternativas por cercanía y días siguientes |
 | `test/availability.test.ts` | endpoint del panel: huecos del día, intervalo del negocio, citas y bloqueos reales, `any` con profesionales libres, sin pasado, rango ≤ 14 días, 404 para servicio/profesional inválido o de B, todo hueco ofrecido se reserva; alternativas en 409/422 (cercanas, reservables, días siguientes en domingo, ninguna si el profesional no hace el servicio, también al reprogramar) |
 | `test/bookings-any.test.ts` | "sin preferencia": menos citas ese día, desempate por orden, salta a quien no está libre (cita o bloqueo), solo activos/que hacen el servicio/del local; todos ocupados → mismo 409 con alternativas `any`; reglas → 422; PROFESSIONAL no puede usar `any`. **Concurrencia**: 8 `any` simultáneas con 3 libres → 3 citas (una por profesional) + 5 × 409; 3 rondas de 14 peticiones mixtas (concretas + `any`) sin duplicados y comprobación SQL de cero solapes; solapes parciales simultáneos → 1; cliente nuevo en 5 reservas simultáneas → 1 cliente; bloqueo y cita a la vez → nunca ambos |
+| `test/public-api.test.ts` | datos públicos y `today` en la zona del negocio; slug inexistente/inválido/suspendido → 404 antes de validar; servicios con `bookable`; profesionales sin datos internos y filtros; disponibilidad con antelación y horizonte; reserva con precio/estado/origen del servidor y `whatsappUrl`; `any` dentro del negocio; campos prohibidos → 400; `TOO_SOON` y ocupado con alternativas; ids de B = inexistentes; cliente existente no se renombra; límite de 3 por teléfono (por negocio); rate limit 10/min; idempotencia (replay, clave reutilizada, liberación tras error, 5 envíos simultáneos → 1 cita, clave por negocio); CORS desde `file://` y otros dominios, POST cross-site aceptado, panel sin CORS |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria
