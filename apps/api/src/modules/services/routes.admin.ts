@@ -12,25 +12,25 @@ export const serviceAdminRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app,
   const anyRole = requireRole('ADMIN', 'PROFESSIONAL');
   const admin = requireRole('ADMIN');
 
-  app.get('/services', { preHandler: anyRole, schema: { querystring: ServiceListQuery } }, async (request) => {
+  app.get('/services', { onRequest: anyRole, schema: { querystring: ServiceListQuery } }, async (request) => {
     const { tenant } = requireAuthContext(request);
     return { items: await services.list(tenant.id, request.query.includeInactive) };
   });
 
-  app.get('/services/:id', { preHandler: anyRole, schema: { params: zIdParams } }, async (request) =>
+  app.get('/services/:id', { onRequest: anyRole, schema: { params: zIdParams } }, async (request) =>
     services.get(requireAuthContext(request).tenant.id, request.params.id),
   );
 
-  app.post('/services', { preHandler: admin, schema: { body: ServiceCreate } }, async (request, reply) => {
+  app.post('/services', { onRequest: admin, schema: { body: ServiceCreate } }, async (request, reply) => {
     const created = await services.create(userActor(requireAuthContext(request), request), request.body);
     return reply.status(201).send(created);
   });
 
-  app.patch('/services/:id', { preHandler: admin, schema: { params: zIdParams, body: ServicePatch } }, async (request) =>
+  app.patch('/services/:id', { onRequest: admin, schema: { params: zIdParams, body: ServicePatch } }, async (request) =>
     services.update(userActor(requireAuthContext(request), request), request.params.id, request.body),
   );
 
-  app.delete('/services/:id', { preHandler: admin, schema: { params: zIdParams } }, async (request) =>
+  app.delete('/services/:id', { onRequest: admin, schema: { params: zIdParams } }, async (request) =>
     services.archive(userActor(requireAuthContext(request), request), request.params.id),
   );
 };

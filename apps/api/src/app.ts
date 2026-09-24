@@ -27,6 +27,13 @@ import { userAdminRoutes } from './modules/users/routes.admin.ts';
 import { registerAuth, requireAuth, sameOriginGuard } from './plugins/auth.ts';
 import { registerErrorHandler } from './plugins/error-handler.ts';
 
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** Todas las rutas registradas (método + URL). Lo usan los tests de permisos para no olvidar ninguna. */
+    routeList: { method: string; url: string }[];
+  }
+}
+
 export interface AppDeps {
   config: Config;
   db: Db;
@@ -48,6 +55,12 @@ export async function buildApp({ config, db, now = () => new Date() }: AppDeps):
             redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
           },
   }).withTypeProvider<ZodTypeProvider>();
+
+  const routeList: { method: string; url: string }[] = [];
+  app.decorate('routeList', routeList);
+  app.addHook('onRoute', (r) => {
+    for (const method of Array.isArray(r.method) ? r.method : [r.method]) if (method !== 'HEAD') routeList.push({ method, url: r.url });
+  });
 
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
@@ -91,11 +104,11 @@ export async function buildApp({ config, db, now = () => new Date() }: AppDeps):
     async (scope) => {
       // Rutas con cookie de sesión (panel): protección CSRF por origen. No se aplica a /public.
       await scope.register(async (session) => {
-        session.addHook('preHandler', sameOriginGuard);
+        session.addHook('onRequest', sameOriginGuard);
         await session.register(authRoutes, { prefix: '/auth', auth, cookieSecure: config.COOKIE_SECURE });
         await session.register(
           async (admin) => {
-            admin.addHook('preHandler', requireAuth);
+            admin.addHook('onRequest', requireAuth);
             await admin.register(tenantAdminRoutes, { db });
             await admin.register(serviceAdminRoutes, { db });
             await admin.register(professionalAdminRoutes, { db, now });

@@ -18,7 +18,7 @@ const Query = z
  * envía nada fuera: cada aviso trae su enlace wa.me para mandarlo a mano si se quiere.
  */
 export const notificationAdminRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) => {
-  app.get('/notifications', { preHandler: requireRole('ADMIN'), schema: { querystring: Query } }, async (request) => {
+  app.get('/notifications', { onRequest: requireRole('ADMIN'), schema: { querystring: Query } }, async (request) => {
     const { tenant } = requireAuthContext(request);
     const q = request.query;
     const rows = await db.notificationOutbox.findMany({

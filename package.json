@@ -18,7 +18,8 @@
     "db:check-drift": "npm run db:check-drift -w apps/api",
     "build": "npm run build -w apps/admin",
     "dev:api": "npm run dev -w apps/api",
-    "dev:admin": "npm run dev -w apps/admin"
+    "dev:admin": "npm run dev -w apps/admin",
+    "test:coverage": "npm run test:coverage --workspaces --if-present"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

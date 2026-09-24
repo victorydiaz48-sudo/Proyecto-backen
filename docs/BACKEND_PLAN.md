@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–13 completadas.** Siguiente: Fase 14 (testing completo).
+Estado: **Fases 0–14 completadas.** Siguiente: Fase 15 (auditoría de seguridad).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -178,6 +178,6 @@ que el generador (que no se toca) sigue igual.
 | 11 | Panel de profesional | Agenda propia, cambiar estado de sus citas, bloqueos propios. Vista de próximos 7 días, resumen del día, formulario limitado a sus servicios, navegación móvil. ✅ |
 | 12 | Notificaciones | Interfaz `NotificationChannel`, outbox + worker, WhatsApp como implementación. Opción C aprobada: transporte `log` + envío manual desde el panel; avisos a cliente y negocio. ✅ |
 | 13 | Integración con el generador | Campos `apiUrl`/`tenantSlug`, selector de horas reales, fallback a WhatsApp, importador del JSON v4. Páginas sin backend idénticas byte a byte (hashes congelados). ✅ |
-| 14 | Testing completo | Cobertura de la matriz de [TESTING](TESTING.md). |
+| 14 | Testing completo | Cobertura de la matriz de [TESTING](TESTING.md). Matriz de rutas automática, pruebas en navegador del panel, puntos de entrada, cobertura con umbrales, suite en UTC+14. ✅ |
 | 15 | Auditoría de seguridad | Checklist de [SECURITY](SECURITY.md), RLS si se aprueba. |
 | 16 | Despliegue | Dockerfile, `prisma migrate deploy`, health checks, backups, guía. |

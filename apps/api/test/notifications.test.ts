@@ -221,3 +221,41 @@ describe('plantillas', () => {
     expect(renderTemplate('customer.booking_cancelled', 'es-ES', data)).not.toContain('Servicio');
   });
 });
+
+describe('bucle del worker y transporte "log"', () => {
+  it('el bucle procesa los avisos solo, sin intervención, y se puede detener', async () => {
+    const { startNotificationWorker } = await import('../src/modules/notifications/worker.ts');
+    now = new Date();
+    await publicBookFuture();
+    const t = new RecordingTransport();
+    const errors: unknown[] = [];
+    const stop = startNotificationWorker(db, t, { error: (e) => errors.push(e) }, 50);
+    for (let i = 0; i < 40 && t.sent.length < 2; i++) await new Promise((r) => setTimeout(r, 50));
+    stop();
+    expect(t.sent).toHaveLength(2);
+    expect(errors).toEqual([]);
+  });
+
+  it('LogTransport registra el aviso sin el texto y con el teléfono enmascarado', async () => {
+    const { LogTransport } = await import('../src/modules/notifications/transport.ts');
+    const logged: unknown[] = [];
+    await new LogTransport({ info: (obj: unknown) => logged.push(obj) } as never).send({ id: 'n1', tenantId: 't1', channel: 'whatsapp', to: '+5541988887777', text: 'Olá Pedro, dados privados' });
+    expect(JSON.stringify(logged)).not.toContain('Pedro');
+    expect(JSON.stringify(logged)).not.toContain('988887777');
+    expect(logged[0]).toMatchObject({ notificationId: 'n1', to: '+554…77', length: 25 });
+  });
+});
+
+/** Reserva pública a unos días vista respecto del reloj real (para el bucle del worker). */
+async function publicBookFuture() {
+  const d = new Date(Date.now() + 3 * 86_400_000);
+  if (d.getUTCDay() === 0) d.setUTCDate(d.getUTCDate() + 1);
+  const realApp = await buildTestApp(db);
+  const res = await realApp.inject({
+    method: 'POST',
+    url: '/api/v1/public/barberia-a/bookings',
+    payload: { serviceId: a.serviceId, professionalId: a.professionalId, date: d.toISOString().slice(0, 10), time: '10:00', customer: { name: 'Pedro', phone: '41 98888-7777' } },
+  });
+  await realApp.close();
+  expect(res.statusCode).toBe(201);
+}

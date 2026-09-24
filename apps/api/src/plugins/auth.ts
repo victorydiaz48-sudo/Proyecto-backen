@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from 'fastify';
+import type { FastifyInstance, FastifyReply, FastifyRequest, onRequestAsyncHookHandler } from 'fastify';
 import type { Db } from '../db.ts';
 import type { Role } from '../generated/prisma/enums.ts';
 import { sha256 } from '../lib/crypto.ts';
@@ -71,11 +71,15 @@ export function requireAuthContext(request: FastifyRequest): AuthContext {
   return request.auth;
 }
 
-export const requireAuth: preHandlerAsyncHookHandler = async (request) => {
+/*
+ * Sesión, rol y CSRF se comprueban en onRequest, ANTES de validar el cuerpo: así una petición anónima o
+ * sin permiso recibe 401/403 y nunca un 400 que revele el esquema del endpoint.
+ */
+export const requireAuth: onRequestAsyncHookHandler = async (request) => {
   requireAuthContext(request);
 };
 
-export function requireRole(...roles: Role[]): preHandlerAsyncHookHandler {
+export function requireRole(...roles: Role[]): onRequestAsyncHookHandler {
   return async (request) => {
     const auth = requireAuthContext(request);
     if (!roles.includes(auth.user.role)) throw forbidden();

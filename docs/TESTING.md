@@ -23,11 +23,17 @@ npm run lint            # ESLint (TypeScript con type-checking)
 npm run typecheck       # prisma generate + tsc --noEmit
 npm test                # vitest run (unit + integración, requiere TEST_DATABASE_URL)
 npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABASE_URL)
+npm run test:coverage   # tests + cobertura con umbral mínimo (lo que ejecuta CI)
+TZ=Pacific/Kiritimati npm test   # toda la suite con el servidor en UTC+14 (también en CI)
 ```
+
+Las pruebas en navegador (`test/generator/e2e.test.ts`, `test/panel-e2e.test.ts`) usan `playwright-core`
+con Chromium y se saltan si no hay navegador o, las del panel, si no existe el build (`npm run build`).
+En CI se instala Chromium y se compila el panel antes de los tests.
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 13)
+## Estado actual (hasta la Fase 14)
 
 | Archivo | Cubre |
 |---|---|
@@ -56,9 +62,54 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/generator/generator.test.ts` | la librería del generador cargada en Node: **6 páginas sin backend idénticas byte a byte** a las del generador anterior (hashes congelados en `baseline-hashes.json`), JSON antiguo sin campos nuevos, configuración de la API (URL normalizada, slug en minúsculas), reserva sin WhatsApp ni servicios locales, multi-local con botón de reserva, validación de URL/slug (https, http solo localhost, sin query/credenciales), escape de la URL |
 | `test/generator/e2e.test.ts` | **Chromium con la página abierta como `file://`** contra la API real: reserva con horas reales y aviso por WhatsApp; otra reserva se adelanta → aviso, alternativas y reserva con una de ellas; elección de servicio antes de que cargue la API se conserva; varios locales (filtra profesionales por local); API caída → flujo WhatsApp sin horas inventadas; página sin backend igual que antes; "Probar conexión" del generador. Se salta si no hay Chromium (en CI se instala) |
 | `test/importer.test.ts` | interpretación de servicios (categorías, precios, marcadores, sin precio), equipo (servicios por nombre, inexistentes), horarios (24 h, cruce de medianoche), locales, monedas y locales; importación completa y reserva posterior por la API pública; negocio existente con datos → se niega sin tocar nada; sin email de ADMIN → error |
+| `test/route-matrix.test.ts` | las 39 rutas `/admin` (lista tomada de la app): 401 sin sesión, 403 para PROFESSIONAL en rutas de ADMIN, 404 con ids de B y B intacto, sin `tenantId` en cuerpos, listados sin ids de B; sesión de A en la API pública de B; 20 reservas públicas simultáneas desde 20 IPs → 1 |
+| `test/entrypoints.test.ts` | `server.ts` real: arranca, `/healthz` y `/readyz`, SIGTERM → salida 0; `tenant:create` e `import:generator` como procesos (éxito, errores y código de salida) |
+| `test/panel-e2e.test.ts` | Chromium contra la API que sirve el panel: ADMIN crea servicio (precio "30,00"), profesional con horario desde el editor, cita desde la agenda y la cancela con motivo, y lo ve en la auditoría; PROFESSIONAL en móvil: menú reducido, bloqueo propio, horario de solo lectura; recarga en una ruta del panel |
+| `apps/admin/test/pages.test.tsx` | cada pantalla del ADMIN: precio a céntimos y precio ilegible, editor de horario (24:00, local), ajustes sin slug, contraseña temporal mostrada una vez, clientes con búsqueda y paginación, locales/bloqueos/auditoría/cuenta |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
-## Matriz obligatoria
+## Cobertura de la matriz obligatoria (Fase 14)
+
+| Requisito | Dónde se prueba |
+|---|---|
+| **Aislamiento**: A no lee ni modifica nada de B por ninguna ruta con `:id` (404 y B intacto) | `route-matrix.test.ts` (recorre **todas** las rutas `/admin` registradas; falla si aparece una ruta sin clasificar) |
+| Relaciones con ids de B imposibles también en la BD | `db-tenant-isolation.test.ts` (FKs compuestas) |
+| `tenantId` en el cuerpo → 400, en todas las rutas con cuerpo | `route-matrix.test.ts`, `roles-and-tenant-isolation.test.ts`, `public-api.test.ts` |
+| Listados de A sin filas de B | `route-matrix.test.ts` (todos los listados), más cada módulo |
+| Público con ids de B → mismo error que inexistente | `public-api.test.ts`, `availability.test.ts` |
+| Mismo teléfono en A y B = dos clientes | `db-tenant-isolation.test.ts`, `customers.test.ts` |
+| Sesión de A no cambia nada en la API pública de B | `route-matrix.test.ts` |
+| **Doble reserva**: 20 simultáneas → 1 (BD, panel y API pública con 20 IPs) | `db-constraints.test.ts`, `bookings.test.ts`, `route-matrix.test.ts` |
+| Solape parcial simultáneo, contiguas, cancelar libera / reactivar ocupada → 409, `23P01` | `db-constraints.test.ts`, `bookings-any.test.ts`, `bookings.test.ts` |
+| `any` concurrente sin duplicar profesional | `bookings-any.test.ts` |
+| **Disponibilidad**: orden de validación, fuera de horario, cierre, pausa, buffer, intervalo, antelación, horizonte | `check-slot.test.ts`, `slots.test.ts`, `availability.test.ts`, `bookings.test.ts` |
+| Alternativas reales por cercanía, nunca reserva otra hora | `slots.test.ts`, `availability.test.ts`, `generator/e2e.test.ts` |
+| `any`: menos citas del día, desempate estable | `slots.test.ts`, `bookings-any.test.ts` |
+| **Zona horaria**: São Paulo vs Madrid, cambio de hora (inexistente/ambigua), cruce de medianoche | `time-phone.test.ts`, `slots.test.ts`, `check-slot.test.ts`, `bookings.test.ts` |
+| "Hoy"/"ahora" en la zona del negocio con el servidor en otra zona | toda la suite con `TZ=Pacific/Kiritimati` (UTC+14) y `Pacific/Pago_Pago` (UTC−11): pasa; CI la ejecuta en UTC+14 |
+| **Roles**: sin sesión → 401 en todo `/admin` (incluso con cuerpo inválido) | `route-matrix.test.ts` |
+| PROFESSIONAL → 403 en todo lo de ADMIN (incluso con cuerpo inválido); no escala su rol | `route-matrix.test.ts` |
+| PROFESSIONAL solo sus citas/bloqueos/clientes | `bookings.test.ts`, `schedule.test.ts`, `customers.test.ts` |
+| Sesión caducada/revocada → 401; logout; fuerza bruta → 429 | `auth.test.ts` |
+| **Validación**: campos extra → 400; teléfonos → mismo E.164; 500 sin detalles | `public-api.test.ts`, `bookings.test.ts`, `time-phone.test.ts`, `roles-and-tenant-isolation.test.ts` |
+| **Migraciones** desde cero y sin drift | global setup (`migrate deploy`), `db-constraints.test.ts`, `npm run db:check-drift` |
+| **Generador**: sin backend, páginas idénticas byte a byte | `generator/generator.test.ts` |
+| Puntos de entrada reales (servidor con SIGTERM, scripts del operador) | `entrypoints.test.ts` |
+| Panel en navegador (ADMIN y PROFESSIONAL en móvil) | `panel-e2e.test.ts` |
+
+**Cobertura medida** (`npm run test:coverage`): API 97 % de sentencias, 91 % de ramas, 100 % de
+funciones (sin contar `server.ts` y `cli/`, que se prueban como procesos); panel 67 % de sentencias con
+tests unitarios, además de las pruebas en Chromium. Umbrales en CI: API 90/83/95/90, panel 60/50/50/60.
+
+**Verificación por mutación** (se rompe el código a propósito y el test debe fallar): quitar el bloqueo
+del profesional al crear citas (Fase 8) y comprobar la sesión después de validar el cuerpo (Fase 14):
+en ambos casos los tests fallan; restaurado, pasan.
+
+**Hallazgo de la Fase 14**: la sesión, el rol y la protección CSRF se comprobaban en `preHandler`, que
+en Fastify va *después* de validar el cuerpo: una petición anónima con cuerpo inválido recibía 400 en
+vez de 401 (revelando el esquema). Ahora se comprueban en `onRequest`.
+
+## Matriz obligatoria (requisitos)
 
 ### Aislamiento entre tenants
 - Admin de A: `GET/PATCH/DELETE` de profesional, servicio, cliente, cita, bloqueo, horario, local,

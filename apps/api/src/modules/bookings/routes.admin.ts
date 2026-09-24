@@ -13,27 +13,27 @@ export const bookingAdminRoutes: FastifyPluginAsyncZod<{ db: Db; now: () => Date
   const bookings = new BookingsService(db, now);
   const anyRole = requireRole('ADMIN', 'PROFESSIONAL');
 
-  app.get('/bookings', { preHandler: anyRole, schema: { querystring: BookingListQuery } }, async (request) => {
+  app.get('/bookings', { onRequest: anyRole, schema: { querystring: BookingListQuery } }, async (request) => {
     const auth = requireAuthContext(request);
     return { items: await bookings.list(auth.tenant.id, viewerOf(auth), request.query) };
   });
 
-  app.get('/bookings/:id', { preHandler: anyRole, schema: { params: zIdParams } }, async (request) => {
+  app.get('/bookings/:id', { onRequest: anyRole, schema: { params: zIdParams } }, async (request) => {
     const auth = requireAuthContext(request);
     return bookings.get(auth.tenant.id, viewerOf(auth), request.params.id);
   });
 
-  app.post('/bookings', { preHandler: anyRole, schema: { body: BookingCreate } }, async (request, reply) => {
+  app.post('/bookings', { onRequest: anyRole, schema: { body: BookingCreate } }, async (request, reply) => {
     const auth = requireAuthContext(request);
     return reply.status(201).send(await bookings.create(userActor(auth, request), viewerOf(auth), request.body));
   });
 
-  app.patch('/bookings/:id', { preHandler: anyRole, schema: { params: zIdParams, body: BookingReschedule } }, async (request) => {
+  app.patch('/bookings/:id', { onRequest: anyRole, schema: { params: zIdParams, body: BookingReschedule } }, async (request) => {
     const auth = requireAuthContext(request);
     return bookings.reschedule(userActor(auth, request), viewerOf(auth), request.params.id, request.body);
   });
 
-  app.post('/bookings/:id/status', { preHandler: anyRole, schema: { params: zIdParams, body: BookingStatusChange } }, async (request) => {
+  app.post('/bookings/:id/status', { onRequest: anyRole, schema: { params: zIdParams, body: BookingStatusChange } }, async (request) => {
     const auth = requireAuthContext(request);
     return bookings.changeStatus(userActor(auth, request), viewerOf(auth), request.params.id, request.body.status, request.body.reason);
   });

@@ -18,21 +18,21 @@ export const customerAdminRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app
   const anyRole = requireRole('ADMIN', 'PROFESSIONAL');
   const admin = requireRole('ADMIN');
 
-  app.get('/customers', { preHandler: anyRole, schema: { querystring: CustomerListQuery } }, async (request) => {
+  app.get('/customers', { onRequest: anyRole, schema: { querystring: CustomerListQuery } }, async (request) => {
     const auth = requireAuthContext(request);
     return customers.list(auth.tenant.id, request.query, scopeFor(auth));
   });
 
-  app.get('/customers/:id', { preHandler: anyRole, schema: { params: zIdParams } }, async (request) => {
+  app.get('/customers/:id', { onRequest: anyRole, schema: { params: zIdParams } }, async (request) => {
     const auth = requireAuthContext(request);
     return customers.get(auth.tenant.id, request.params.id, scopeFor(auth));
   });
 
-  app.post('/customers', { preHandler: admin, schema: { body: CustomerCreate } }, async (request, reply) =>
+  app.post('/customers', { onRequest: admin, schema: { body: CustomerCreate } }, async (request, reply) =>
     reply.status(201).send(await customers.create(userActor(requireAuthContext(request), request), request.body)),
   );
 
-  app.patch('/customers/:id', { preHandler: admin, schema: { params: zIdParams, body: CustomerPatch } }, async (request) =>
+  app.patch('/customers/:id', { onRequest: admin, schema: { params: zIdParams, body: CustomerPatch } }, async (request) =>
     customers.update(userActor(requireAuthContext(request), request), request.params.id, request.body),
   );
 };

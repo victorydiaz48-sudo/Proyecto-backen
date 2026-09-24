@@ -38,8 +38,13 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run db:check-drift
-      - run: npm test
-      - name: Build del panel
+      - name: Build del panel (lo necesitan las pruebas del panel en el navegador)
         run: npm run build
+      - name: Tests con cobertura mínima
+        run: npm run test:coverage
+      - name: Tests con el servidor en otra zona horaria (UTC+14)
+        run: npm test
+        env:
+          TZ: Pacific/Kiritimati
       - name: Migraciones desde cero (como en producción)
         run: npm run db:deploy -w apps/api

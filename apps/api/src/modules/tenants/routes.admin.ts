@@ -6,12 +6,12 @@ import { TENANT_SETTINGS_SELECT, TenantSettingsPatch } from './schemas.ts';
 
 /** /admin/settings: ajustes del tenant de la sesión (nunca de otro). */
 export const tenantAdminRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { db }) => {
-  app.get('/settings', { preHandler: requireRole('ADMIN') }, async (request) => {
+  app.get('/settings', { onRequest: requireRole('ADMIN') }, async (request) => {
     const { tenant } = requireAuthContext(request);
     return db.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: TENANT_SETTINGS_SELECT });
   });
 
-  app.patch('/settings', { preHandler: requireRole('ADMIN'), schema: { body: TenantSettingsPatch } }, async (request) => {
+  app.patch('/settings', { onRequest: requireRole('ADMIN'), schema: { body: TenantSettingsPatch } }, async (request) => {
     const { tenant, user } = requireAuthContext(request);
     return db.$transaction(async (tx) => {
       const before = await tx.tenant.findUniqueOrThrow({ where: { id: tenant.id }, select: TENANT_SETTINGS_SELECT });

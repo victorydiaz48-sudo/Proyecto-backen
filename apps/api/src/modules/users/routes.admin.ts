@@ -11,23 +11,23 @@ export const userAdminRoutes: FastifyPluginAsyncZod<{ db: Db }> = async (app, { 
   const users = new UsersService(db);
   const admin = requireRole('ADMIN');
 
-  app.get('/users', { preHandler: admin }, async (request) => ({ items: await users.list(requireAuthContext(request).tenant.id) }));
+  app.get('/users', { onRequest: admin }, async (request) => ({ items: await users.list(requireAuthContext(request).tenant.id) }));
 
-  app.post('/users', { preHandler: admin, schema: { body: UserCreate } }, async (request, reply) =>
+  app.post('/users', { onRequest: admin, schema: { body: UserCreate } }, async (request, reply) =>
     reply.status(201).send(await users.create(userActor(requireAuthContext(request), request), request.body)),
   );
 
-  app.patch('/users/:id', { preHandler: admin, schema: { params: zIdParams, body: UserPatch } }, async (request) =>
+  app.patch('/users/:id', { onRequest: admin, schema: { params: zIdParams, body: UserPatch } }, async (request) =>
     users.update(userActor(requireAuthContext(request), request), request.params.id, request.body),
   );
 
   app.post(
     '/users/:id/reset-password',
-    { preHandler: admin, config: { rateLimit: { max: 10, timeWindow: '15 minutes' } }, schema: { params: zIdParams } },
+    { onRequest: admin, config: { rateLimit: { max: 10, timeWindow: '15 minutes' } }, schema: { params: zIdParams } },
     async (request) => users.resetPassword(userActor(requireAuthContext(request), request), request.params.id),
   );
 
-  app.get('/audit-logs', { preHandler: admin, schema: { querystring: AuditListQuery } }, async (request) => {
+  app.get('/audit-logs', { onRequest: admin, schema: { querystring: AuditListQuery } }, async (request) => {
     const { tenant } = requireAuthContext(request);
     const q = request.query;
     const rows = await db.auditLog.findMany({

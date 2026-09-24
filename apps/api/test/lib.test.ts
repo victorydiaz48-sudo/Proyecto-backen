@@ -47,3 +47,15 @@ describe('validación', () => {
     }
   });
 });
+
+describe('FailureLimiter con muchas claves', () => {
+  it('limpia las claves caducadas para no crecer sin límite', () => {
+    let t = 0;
+    const l = new FailureLimiter(3, 1000, () => t);
+    for (let i = 0; i < 10_001; i++) l.fail(`k${i}`);
+    t = 5000;
+    l.fail('nueva'); // dispara la limpieza
+    expect(l.isBlocked('k1')).toBe(false);
+    expect((l as unknown as { failures: Map<string, number[]> }).failures.size).toBeLessThan(10);
+  });
+});

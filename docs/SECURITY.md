@@ -39,7 +39,9 @@
 
 ## 4. Autorización
 
-- `requireAuth` + `requireRole(...)` en cada ruta admin, declarados en la definición de la ruta.
+- `requireAuth` + `requireRole(...)` en cada ruta admin, declarados en la definición de la ruta, en el
+  hook `onRequest` (antes de validar el cuerpo): sin sesión o sin permiso siempre 401/403, nunca un 400
+  que revele el esquema. `route-matrix.test.ts` lo comprueba en todas las rutas.
 - Políticas por recurso para `PROFESSIONAL` (solo `professionalId === session.professionalId`).
 - El rol y el `professionalId` salen de la BD vía sesión, nunca del cliente.
 - Siempre queda al menos un ADMIN activo (Fase 10): degradar o desactivar al último → `409`; los
@@ -107,7 +109,7 @@
 
 ## 9. Checklist para la Fase 15
 
-- [ ] Test de acceso cruzado para cada ruta.
+- [x] Test de acceso cruzado para cada ruta (`route-matrix.test.ts`, lista tomada de la app).
 - [ ] Ningún esquema de entrada acepta `tenantId`, `price*`, `duration*`, `role`, `status` donde no corresponda.
 - [ ] Exclusion constraint presente tras `migrate deploy`.
 - [ ] Rate limits activos en producción.

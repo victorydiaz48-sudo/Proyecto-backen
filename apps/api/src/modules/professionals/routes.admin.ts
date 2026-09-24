@@ -12,31 +12,31 @@ export const professionalAdminRoutes: FastifyPluginAsyncZod<{ db: Db; now: () =>
   const anyRole = requireRole('ADMIN', 'PROFESSIONAL');
   const admin = requireRole('ADMIN');
 
-  app.get('/professionals', { preHandler: anyRole, schema: { querystring: ProfessionalListQuery } }, async (request) => {
+  app.get('/professionals', { onRequest: anyRole, schema: { querystring: ProfessionalListQuery } }, async (request) => {
     const { tenant } = requireAuthContext(request);
     return { items: await pros.list(tenant.id, request.query) };
   });
 
-  app.get('/professionals/:id', { preHandler: anyRole, schema: { params: zIdParams } }, async (request) =>
+  app.get('/professionals/:id', { onRequest: anyRole, schema: { params: zIdParams } }, async (request) =>
     pros.get(requireAuthContext(request).tenant.id, request.params.id),
   );
 
-  app.post('/professionals', { preHandler: admin, schema: { body: ProfessionalCreate } }, async (request, reply) => {
+  app.post('/professionals', { onRequest: admin, schema: { body: ProfessionalCreate } }, async (request, reply) => {
     const created = await pros.create(userActor(requireAuthContext(request), request), request.body);
     return reply.status(201).send(created);
   });
 
-  app.patch('/professionals/:id', { preHandler: admin, schema: { params: zIdParams, body: ProfessionalPatch } }, async (request) =>
+  app.patch('/professionals/:id', { onRequest: admin, schema: { params: zIdParams, body: ProfessionalPatch } }, async (request) =>
     pros.update(userActor(requireAuthContext(request), request), request.params.id, request.body),
   );
 
-  app.delete('/professionals/:id', { preHandler: admin, schema: { params: zIdParams } }, async (request) =>
+  app.delete('/professionals/:id', { onRequest: admin, schema: { params: zIdParams } }, async (request) =>
     pros.archive(userActor(requireAuthContext(request), request), request.params.id),
   );
 
   app.put(
     '/professionals/:id/services',
-    { preHandler: admin, schema: { params: zIdParams, body: ProfessionalServicesPut } },
+    { onRequest: admin, schema: { params: zIdParams, body: ProfessionalServicesPut } },
     async (request) => pros.setServices(userActor(requireAuthContext(request), request), request.params.id, request.body.serviceIds),
   );
 };

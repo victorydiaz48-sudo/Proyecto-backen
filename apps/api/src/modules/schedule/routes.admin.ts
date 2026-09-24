@@ -21,7 +21,7 @@ export const scheduleAdminRoutes: FastifyPluginAsyncZod<{ db: Db; now: () => Dat
   const blocks = new TimeBlocksService(db);
   const anyRole = requireRole('ADMIN', 'PROFESSIONAL');
 
-  app.get('/professionals/:id/working-hours', { preHandler: anyRole, schema: { params: zIdParams } }, async (request) => {
+  app.get('/professionals/:id/working-hours', { onRequest: anyRole, schema: { params: zIdParams } }, async (request) => {
     const auth = requireAuthContext(request);
     ownProfessionalOrAdmin(auth, request.params.id);
     return { items: await hours.get(auth.tenant.id, request.params.id) };
@@ -29,13 +29,13 @@ export const scheduleAdminRoutes: FastifyPluginAsyncZod<{ db: Db; now: () => Dat
 
   app.put(
     '/professionals/:id/working-hours',
-    { preHandler: requireRole('ADMIN'), schema: { params: zIdParams, body: WorkingHoursPut } },
+    { onRequest: requireRole('ADMIN'), schema: { params: zIdParams, body: WorkingHoursPut } },
     async (request) => ({
       items: await hours.replace(userActor(requireAuthContext(request), request), request.params.id, request.body.intervals),
     }),
   );
 
-  app.get('/time-blocks', { preHandler: anyRole, schema: { querystring: TimeBlockListQuery } }, async (request) => {
+  app.get('/time-blocks', { onRequest: anyRole, schema: { querystring: TimeBlockListQuery } }, async (request) => {
     const auth = requireAuthContext(request);
     const from = request.query.from ?? now();
     const to = request.query.to ?? new Date(from.getTime() + 60 * DAY_MS);
@@ -56,7 +56,7 @@ export const scheduleAdminRoutes: FastifyPluginAsyncZod<{ db: Db; now: () => Dat
     };
   });
 
-  app.post('/time-blocks', { preHandler: anyRole, schema: { body: TimeBlockCreate } }, async (request, reply) => {
+  app.post('/time-blocks', { onRequest: anyRole, schema: { body: TimeBlockCreate } }, async (request, reply) => {
     const auth = requireAuthContext(request);
     const body = request.body;
     let professionalId = body.professionalId ?? null;
@@ -76,7 +76,7 @@ export const scheduleAdminRoutes: FastifyPluginAsyncZod<{ db: Db; now: () => Dat
     return reply.status(201).send(created);
   });
 
-  app.delete('/time-blocks/:id', { preHandler: anyRole, schema: { params: zIdParams } }, async (request, reply) => {
+  app.delete('/time-blocks/:id', { onRequest: anyRole, schema: { params: zIdParams } }, async (request, reply) => {
     const auth = requireAuthContext(request);
     const isAdmin = auth.user.role === 'ADMIN';
     if (!isAdmin && !auth.user.professionalId) throw notFound();

@@ -41,18 +41,18 @@ export const authRoutes: FastifyPluginAsyncZod<AuthRoutesOptions> = async (app, 
     },
   );
 
-  app.post('/logout', { preHandler: requireAuth }, async (request, reply) => {
+  app.post('/logout', { onRequest: requireAuth }, async (request, reply) => {
     await auth.logout(requireAuthContext(request).sessionId);
     reply.clearCookie(SESSION_COOKIE, cookieOptions);
     return reply.status(204).send();
   });
 
-  app.get('/me', { preHandler: requireAuth }, async (request) => meResponse(requireAuthContext(request)));
+  app.get('/me', { onRequest: requireAuth }, async (request) => meResponse(requireAuthContext(request)));
 
   app.post(
     '/password',
     {
-      preHandler: requireAuth,
+      onRequest: requireAuth,
       config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
       schema: {
         body: z

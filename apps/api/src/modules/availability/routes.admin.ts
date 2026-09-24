@@ -29,7 +29,7 @@ export const availabilityAdminRoutes: FastifyPluginAsyncZod<{ db: Db; now: () =>
   const availability = new AvailabilityService(db, now);
   app.get(
     '/availability',
-    { preHandler: requireRole('ADMIN', 'PROFESSIONAL'), schema: { querystring: AvailabilityQuerySchema } },
+    { onRequest: requireRole('ADMIN', 'PROFESSIONAL'), schema: { querystring: AvailabilityQuerySchema } },
     async (request) => {
       const { tenant } = requireAuthContext(request);
       const q = request.query;

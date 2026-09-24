@@ -22,3 +22,17 @@ describe('pgErrorCode', () => {
     expect(pgErrorCode(new Error('x'))).toBeUndefined();
   });
 });
+
+describe('loadConfig en producción', () => {
+  const base = { DATABASE_URL: 'postgresql://u:p@localhost:5432/db', NODE_ENV: 'production' };
+  it('las cookies de sesión son Secure por defecto y no se puede desactivar', () => {
+    expect(loadConfig(base).COOKIE_SECURE).toBe(true);
+    expect(() => loadConfig({ ...base, COOKIE_SECURE: 'false' })).toThrow(/COOKIE_SECURE/);
+    expect(loadConfig({ DATABASE_URL: base.DATABASE_URL }).COOKIE_SECURE).toBe(false);
+  });
+
+  it('valores por defecto del servidor y del worker de avisos', () => {
+    expect(loadConfig(base)).toMatchObject({ PORT: 3000, HOST: '0.0.0.0', NOTIFICATIONS_TRANSPORT: 'log', NOTIFICATIONS_WORKER: true, TRUST_PROXY: false });
+    expect(loadConfig({ ...base, NOTIFICATIONS_WORKER: 'false', TRUST_PROXY: '1' })).toMatchObject({ NOTIFICATIONS_WORKER: false, TRUST_PROXY: true });
+  });
+});
