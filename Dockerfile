@@ -16,10 +16,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/admin/package.json apps/admin/
-# CA adicional opcional (redes con proxy que inspecciona TLS): --secret id=ca,src=ruta/ca.pem
-RUN --mount=type=secret,id=ca,required=false \
-    if [ -f /run/secrets/ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/ca; fi; \
-    npm ci --no-audit --no-fund
+RUN npm ci --no-audit --no-fund
 COPY tsconfig.base.json ./
 COPY apps/api apps/api
 COPY apps/admin apps/admin
@@ -33,9 +30,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/admin/package.json apps/admin/
-RUN --mount=type=secret,id=ca,required=false \
-    if [ -f /run/secrets/ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/ca; fi; \
-    npm ci --workspace apps/api --include-workspace-root=false --no-audit --no-fund \
+RUN npm ci --workspace apps/api --include-workspace-root=false --no-audit --no-fund \
     && npm cache clean --force
 COPY apps/api/prisma/schema.prisma apps/api/prisma/schema.prisma
 COPY apps/api/prisma/migrations apps/api/prisma/migrations
@@ -57,9 +52,7 @@ COPY apps/admin/package.json apps/admin/
 COPY docker/prune-optional-peers.mjs /tmp/
 # Solo dependencias de producción de la API. npm instala también las peers opcionales (la herramienta
 # de Prisma y lo que arrastra); se quitan en el mismo paso para que no ocupen espacio en la imagen.
-RUN --mount=type=secret,id=ca,required=false \
-    if [ -f /run/secrets/ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/ca; fi; \
-    npm ci --omit=dev --workspace apps/api --include-workspace-root=false --no-audit --no-fund \
+RUN npm ci --omit=dev --workspace apps/api --include-workspace-root=false --no-audit --no-fund \
     && node /tmp/prune-optional-peers.mjs /app apps/api \
     && rm /tmp/prune-optional-peers.mjs \
     && npm cache clean --force

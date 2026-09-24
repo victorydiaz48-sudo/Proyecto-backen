@@ -33,9 +33,6 @@ docker build --target runtime -t reservas:1.0.0 .
 docker build --target migrate -t reservas-migrate:1.0.0 .
 ```
 
-Detrás de un proxy corporativo que inspecciona TLS, pasa su CA en el build:
-`--secret id=ca,src=ruta/ca.pem` (no queda en la imagen).
-
 Comandos de la imagen `runtime`: `serve` (por defecto), `tenant-create …`, `import-generator …`.
 
 ## 3. Variables de entorno
