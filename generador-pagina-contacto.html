@@ -249,7 +249,7 @@ const PAGE={
     mainLocFallback:'Unidade principal',locBook:'Agendar',locSuffix:' (Unidade: {name})',
     bkName:'Nome',bkPhone:'Telefone',bkService:'Serviço',bkPro:'Profissional',bkProAny:'Sem preferência',bkDate:'Data',bkTime:'Horário',bkNotes:'Observações',bkNotesPh:'Alguma preferência ou observação (opcional)',
     bkPick:'Selecione',bkContinue:'Continuar',bkBack:'Voltar',bkWa:'Continuar no WhatsApp',
-    bkReview:'Confira os dados antes de continuar',bkErrReq:'Preencha este campo.',bkErrPhone:'Telefone inválido.',bkErrDate:'Escolha uma data válida.',
+    bkReview:'Confira os dados antes de continuar',bkErrReq:'Preencha este campo.',bkErrPhone:'Telefone inválido.',bkErrDate:'Escolha uma data válida.',bkErrTime:'Fora do horário ({h}).',
     bkMsg1:'Olá! Gostaria de agendar um atendimento.',bkMsg2:'Aguardo confirmação. Obrigado!',
     bkLName:'Nome',bkLPhone:'Telefone',bkLService:'Serviço',bkLPro:'Profissional',bkLDate:'Data',bkLTime:'Horário',bkLNotes:'Observações',
     waMsg:'Olá! Vim pelo QR Code.',logoAlt:'Logotipo de ',metaDef:' — contato, WhatsApp, endereço e redes sociais.',
@@ -274,7 +274,7 @@ const PAGE={
     mainLocFallback:'Sede principal',locBook:'Agendar',locSuffix:' (Sede: {name})',
     bkName:'Nombre',bkPhone:'Teléfono',bkService:'Servicio',bkPro:'Profesional',bkProAny:'Sin preferencia',bkDate:'Fecha',bkTime:'Hora',bkNotes:'Notas',bkNotesPh:'Alguna preferencia u observación (opcional)',
     bkPick:'Selecciona',bkContinue:'Continuar',bkBack:'Volver',bkWa:'Continuar por WhatsApp',
-    bkReview:'Revisa los datos antes de continuar',bkErrReq:'Completa este campo.',bkErrPhone:'Teléfono no válido.',bkErrDate:'Elige una fecha válida.',
+    bkReview:'Revisa los datos antes de continuar',bkErrReq:'Completa este campo.',bkErrPhone:'Teléfono no válido.',bkErrDate:'Elige una fecha válida.',bkErrTime:'Fuera del horario ({h}).',
     bkMsg1:'¡Hola! Me gustaría reservar una cita.',bkMsg2:'Quedo atento/a a la confirmación. ¡Gracias!',
     bkLName:'Nombre',bkLPhone:'Teléfono',bkLService:'Servicio',bkLPro:'Profesional',bkLDate:'Fecha',bkLTime:'Hora',bkLNotes:'Notas',
     waMsg:'¡Hola! Vengo del código QR.',logoAlt:'Logotipo de ',metaDef:' — contacto, WhatsApp, dirección y redes sociales.',
@@ -1338,12 +1338,66 @@ function cardRuntime(R,C){
     var xBtn=q('[data-bkclose]');if(xBtn)xBtn.addEventListener('click',closeBk);
     bk.addEventListener('click',function(e){if(e.target===bk)closeBk();});
     var backBtn=q('[data-bkback]');if(backBtn)backBtn.addEventListener('click',function(){review.hidden=true;form.hidden=false;});
-    if(dateEl){try{var nn=new Date();dateEl.min=nn.getFullYear()+'-'+('0'+(nn.getMonth()+1)).slice(-2)+'-'+('0'+nn.getDate()).slice(-2);}catch(e){}}
+    /* Fecha y hora contra el horario declarado del negocio (el mismo de "abierto ahora"). Un día puede tener
+       más de un tramo: el suyo y, si la víspera cierra de madrugada (18:00–02:00), el trozo que pasa de
+       medianoche. La hora vale si cae dentro de algún tramo, nunca en el hueco entre dos. */
+    var H=cfg.hd,timeEl0=q('#bkTime');
+    var pad2=function(n){return ('0'+n).slice(-2);};
+    var hm=function(x){x=x%1440;return pad2(Math.floor(x/60))+':'+pad2(x%60);};
+    var today=function(){
+      try{
+        var p=new Intl.DateTimeFormat('en-US',{timeZone:cfg.tz,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()),o={};
+        for(var i=0;i<p.length;i++)o[p[i].type]=p[i].value;
+        if(o.year&&o.month&&o.day)return o.year+'-'+o.month+'-'+o.day;
+      }catch(e){}
+      var n=new Date();return n.getFullYear()+'-'+pad2(n.getMonth()+1)+'-'+pad2(n.getDate());
+    };
+    var minDate=today();
+    if(dateEl)dateEl.min=minDate;
+    var dayOf=function(v){
+      var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(v||'');if(!m)return -1;
+      var dt=new Date(Date.UTC(+m[1],+m[2]-1,+m[3]));
+      return dt.getUTCDate()===+m[3]&&dt.getUTCMonth()===+m[2]-1?dt.getUTCDay():-1;
+    };
+    var spans=function(w){
+      var out=[],t=H[w],y=H[(w+6)%7];
+      if(y&&y[1]<=y[0]&&y[1]>0)out.push({a:0,b:y[1],txt:hm(0)+' – '+hm(y[1])});
+      if(t)out.push({a:t[0],b:t[1]>t[0]?t[1]:1440,txt:t[0]===0&&t[1]===0?cfg.l.h24:hm(t[0])+' – '+hm(t[1])});
+      return out;
+    };
+    var dateMsg=function(v){
+      if(!v)return '';
+      var w=dayOf(v);
+      if(w<0||v<minDate)return cfg.e.date;
+      if(H&&!spans(w).length)return cfg.e.closed+' ('+cfg.l.days[w]+'). '+cfg.e.date;
+      return '';
+    };
+    var timeMsg=function(v,tv){
+      var tm=/^(\d{2}):(\d{2})/.exec(tv||'');
+      if(!H||!tm||dateMsg(v))return '';
+      var w=dayOf(v),sp=spans(w),x=(+tm[1])*60+(+tm[2]);
+      for(var si=0;si<sp.length;si++)if(x>=sp[si].a&&x<sp[si].b)return '';
+      return cfg.e.time.replace('{h}',cfg.l.days[w]+' '+sp.map(function(s){return s.txt;}).join(', '));
+    };
+    /* con un solo tramo ese día, min/max del campo de hora lo acotan (en los navegadores que lo respetan);
+       con varios tramos o sin fecha no hay un rango único, y manda la validación */
+    var syncTimeRange=function(){
+      if(!timeEl0)return;
+      var v=dateEl?dateEl.value:'',sp=H&&v&&!dateMsg(v)?spans(dayOf(v)):[];
+      if(sp.length===1&&sp[0].b-sp[0].a<1440){timeEl0.min=hm(sp[0].a);timeEl0.max=hm(Math.max(sp[0].a,sp[0].b-15));}
+      else{timeEl0.removeAttribute('min');timeEl0.removeAttribute('max');}
+    };
     var setErr=function(id,msg){
       var fld=R.querySelector('.bkf[data-f="'+id+'"]'),el=q('#bk'+id.charAt(0).toUpperCase()+id.slice(1)+'-e');
       if(fld)fld.classList.toggle('err',!!msg);
       if(el){el.textContent=msg||'';el.hidden=!msg;}
     };
+    /* aviso inmediato al cambiar la fecha o la hora (sin el "Preencha este campo" de los vacíos, que solo sale al enviar) */
+    if(dateEl)dateEl.addEventListener('change',function(){
+      setErr('date',dateMsg(dateEl.value));syncTimeRange();
+      if(timeEl0&&timeEl0.value)setErr('time',timeMsg(dateEl.value,timeEl0.value));
+    });
+    if(timeEl0)timeEl0.addEventListener('change',function(){setErr('time',timeMsg(dateEl?dateEl.value:'',timeEl0.value));});
     form.addEventListener('submit',function(ev){
       ev.preventDefault();
       var nameEl=q('#bkName'),phoneEl=q('#bkPhone'),svcEl=q('#bkService'),proEl=q('#bkPro'),timeEl=q('#bkTime'),notesEl=q('#bkNotes');
@@ -1352,8 +1406,9 @@ function cardRuntime(R,C){
       setErr('name',!name?cfg.e.req:'');if(!name)ok=false;
       if(!phone){setErr('phone',cfg.e.req);ok=false;}else if(digits.length<8){setErr('phone',cfg.e.phone);ok=false;}else setErr('phone','');
       setErr('service',!service?cfg.e.req:'');if(!service)ok=false;
-      setErr('date',!date?cfg.e.req:'');if(!date)ok=false;
-      setErr('time',!time?cfg.e.req:'');if(!time)ok=false;
+      var dErr=!date?cfg.e.req:dateMsg(date),tErr=!time?cfg.e.req:timeMsg(date,time);
+      setErr('date',dErr);if(dErr)ok=false;
+      setErr('time',tErr);if(tErr)ok=false;
       if(!ok){var bad=R.querySelector('.bkf.err input,.bkf.err select');if(bad)bad.focus();return;}
       var dp=date.split('-'),dispDate=dp.length===3?(dp[2]+'/'+dp[1]+'/'+dp[0]):date;
       var svcLbl=(svcEl.selectedOptions&&svcEl.selectedOptions[0]&&svcEl.selectedOptions[0].textContent)||service;
@@ -1888,16 +1943,16 @@ footer{text-align:center;font-size:.8125rem;color:var(--text-muted);overflow-wra
 .bkx svg{width:18px;height:18px}
 .bkf1,.bkf2{overflow-y:auto;padding:16px var(--pr) calc(20px + env(safe-area-inset-bottom,0px)) var(--pl)}
 .bkf1:not([hidden]),.bkf2:not([hidden]){display:flex;flex-direction:column;gap:14px}
-.bkf{display:flex;flex-direction:column;gap:6px}
+.bkf{display:flex;flex-direction:column;gap:6px;min-width:0}
 .bkf label{font-size:.8125rem;font-weight:650;color:var(--text-muted)}
-.bkf input,.bkf select,.bkf textarea{min-height:48px;padding:10px 14px;border-radius:calc(var(--c-r)*.5 + 4px);border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);font:16px/1.3 var(--fb);-webkit-appearance:none;appearance:none}
+.bkf input,.bkf select,.bkf textarea{width:100%;min-width:0;min-height:48px;padding:10px 14px;border-radius:calc(var(--c-r)*.5 + 4px);border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);font:16px/1.3 var(--fb);-webkit-appearance:none;appearance:none}
 .bkf textarea{min-height:64px;resize:vertical}
 .bkf select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%23888' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:34px}
 .bkf input:focus-visible,.bkf select:focus-visible,.bkf textarea:focus-visible{outline:3px solid var(--focus);outline-offset:1px;border-color:var(--accent)}
 .bkf.err input,.bkf.err select{border-color:var(--off)}
 .ctf.err textarea{border-color:var(--off)}
 .bke{margin:0;font-size:.8125rem;color:var(--off)}
-.bkrow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bkrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
 .bkf1 .cta{margin-top:4px}
 .bkrh{margin:0;font-size:.875rem;color:var(--text-muted)}
 .bksum{display:grid;gap:2px;margin:0;padding:4px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
@@ -2117,7 +2172,7 @@ function bookingDialog(m){
         '<div class="bkf" data-f="service"><label for="bkService">'+esc(T.bkService)+'</label><select id="bkService" required>'+svcOpts+'</select><p class="bke" id="bkService-e" hidden></p></div>'+
         proField+
         '<div class="bkrow"><div class="bkf" data-f="date"><label for="bkDate">'+esc(T.bkDate)+'</label><input id="bkDate" type="date" required><p class="bke" id="bkDate-e" hidden></p></div>'+
-        '<div class="bkf" data-f="time"><label for="bkTime">'+esc(T.bkTime)+'</label><input id="bkTime" type="time" required><p class="bke" id="bkTime-e" hidden></p></div></div>'+
+        '<div class="bkf" data-f="time"><label for="bkTime">'+esc(T.bkTime)+'</label><input id="bkTime" type="time" step="900" required><p class="bke" id="bkTime-e" hidden></p></div></div>'+
         '<div class="bkf" data-f="notes"><label for="bkNotes">'+esc(T.bkNotes)+'</label><textarea id="bkNotes" rows="2" maxlength="300" placeholder="'+esc(T.bkNotesPh)+'"></textarea></div>'+
         '<button type="submit" class="cta">'+ICONS.go+'<span>'+esc(T.bkContinue)+'</span></button>'+
       '</form>'+
@@ -2163,8 +2218,10 @@ function buildParts(raw,opt){
       cart:m.cartOn?{wa:m.waNum,name:m.shown,items:m.services.map(s=>({n:s.n,p:s.p,desc:s.desc,photo:s.photo?1:0,sizes:s.sizes,opts:s.opts})),msg1:T.ctMsg1,msg2:T.ctMsg2,l:{mode:T.ctLMode,notes:T.ctLNotes,total:T.ctLTotal,address:T.ctLAddress,payment:T.ctLPayment,change:T.ctLChange,qty:T.ctQty,table:T.ctLTable},e:{address:T.ctErrAddress,table:T.ctErrTable},icoMinus:ICONS.minus,icoPlus:ICONS.plus}:null,
       book:(!m.locations&&m.cta&&m.cta.k==='book')?{wa:m.waNum,name:m.shown,msg1:T.bkMsg1,msg2:T.bkMsg2,
         pros:m.team.map(x=>({n:x.n,label:x.r?x.n+' — '+x.r:x.n,svc:x.svc})),
-        l:{name:T.bkLName,phone:T.bkLPhone,service:T.bkLService,pro:T.bkLPro,proAny:T.bkProAny,date:T.bkLDate,time:T.bkLTime,notes:T.bkLNotes},
-        e:{req:T.bkErrReq,phone:T.bkErrPhone,date:T.bkErrDate}}:null}};
+        l:{name:T.bkLName,phone:T.bkLPhone,service:T.bkLService,pro:T.bkLPro,proAny:T.bkProAny,date:T.bkLDate,time:T.bkLTime,notes:T.bkLNotes,days:T.days,h24:T.h24},
+        /* el mismo horario (y la misma zona horaria) que usa "abierto ahora"; null si el negocio no declaró horarios */
+        hd:m.hours.cfg?m.hours.cfg.d:null,tz:m.d.tz,
+        e:{req:T.bkErrReq,phone:T.bkErrPhone,date:T.bkErrDate,closed:T.closed,time:T.bkErrTime}}:null}};
 }
 function faviconOf(m,icon){
   if(icon)return icon;
