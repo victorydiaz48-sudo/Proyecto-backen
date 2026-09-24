@@ -9,7 +9,7 @@ export function MyHoursPage() {
   return (
     <section>
       <h1>{t.navMyHours}</h1>
-      {me.user.professionalId ? <HoursEditor professionalId={me.user.professionalId} readOnly /> : <p className="muted">{t.none}</p>}
+      {me.user.professionalId ? <HoursEditor professionalId={me.user.professionalId} readOnly /> : <p className="notice">{t.unlinked}</p>}
     </section>
   );
 }

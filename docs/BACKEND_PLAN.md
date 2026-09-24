@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–10 completadas.** Siguiente: Fase 11 (panel de profesional).
+Estado: **Fases 0–11 completadas.** Siguiente: Fase 12 (servicio de notificaciones).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -168,7 +168,7 @@ que el generador (que no se toca) sigue igual.
 | 8 | Doble reserva | Exclusion constraint + transacción; test concurrente con N peticiones simultáneas. Creación con `any` y reintento por candidato. ✅ |
 | 9 | API pública | 5 endpoints, CORS `*` sin credenciales, rate limit, idempotencia. ✅ |
 | 10 | API admin + panel React | CRUD completo, agenda, auditoría. Usuarios y auditoría en la API; panel React (pt/es) servido por la API. ✅ |
-| 11 | Panel de profesional | Agenda propia, cambiar estado de sus citas, bloqueos propios. |
+| 11 | Panel de profesional | Agenda propia, cambiar estado de sus citas, bloqueos propios. Vista de próximos 7 días, resumen del día, formulario limitado a sus servicios, navegación móvil. ✅ |
 | 12 | Notificaciones | Interfaz `NotificationChannel`, outbox + worker, WhatsApp como implementación. |
 | 13 | Integración con el generador | Campos `apiUrl`/`tenantSlug`, selector de horas reales, fallback a WhatsApp, importador del JSON v4. |
 | 14 | Testing completo | Cobertura de la matriz de [TESTING](TESTING.md). |

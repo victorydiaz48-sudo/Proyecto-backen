@@ -196,6 +196,17 @@ base del motor de disponibilidad (Fase 7).
   (lectura), Clientes (los suyos) y Mi cuenta. La API aplica igualmente todos los permisos.
 - Idioma: portugués y español como el generador; por defecto el `locale` del negocio.
 
+**Panel del profesional (Fase 11)** — pensado para el móvil:
+- Agenda con dos vistas: **Día** (su columna, con resumen "N citas · total" sin contar canceladas) y
+  **Próximos 7 días** (agrupada por fecha, sin canceladas; tocar la fecha abre ese día).
+- Acciones sobre sus citas: confirmar, completar / no vino (solo tras el inicio), cancelar con motivo,
+  mover. Reactivar una cancelada es solo de ADMIN.
+- Nueva cita: solo en su agenda y solo con los servicios que él hace; horas reales del servidor.
+- Bloqueos: crea y borra los suyos (sin elegir profesional ni local); ve también los generales.
+- Mi horario: lectura (lo cambia el ADMIN). Clientes: los que tienen cita con él (lectura).
+- Usuario PROFESSIONAL sin ficha vinculada: aviso claro en vez de pantallas vacías.
+- En pantallas estrechas la navegación es una barra fija, compacta y desplazable.
+
 ## 8. Despliegue (Fase 16, resumen)
 
 Una imagen Docker: `api` sirve `/api/*` y los estáticos de la SPA. `prisma migrate deploy` en el

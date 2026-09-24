@@ -20,6 +20,14 @@ export function BlocksPage() {
   const proName = (id: string | null) => (id ? (pros.data?.find((p) => p.id === id)?.displayName ?? '—') : t.allProfessionals);
   const locName = (id: string | null) => (id ? (locations.data?.find((l) => l.id === id)?.name ?? '—') : t.allLocations);
   const canDelete = (b: TimeBlock) => admin || b.professionalId === me.user.professionalId;
+  if (!admin && !me.user.professionalId) {
+    return (
+      <section>
+        <h1>{t.navBlocks}</h1>
+        <p className="notice">{t.unlinked}</p>
+      </section>
+    );
+  }
 
   return (
     <section>

@@ -63,11 +63,20 @@ input[aria-invalid='true'] { border-color: var(--danger); }
 .sidebar-footer { margin-top: auto; display: flex; flex-direction: column; gap: 8px; padding-top: 16px; }
 .content { padding: 24px; min-width: 0; }
 @media (max-width: 760px) {
-  .layout { grid-template-columns: 1fr; }
-  .sidebar { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--border); }
-  .brand { width: 100%; }
-  .sidebar-footer { margin-top: 0; flex-direction: row; padding-top: 0; }
-  .content { padding: 16px; }
+  /* En el móvil (donde más lo usa un profesional) la navegación es una barra compacta desplazable. */
+  .layout { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .sidebar {
+    flex-direction: row; align-items: center; gap: 4px; padding: 8px 12px;
+    border-right: 0; border-bottom: 1px solid var(--border);
+    overflow-x: auto; white-space: nowrap; position: sticky; top: 0; z-index: 5;
+  }
+  .brand { margin: 0 8px 0 0; flex: none; max-width: 40vw; }
+  .brand small { display: none; }
+  .sidebar a { padding: 6px 10px; flex: none; }
+  .sidebar-footer { margin: 0 0 0 auto; flex-direction: row; padding: 0; flex: none; }
+  .sidebar-footer select, .sidebar-footer button { padding: 4px 8px; font-size: 0.85em; }
+  .content { padding: 16px 12px; }
+  .agenda, .upcoming { grid-template-columns: 1fr; }
 }
 
 .page-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
@@ -115,3 +124,11 @@ legend { font-weight: 600; font-size: 0.9em; padding: 0 4px; }
 
 .login { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: min(380px, 100%); display: grid; gap: 12px; }
+
+.segmented { display: inline-flex; }
+.segmented button { border-radius: 0; }
+.segmented button:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.segmented button:last-child { border-radius: 0 var(--radius) var(--radius) 0; margin-left: -1px; }
+button.link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.notice { background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
+.upcoming { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }

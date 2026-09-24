@@ -27,7 +27,7 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 10)
+## Estado actual (hasta la Fase 11)
 
 | Archivo | Cubre |
 |---|---|
@@ -51,6 +51,7 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/users.test.ts` | lista sin hashes; alta de PROFESSIONAL con contraseña temporal (una vez, no auditada) y ficha; validaciones (duplicado, débil, ficha ocupada/de B/para ADMIN); nunca sin ADMIN activo, también con dos degradaciones simultáneas; rol/desactivar cortan sesiones; reset de contraseña; PROFESSIONAL sin acceso; usuarios de B → 404; auditoría paginada, filtrada y sin filas de B |
 | `test/spa.test.ts` | index.html en `/` y rutas del panel (no-cache), assets `immutable`, `/api` inexistente sigue siendo 404 JSON, CSP |
 | `apps/admin/test/*.test.ts(x)` | importes y fechas en la zona del negocio (incluido cambio de hora), cliente de la API (errores, 401, sin red, sin tenantId), login y error traducido, navegación por rol (PROFESSIONAL solo su columna), idioma por defecto del negocio |
+| `apps/admin/test/professional.test.tsx` | panel del profesional: resumen del día sin canceladas y solo su columna; vista de 7 días (rango pedido, agrupación, sin canceladas); nueva cita limitada a sus servicios y a su agenda; aviso si no tiene ficha vinculada |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria
@@ -124,3 +125,9 @@ Con el seed, `npm run build` y la API arrancada, un script de Playwright (Chromi
 ofrecida por el servidor, comprueba que aparece en la columna del profesional y abre el editor de
 horario. Resultado: sin errores de consola salvo el 401 esperado de `/auth/me` antes del login.
 Pendiente (Fase 14): convertirlo en una suite E2E automatizada en CI.
+
+## Prueba manual en navegador (Fase 11)
+
+Chromium con viewport de móvil (390×844) como `carlos@barberia-a.test`: navegación en una sola barra,
+creación de una cita propia desde el móvil (primera hora libre), resumen del día, vista de próximos
+7 días y formulario de bloqueo sin selector de profesional ni de local. Sin errores de consola.
