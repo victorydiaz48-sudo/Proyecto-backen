@@ -48,7 +48,14 @@
     lib/                            errores, contraseñas, tokens, validación, tiempo, teléfono, dinero
     cli/                            tareas del operador (tenant-create)
   test/                             unit + integración (BD real)
-/apps/admin/                        React + Vite (SPA admin y profesional)
+/apps/admin/                        React 19 + Vite (SPA admin y profesional)
+  src/api.ts                        cliente fetch (mismo origen, errores → ApiError, 401 → login)
+  src/i18n.tsx                      pt / es (por defecto el idioma del negocio; elegible y recordado)
+  src/format.ts                     moneda, fechas en la zona del NEGOCIO, fecha+hora local → ISO con desfase
+  src/router.tsx                    router mínimo (history API)
+  src/pages/*                       Agenda, Bloqueos, Mi horario, Clientes, Servicios, Profesionales
+                                    (+ editor de horario), Locales, Usuarios, Ajustes, Auditoría, Mi cuenta
+  test/                             Vitest + jsdom + Testing Library
 /packages/shared/                   tipos y esquemas Zod compartidos
 docker-compose.yml                  postgres dev + test
 ```
@@ -174,6 +181,20 @@ base del motor de disponibilidad (Fase 7).
   vincula 1:1 a un `Professional`.
 - Autorización por política: `can(user, action, resource)`; `PROFESSIONAL` solo sus citas,
   sus bloqueos y su agenda.
+
+## 7b. Panel (Fase 10)
+
+- La API sirve `apps/admin/dist` con `@fastify/static` (o `ADMIN_DIST_DIR`) en `/`: assets con hash →
+  `Cache-Control: immutable`; `index.html` → `no-cache`. Cualquier `GET` de navegador fuera de `/api`
+  que no sea un archivo devuelve `index.html` (rutas de la SPA); `/api/*` inexistente sigue siendo 404
+  JSON. Si el build no existe, la API funciona igual sin panel.
+- Mismo origen: la cookie `SameSite=Strict` funciona sin CORS; CSP de helmet (`script-src 'self'`).
+- En desarrollo, Vite (puerto 5173) reenvía `/api` a la API.
+- El panel nunca decide nada que decida el servidor: la agenda solo ofrece horas devueltas por
+  `/admin/availability`; si la reserva falla, muestra el motivo y las alternativas del servidor.
+- Navegación por rol: ADMIN ve todo; PROFESSIONAL ve Agenda (solo su columna), Bloqueos, Mi horario
+  (lectura), Clientes (los suyos) y Mi cuenta. La API aplica igualmente todos los permisos.
+- Idioma: portugués y español como el generador; por defecto el `locale` del negocio.
 
 ## 8. Despliegue (Fase 16, resumen)
 

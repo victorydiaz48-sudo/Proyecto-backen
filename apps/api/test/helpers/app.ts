@@ -7,11 +7,14 @@ import { hashPassword } from '../../src/lib/password.ts';
 
 export const TEST_PASSWORD = 'clave-de-prueba-segura';
 
-export async function buildTestApp(db: Db, now?: () => Date): Promise<FastifyInstance> {
+export async function buildTestApp(db: Db, now?: () => Date, env: Record<string, string> = {}): Promise<FastifyInstance> {
   const config = loadConfig({
     NODE_ENV: 'test',
     DATABASE_URL: process.env.TEST_DATABASE_URL,
     LOG_LEVEL: 'silent',
+    // Por defecto sin panel: los tests no dependen de que apps/admin esté compilado.
+    ADMIN_DIST_DIR: '/nonexistent-admin-dist',
+    ...env,
   });
   return buildApp({ config, db, ...(now ? { now } : {}) });
 }

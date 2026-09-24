@@ -14,6 +14,8 @@ const EnvSchema = z.object({
   TRUST_PROXY: bool.default(false),
   /** Cookie de sesión solo por HTTPS. Por defecto: activado en producción. */
   COOKIE_SECURE: bool.optional(),
+  /** Build del panel (apps/admin/dist). Si no existe, la API funciona sin servir el panel. */
+  ADMIN_DIST_DIR: z.string().optional(),
 });
 
 export type Config = Omit<z.infer<typeof EnvSchema>, 'COOKIE_SECURE'> & { COOKIE_SECURE: boolean };

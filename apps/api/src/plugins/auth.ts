@@ -13,7 +13,7 @@ const TOUCH_EVERY_MS = 5 * 60 * 1000;
 export interface AuthContext {
   sessionId: string;
   user: { id: string; email: string; role: Role; professionalId: string | null };
-  tenant: { id: string; slug: string; name: string; timezone: string };
+  tenant: { id: string; slug: string; name: string; timezone: string; currency: string; locale: string };
 }
 
 declare module 'fastify' {
@@ -53,7 +53,14 @@ export function registerAuth(app: FastifyInstance, { db, now }: AuthOptions): vo
     request.auth = {
       sessionId: session.id,
       user: { id: user.id, email: user.email, role: user.role, professionalId: user.professional?.id ?? null },
-      tenant: { id: user.tenant.id, slug: user.tenant.slug, name: user.tenant.name, timezone: user.tenant.timezone },
+      tenant: {
+        id: user.tenant.id,
+        slug: user.tenant.slug,
+        name: user.tenant.name,
+        timezone: user.tenant.timezone,
+        currency: user.tenant.currency,
+        locale: user.tenant.locale,
+      },
     };
   });
 }

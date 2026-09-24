@@ -150,7 +150,7 @@ Permisos: A = ADMIN, P = PROFESSIONAL (solo sus propios recursos).
 |---|---|---|
 | Tenant settings ✅ | `GET/PATCH /admin/settings` (`name`, `timezone`, `defaultCountryCode`, `currency`, `locale`, `slotIntervalMinutes`, `defaultBookingStatus` ∈ {PENDING, CONFIRMED}, `bookingLeadMinutes`, `bookingHorizonDays`; el slug no se cambia) | A |
 | Locations ✅ | `GET /admin/locations?includeInactive`, `POST`, `GET/PATCH/DELETE /:id` | A (GET: A,P) |
-| Users | `GET/POST /admin/users`, `PATCH /admin/users/:id` | A |
+| Users ✅ | `GET/POST /admin/users`, `PATCH /admin/users/:id`, `POST /admin/users/:id/reset-password` | A |
 | Professionals ✅ | `GET /admin/professionals?includeInactive&serviceId`, `POST`, `GET/PATCH/DELETE /:id`, `PUT /:id/services` | A (GET: A,P) |
 | Services ✅ | `GET /admin/services?includeInactive`, `POST`, `GET/PATCH/DELETE /:id` | A (GET: A,P) |
 | Working hours ✅ | `GET/PUT /admin/professionals/:id/working-hours` (reemplazo completo de la semana) | A; P solo lectura de lo suyo |
@@ -158,9 +158,25 @@ Permisos: A = ADMIN, P = PROFESSIONAL (solo sus propios recursos).
 | Customers ✅ | `GET /admin/customers?search&cursor&limit`, `POST`, `GET/PATCH /:id` | A; P solo lectura de clientes con citas suyas |
 | Bookings ✅ | `GET /admin/bookings?from&to&professionalId&locationId&customerId&status`, `POST`, `GET /:id`, `PATCH /:id` (reprogramar), `POST /:id/status` | A; P solo las suyas |
 | Availability ✅ | `GET /admin/availability?serviceId&professionalId&date` (o `from`/`to`) `&locationId` — igual que la pública, sin antelación mínima ni horizonte | A,P |
-| Audit | `GET /admin/audit-logs` | A |
+| Audit ✅ | `GET /admin/audit-logs?entityType&entityId&action&cursor&limit` | A |
 
 `DELETE` es borrado lógico en entidades referenciadas por citas.
+
+### Usuarios y auditoría (Fase 10)
+
+**Usuario** — `POST /admin/users { email, role, password?, professionalId? }`:
+- `role`: `ADMIN` | `PROFESSIONAL`. `professionalId` (solo PROFESSIONAL) vincula la ficha; una ficha
+  solo puede tener un usuario (`409`); ficha inexistente o de otro negocio → `400`.
+- Sin `password`, el servidor genera una temporal y la devuelve **una sola vez** en `temporaryPassword`
+  (nunca se guarda en claro ni en la auditoría). Respuesta `{ user, temporaryPassword }`.
+- `PATCH /admin/users/:id { role?, active?, professionalId? }`: siempre queda al menos un ADMIN activo
+  (`409`; serializado con un bloqueo del tenant, dos ADMIN no pueden degradarse a la vez). Cambiar de
+  rol o desactivar cierra sus sesiones; pasar a ADMIN desvincula la ficha.
+- `POST /admin/users/:id/reset-password` → `{ temporaryPassword }`; cierra sus sesiones.
+- Nunca se devuelven hashes. `GET /auth/me` incluye ahora `tenant.currency` y `tenant.locale`.
+
+**Auditoría** — `GET /admin/audit-logs`: `{ items: [{ id, createdAt, action, entityType, entityId,
+actorType, actor: { id, email } | null, before, after, ip }], nextCursor }`, más reciente primero.
 
 ### Servicios y profesionales (Fase 4)
 

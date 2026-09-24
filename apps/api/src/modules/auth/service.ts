@@ -96,7 +96,7 @@ export class AuthService {
       auth: {
         sessionId: session.id,
         user: { id: user.id, email: user.email, role: user.role, professionalId: user.professional?.id ?? null },
-        tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name, timezone: tenant.timezone },
+        tenant: { id: tenant.id, slug: tenant.slug, name: tenant.name, timezone: tenant.timezone, currency: tenant.currency, locale: tenant.locale },
       },
     };
   }

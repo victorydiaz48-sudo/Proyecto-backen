@@ -37,6 +37,8 @@ jobs:
       - run: npm run lint
       - run: npm run db:check-drift
       - run: npm test
+      - name: Build del panel
+        run: npm run build
       - name: Migraciones desde cero (como en producción)
         run: npm run db:deploy -w apps/api
       - name: El generador HTML no cambia hasta la Fase 13

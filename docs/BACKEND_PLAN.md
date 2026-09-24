@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–9 completadas.** Siguiente: Fase 10 (API de administración + panel React).
+Estado: **Fases 0–10 completadas.** Siguiente: Fase 11 (panel de profesional).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -132,6 +132,8 @@ Nada en el repositorio contradice estas decisiones.
   (typescript-eslint aún no soporta TS 7). Se ejecuta TypeScript directamente con `tsx` en desarrollo;
   la estrategia de build de producción se fija en la Fase 16.
 - Monorepo con npm workspaces (`apps/api`, `apps/admin`, `packages/shared`); SPA con Vite.
+- Panel en portugués y español como el generador; idioma por defecto = `locale` del negocio.
+- Panel sin librería de componentes ni router externo (menos dependencias): router mínimo propio.
 - Notificaciones vía tabla **outbox** (se escribe en la misma transacción que la cita; un worker envía).
 
 ## 4. Decisiones adicionales (aprobadas antes de la Fase 2)
@@ -165,7 +167,7 @@ que el generador (que no se toca) sigue igual.
 | 7 | Motor de disponibilidad | Módulo puro (sin BD) + adaptador; tests de cierre, solapes, TZ/DST. `GET /admin/availability` y alternativas en los errores de reserva. ✅ |
 | 8 | Doble reserva | Exclusion constraint + transacción; test concurrente con N peticiones simultáneas. Creación con `any` y reintento por candidato. ✅ |
 | 9 | API pública | 5 endpoints, CORS `*` sin credenciales, rate limit, idempotencia. ✅ |
-| 10 | API admin + panel React | CRUD completo, agenda, auditoría. |
+| 10 | API admin + panel React | CRUD completo, agenda, auditoría. Usuarios y auditoría en la API; panel React (pt/es) servido por la API. ✅ |
 | 11 | Panel de profesional | Agenda propia, cambiar estado de sus citas, bloqueos propios. |
 | 12 | Notificaciones | Interfaz `NotificationChannel`, outbox + worker, WhatsApp como implementación. |
 | 13 | Integración con el generador | Campos `apiUrl`/`tenantSlug`, selector de horas reales, fallback a WhatsApp, importador del JSON v4. |

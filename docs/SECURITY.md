@@ -42,7 +42,10 @@
 - `requireAuth` + `requireRole(...)` en cada ruta admin, declarados en la definición de la ruta.
 - Políticas por recurso para `PROFESSIONAL` (solo `professionalId === session.professionalId`).
 - El rol y el `professionalId` salen de la BD vía sesión, nunca del cliente.
-- Un ADMIN no puede quitarse a sí mismo el último rol ADMIN del tenant.
+- Siempre queda al menos un ADMIN activo (Fase 10): degradar o desactivar al último → `409`; los
+  cambios de usuarios se serializan con `SELECT … FOR UPDATE` sobre el tenant. Cambiar de rol o
+  desactivar corta sus sesiones al instante. Las contraseñas temporales se muestran una sola vez y no
+  se auditan.
 
 ## 5. Validación y datos confiables
 
@@ -83,7 +86,8 @@
   concatena strings.
 - Errores: handler global; en producción solo `code`, `message` genérico y `requestId`. Logs
   estructurados (pino) con redacción de `password`, `cookie`, `authorization`, teléfonos parcialmente.
-- Cabeceras: `@fastify/helmet` global (CSP, HSTS, nosniff…); se ajustará la CSP al servir la SPA.
+- Cabeceras: `@fastify/helmet` global (CSP, HSTS, nosniff…). El panel (Fase 10) funciona con la CSP por
+  defecto (`script-src 'self'`, sin scripts en línea); un test lo comprueba.
 - Secretos por variables de entorno (`DATABASE_URL`, `SESSION_SECRET`, credenciales de WhatsApp),
   validados al arrancar; `.env` en `.gitignore`, `.env.example` sin valores reales.
 - Audit log de: login (éxito/fallo), cambios de usuarios/roles, servicios, precios, horarios,

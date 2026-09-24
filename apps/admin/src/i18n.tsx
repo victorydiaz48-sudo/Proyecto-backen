@@ -1,0 +1,331 @@
+import { createContext, useContext, useState, type ReactNode } from 'react';
+
+// Portugués y español, como el generador. Por defecto, el idioma del negocio (pt-BR → pt, es-* → es);
+// el usuario puede cambiarlo y se recuerda en este navegador.
+export type Lang = 'pt' | 'es';
+
+const pt = {
+  appName: 'Painel de reservas',
+  loading: 'Carregando…',
+  save: 'Salvar',
+  saved: 'Salvo',
+  cancel: 'Cancelar',
+  close: 'Fechar',
+  edit: 'Editar',
+  new: 'Novo',
+  create: 'Criar',
+  archive: 'Arquivar',
+  delete: 'Excluir',
+  active: 'Ativo',
+  inactive: 'Inativo',
+  actions: 'Ações',
+  yes: 'Sim',
+  no: 'Não',
+  search: 'Buscar',
+  more: 'Carregar mais',
+  none: 'Nenhum',
+  optional: 'opcional',
+  showInactive: 'Mostrar inativos',
+  networkError: 'Sem conexão com o servidor.',
+  // login
+  loginTitle: 'Entrar no painel',
+  business: 'Negócio (identificador)',
+  email: 'E-mail',
+  password: 'Senha',
+  login: 'Entrar',
+  logout: 'Sair',
+  invalidCredentials: 'E-mail, senha ou negócio incorretos.',
+  // nav
+  navAgenda: 'Agenda',
+  navServices: 'Serviços',
+  navProfessionals: 'Profissionais',
+  navLocations: 'Locais',
+  navBlocks: 'Bloqueios',
+  navCustomers: 'Clientes',
+  navUsers: 'Usuários',
+  navSettings: 'Configurações',
+  navAudit: 'Auditoria',
+  navMyHours: 'Meu horário',
+  navAccount: 'Minha conta',
+  // agenda
+  today: 'Hoje',
+  prevDay: 'Dia anterior',
+  nextDay: 'Próximo dia',
+  noBookings: 'Nenhum agendamento neste dia.',
+  newBooking: 'Novo agendamento',
+  service: 'Serviço',
+  professional: 'Profissional',
+  anyProfessional: 'Sem preferência',
+  date: 'Data',
+  time: 'Horário',
+  location: 'Local',
+  customer: 'Cliente',
+  name: 'Nome',
+  phone: 'Telefone',
+  notes: 'Observações',
+  noSlots: 'Sem horários livres neste dia.',
+  pickSlot: 'Escolha um horário',
+  alternatives: 'Horários próximos disponíveis:',
+  status_PENDING: 'Pendente',
+  status_CONFIRMED: 'Confirmado',
+  status_COMPLETED: 'Concluído',
+  status_CANCELLED: 'Cancelado',
+  status_NO_SHOW: 'Não compareceu',
+  confirm: 'Confirmar',
+  complete: 'Concluir',
+  noShow: 'Não veio',
+  cancelBooking: 'Cancelar',
+  reactivate: 'Reativar',
+  reschedule: 'Remarcar',
+  cancelReason: 'Motivo do cancelamento (opcional)',
+  source_PUBLIC_WEB: 'Site',
+  source_ADMIN: 'Painel',
+  source_PROFESSIONAL: 'Profissional',
+  // services
+  duration: 'Duração (min)',
+  buffer: 'Intervalo após (min)',
+  price: 'Preço',
+  category: 'Categoria',
+  description: 'Descrição',
+  order: 'Ordem',
+  // professionals
+  displayName: 'Nome exibido',
+  title: 'Cargo',
+  bio: 'Bio',
+  photoUrl: 'Foto (URL https)',
+  servicesOffered: 'Serviços que realiza',
+  workingHours: 'Horário de trabalho',
+  addInterval: 'Adicionar intervalo',
+  weekdays: ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'],
+  from: 'De',
+  to: 'Até',
+  hoursHint: 'Vários intervalos por dia. Para passar da meia-noite, use 24:00 e continue às 00:00 do dia seguinte.',
+  // locations
+  address: 'Endereço',
+  mapsUrl: 'Link do Google Maps',
+  whatsapp: 'WhatsApp',
+  isDefault: 'Local padrão',
+  makeDefault: 'Tornar padrão',
+  // blocks
+  newBlock: 'Novo bloqueio',
+  reason: 'Motivo',
+  allProfessionals: 'Todos os profissionais',
+  allLocations: 'Todos os locais',
+  start: 'Início',
+  end: 'Fim',
+  // customers
+  searchCustomers: 'Nome ou telefone',
+  // users
+  role: 'Papel',
+  role_ADMIN: 'Administrador',
+  role_PROFESSIONAL: 'Profissional',
+  linkedProfessional: 'Ficha de profissional',
+  lastLogin: 'Último acesso',
+  resetPassword: 'Redefinir senha',
+  temporaryPassword: 'Senha temporária (mostrada só agora, anote-a):',
+  deactivate: 'Desativar',
+  activate: 'Ativar',
+  // settings
+  businessName: 'Nome do negócio',
+  timezone: 'Fuso horário',
+  countryCode: 'Código do país',
+  currency: 'Moeda',
+  locale: 'Idioma do negócio',
+  slotInterval: 'Intervalo entre horários (min)',
+  defaultStatus: 'Estado inicial dos agendamentos',
+  leadMinutes: 'Antecedência mínima (min)',
+  horizonDays: 'Agendar até (dias)',
+  publicLink: 'Identificador público',
+  // audit
+  when: 'Quando',
+  who: 'Quem',
+  action: 'Ação',
+  entity: 'Entidade',
+  actor_PUBLIC: 'Site público',
+  actor_SYSTEM: 'Sistema',
+  // account
+  currentPassword: 'Senha atual',
+  newPassword: 'Nova senha',
+  changePassword: 'Alterar senha',
+  language: 'Idioma',
+};
+
+export type Dict = typeof pt;
+
+const es: Dict = {
+  appName: 'Panel de reservas',
+  loading: 'Cargando…',
+  save: 'Guardar',
+  saved: 'Guardado',
+  cancel: 'Cancelar',
+  close: 'Cerrar',
+  edit: 'Editar',
+  new: 'Nuevo',
+  create: 'Crear',
+  archive: 'Archivar',
+  delete: 'Eliminar',
+  active: 'Activo',
+  inactive: 'Inactivo',
+  actions: 'Acciones',
+  yes: 'Sí',
+  no: 'No',
+  search: 'Buscar',
+  more: 'Cargar más',
+  none: 'Ninguno',
+  optional: 'opcional',
+  showInactive: 'Mostrar inactivos',
+  networkError: 'Sin conexión con el servidor.',
+  loginTitle: 'Entrar al panel',
+  business: 'Negocio (identificador)',
+  email: 'Email',
+  password: 'Contraseña',
+  login: 'Entrar',
+  logout: 'Salir',
+  invalidCredentials: 'Email, contraseña o negocio incorrectos.',
+  navAgenda: 'Agenda',
+  navServices: 'Servicios',
+  navProfessionals: 'Profesionales',
+  navLocations: 'Locales',
+  navBlocks: 'Bloqueos',
+  navCustomers: 'Clientes',
+  navUsers: 'Usuarios',
+  navSettings: 'Ajustes',
+  navAudit: 'Auditoría',
+  navMyHours: 'Mi horario',
+  navAccount: 'Mi cuenta',
+  today: 'Hoy',
+  prevDay: 'Día anterior',
+  nextDay: 'Día siguiente',
+  noBookings: 'No hay citas este día.',
+  newBooking: 'Nueva cita',
+  service: 'Servicio',
+  professional: 'Profesional',
+  anyProfessional: 'Sin preferencia',
+  date: 'Fecha',
+  time: 'Hora',
+  location: 'Local',
+  customer: 'Cliente',
+  name: 'Nombre',
+  phone: 'Teléfono',
+  notes: 'Notas',
+  noSlots: 'No hay horas libres este día.',
+  pickSlot: 'Elige una hora',
+  alternatives: 'Horas cercanas disponibles:',
+  status_PENDING: 'Pendiente',
+  status_CONFIRMED: 'Confirmada',
+  status_COMPLETED: 'Completada',
+  status_CANCELLED: 'Cancelada',
+  status_NO_SHOW: 'No se presentó',
+  confirm: 'Confirmar',
+  complete: 'Completar',
+  noShow: 'No vino',
+  cancelBooking: 'Cancelar',
+  reactivate: 'Reactivar',
+  reschedule: 'Mover',
+  cancelReason: 'Motivo de la cancelación (opcional)',
+  source_PUBLIC_WEB: 'Web',
+  source_ADMIN: 'Panel',
+  source_PROFESSIONAL: 'Profesional',
+  duration: 'Duración (min)',
+  buffer: 'Margen después (min)',
+  price: 'Precio',
+  category: 'Categoría',
+  description: 'Descripción',
+  order: 'Orden',
+  displayName: 'Nombre visible',
+  title: 'Cargo',
+  bio: 'Bio',
+  photoUrl: 'Foto (URL https)',
+  servicesOffered: 'Servicios que realiza',
+  workingHours: 'Horario laboral',
+  addInterval: 'Añadir intervalo',
+  weekdays: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+  from: 'Desde',
+  to: 'Hasta',
+  hoursHint: 'Varios intervalos por día. Para pasar de medianoche, usa 24:00 y continúa a las 00:00 del día siguiente.',
+  address: 'Dirección',
+  mapsUrl: 'Enlace de Google Maps',
+  whatsapp: 'WhatsApp',
+  isDefault: 'Local por defecto',
+  makeDefault: 'Hacer predeterminado',
+  newBlock: 'Nuevo bloqueo',
+  reason: 'Motivo',
+  allProfessionals: 'Todos los profesionales',
+  allLocations: 'Todos los locales',
+  start: 'Inicio',
+  end: 'Fin',
+  searchCustomers: 'Nombre o teléfono',
+  role: 'Rol',
+  role_ADMIN: 'Administrador',
+  role_PROFESSIONAL: 'Profesional',
+  linkedProfessional: 'Ficha de profesional',
+  lastLogin: 'Último acceso',
+  resetPassword: 'Restablecer contraseña',
+  temporaryPassword: 'Contraseña temporal (solo se muestra ahora, anótala):',
+  deactivate: 'Desactivar',
+  activate: 'Activar',
+  businessName: 'Nombre del negocio',
+  timezone: 'Zona horaria',
+  countryCode: 'Código de país',
+  currency: 'Moneda',
+  locale: 'Idioma del negocio',
+  slotInterval: 'Intervalo entre horas (min)',
+  defaultStatus: 'Estado inicial de las citas',
+  leadMinutes: 'Antelación mínima (min)',
+  horizonDays: 'Reservar hasta (días)',
+  publicLink: 'Identificador público',
+  when: 'Cuándo',
+  who: 'Quién',
+  action: 'Acción',
+  entity: 'Entidad',
+  actor_PUBLIC: 'Web pública',
+  actor_SYSTEM: 'Sistema',
+  currentPassword: 'Contraseña actual',
+  newPassword: 'Nueva contraseña',
+  changePassword: 'Cambiar contraseña',
+  language: 'Idioma',
+};
+
+const DICTS: Record<Lang, Dict> = { pt, es };
+const STORAGE_KEY = 'reservas-admin-lang';
+
+export function langFromLocale(locale: string | undefined): Lang {
+  return locale?.toLowerCase().startsWith('es') ? 'es' : 'pt';
+}
+
+function stored(): Lang | null {
+  try {
+    const v = localStorage.getItem(STORAGE_KEY);
+    return v === 'pt' || v === 'es' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+interface I18n {
+  lang: Lang;
+  t: Dict;
+  setLang: (l: Lang) => void;
+  /** Idioma por defecto (el del negocio) si el usuario no eligió otro. */
+  setDefaultLang: (l: Lang) => void;
+}
+
+const Ctx = createContext<I18n>({ lang: 'pt', t: pt, setLang: () => {}, setDefaultLang: () => {} });
+
+export function I18nProvider({ children, initial }: { children: ReactNode; initial?: Lang }) {
+  const [lang, setLangState] = useState<Lang>(stored() ?? initial ?? 'pt');
+  const setLang = (l: Lang) => {
+    setLangState(l);
+    try {
+      localStorage.setItem(STORAGE_KEY, l);
+    } catch {
+      /* sin almacenamiento: solo esta sesión */
+    }
+  };
+  const setDefaultLang = (l: Lang) => {
+    if (!stored()) setLangState(l);
+  };
+  return <Ctx.Provider value={{ lang, t: DICTS[lang], setLang, setDefaultLang }}>{children}</Ctx.Provider>;
+}
+
+export const useI18n = (): I18n => useContext(Ctx);

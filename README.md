@@ -5,6 +5,7 @@ Plataforma de reservas multi-tenant (empezando por barberías) y el generador de
 - `generador-pagina-contacto.html` — generador de páginas estáticas (reserva por WhatsApp). No se
   modifica hasta la Fase 13 del plan.
 - `apps/api` — backend (Node.js + TypeScript + Fastify + Prisma + PostgreSQL).
+- `apps/admin` — panel de administración y de profesional (React + Vite), servido por la API.
 - `docs/` — plan, arquitectura, base de datos, API, seguridad, testing e integración.
   Empieza por [docs/BACKEND_PLAN.md](docs/BACKEND_PLAN.md).
 
@@ -18,7 +19,9 @@ npm run db:up                                   # PostgreSQL en Docker (opcional
 cp apps/api/.env.example apps/api/.env          # ajusta las URLs si hace falta
 npm run db:migrate                              # aplica las migraciones a la BD de desarrollo
 npm run db:seed                                 # barberia-a y barberia-b de ejemplo
-npm run dev -w apps/api                         # API en http://localhost:3000
+npm run dev:api                                 # API en http://localhost:3000
+npm run dev:admin                               # panel con recarga en caliente en http://localhost:5173
+npm run build                                   # compila el panel; la API lo sirve en http://localhost:3000/
 
 npm run typecheck && npm run lint && npm test   # lo mismo que ejecuta CI
 npm run db:check-drift                          # schema.prisma coincide con las migraciones

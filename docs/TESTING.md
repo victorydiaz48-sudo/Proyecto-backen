@@ -27,7 +27,7 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 9)
+## Estado actual (hasta la Fase 10)
 
 | Archivo | Cubre |
 |---|---|
@@ -48,6 +48,9 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/availability.test.ts` | endpoint del panel: huecos del día, intervalo del negocio, citas y bloqueos reales, `any` con profesionales libres, sin pasado, rango ≤ 14 días, 404 para servicio/profesional inválido o de B, todo hueco ofrecido se reserva; alternativas en 409/422 (cercanas, reservables, días siguientes en domingo, ninguna si el profesional no hace el servicio, también al reprogramar) |
 | `test/bookings-any.test.ts` | "sin preferencia": menos citas ese día, desempate por orden, salta a quien no está libre (cita o bloqueo), solo activos/que hacen el servicio/del local; todos ocupados → mismo 409 con alternativas `any`; reglas → 422; PROFESSIONAL no puede usar `any`. **Concurrencia**: 8 `any` simultáneas con 3 libres → 3 citas (una por profesional) + 5 × 409; 3 rondas de 14 peticiones mixtas (concretas + `any`) sin duplicados y comprobación SQL de cero solapes; solapes parciales simultáneos → 1; cliente nuevo en 5 reservas simultáneas → 1 cliente; bloqueo y cita a la vez → nunca ambos |
 | `test/public-api.test.ts` | datos públicos y `today` en la zona del negocio; slug inexistente/inválido/suspendido → 404 antes de validar; servicios con `bookable`; profesionales sin datos internos y filtros; disponibilidad con antelación y horizonte; reserva con precio/estado/origen del servidor y `whatsappUrl`; `any` dentro del negocio; campos prohibidos → 400; `TOO_SOON` y ocupado con alternativas; ids de B = inexistentes; cliente existente no se renombra; límite de 3 por teléfono (por negocio); rate limit 10/min; idempotencia (replay, clave reutilizada, liberación tras error, 5 envíos simultáneos → 1 cita, clave por negocio); CORS desde `file://` y otros dominios, POST cross-site aceptado, panel sin CORS |
+| `test/users.test.ts` | lista sin hashes; alta de PROFESSIONAL con contraseña temporal (una vez, no auditada) y ficha; validaciones (duplicado, débil, ficha ocupada/de B/para ADMIN); nunca sin ADMIN activo, también con dos degradaciones simultáneas; rol/desactivar cortan sesiones; reset de contraseña; PROFESSIONAL sin acceso; usuarios de B → 404; auditoría paginada, filtrada y sin filas de B |
+| `test/spa.test.ts` | index.html en `/` y rutas del panel (no-cache), assets `immutable`, `/api` inexistente sigue siendo 404 JSON, CSP |
+| `apps/admin/test/*.test.ts(x)` | importes y fechas en la zona del negocio (incluido cambio de hora), cliente de la API (errores, 401, sin red, sin tenantId), login y error traducido, navegación por rol (PROFESSIONAL solo su columna), idioma por defecto del negocio |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria
@@ -113,3 +116,11 @@ se ejecutaron 5 veces seguidas sin fallos.
 ### No romper el generador
 - Hasta la Fase 13, `generador-pagina-contacto.html` no cambia (`git diff --exit-code` sobre el archivo en CI).
 - Fase 13: tests con Playwright de la página generada con y sin `apiUrl` (sin él, el flujo WhatsApp es idéntico al actual).
+
+## Prueba manual en navegador (Fase 10)
+
+Con el seed, `npm run build` y la API arrancada, un script de Playwright (Chromium) entra como
+`admin@barberia-a.test`, abre un lunes, crea una cita desde "Novo agendamento" eligiendo una hora
+ofrecida por el servidor, comprueba que aparece en la columna del profesional y abre el editor de
+horario. Resultado: sin errores de consola salvo el 401 esperado de `/auth/me` antes del login.
+Pendiente (Fase 14): convertirlo en una suite E2E automatizada en CI.

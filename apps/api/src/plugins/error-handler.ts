@@ -17,7 +17,7 @@ const FASTIFY_4XX: Record<number, [string, string]> = {
 };
 
 /** Respuesta de error uniforme `{ error: { code, message, details? }, requestId }` sin detalles internos. */
-export function registerErrorHandler(app: FastifyInstance): void {
+export function registerErrorHandler(app: FastifyInstance, opts: { spaFallback?: boolean } = {}): void {
   app.setErrorHandler((err: FastifyError, request, reply) => {
     const send = (status: number, code: string, message: string, details?: Record<string, unknown>) => {
       const body: ErrorBody = { error: { code, message, ...(details ? { details } : {}) }, requestId: request.id };
@@ -47,6 +47,10 @@ export function registerErrorHandler(app: FastifyInstance): void {
   });
 
   app.setNotFoundHandler((request, reply) => {
+    // Rutas del panel (SPA): cualquier GET de navegador fuera de /api devuelve index.html.
+    if (opts.spaFallback && request.method === 'GET' && !request.url.startsWith('/api/') && (request.headers.accept ?? '').includes('text/html')) {
+      return reply.header('cache-control', 'no-cache').sendFile('index.html');
+    }
     const body: ErrorBody = { error: { code: 'NOT_FOUND', message: 'No encontrado.' }, requestId: request.id };
     return reply.status(404).send(body);
   });
