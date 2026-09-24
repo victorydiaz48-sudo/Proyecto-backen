@@ -140,15 +140,22 @@ export interface Page<T> {
 
 export type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED' | 'CANCELLED';
 
+export interface TelegramStatus {
+  available: boolean;
+  linked: boolean;
+  linkedAt: string | null;
+}
+
 export interface Notification {
   id: string;
   bookingId: string | null;
+  channel: 'whatsapp' | 'telegram';
   audience: 'CUSTOMER' | 'BUSINESS';
   template: string;
   status: NotificationStatus;
   to: string;
   text: string;
-  waUrl: string;
+  waUrl: string | null;
   attempts: number;
   lastError: string | null;
   scheduledFor: string;

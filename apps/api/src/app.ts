@@ -21,6 +21,7 @@ import { customerAdminRoutes } from './modules/customers/routes.admin.ts';
 import { locationAdminRoutes } from './modules/locations/routes.admin.ts';
 import { notificationAdminRoutes } from './modules/notifications/routes.admin.ts';
 import { professionalAdminRoutes } from './modules/professionals/routes.admin.ts';
+import { createTelegramBot, type TelegramBot } from './modules/notifications/telegram.ts';
 import { operatorRoutes } from './modules/ops/operator.ts';
 import { publicRoutes } from './modules/public/routes.ts';
 import { scheduleAdminRoutes } from './modules/schedule/routes.admin.ts';
@@ -49,12 +50,14 @@ export interface AppDeps {
   db: Db;
   /** Reloj inyectable para los tests (sesiones, disponibilidad). */
   now?: () => Date;
+  /** Bot de Telegram compartido con el worker; por defecto se crea desde TELEGRAM_BOT_TOKEN. */
+  telegram?: TelegramBot | null;
   /** Destino de los logs (los tests lo capturan); por defecto stdout. */
   logStream?: { write(line: string): void };
 }
 
 /** Construye la aplicación sin escuchar en ningún puerto (los tests usan app.inject()). */
-export async function buildApp({ config, db, now = () => new Date(), logStream }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db, now = () => new Date(), logStream, telegram = createTelegramBot(config) }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     trustProxy: config.TRUST_PROXY,
     bodyLimit: 16 * 1024,
@@ -127,7 +130,7 @@ export async function buildApp({ config, db, now = () => new Date(), logStream }
         await session.register(
           async (admin) => {
             admin.addHook('onRequest', requireAuth);
-            await admin.register(tenantAdminRoutes, { db });
+            await admin.register(tenantAdminRoutes, { db, telegram, now });
             await admin.register(serviceAdminRoutes, { db });
             await admin.register(professionalAdminRoutes, { db, now });
             await admin.register(locationAdminRoutes, { db, now });

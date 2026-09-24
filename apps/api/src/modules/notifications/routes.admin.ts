@@ -32,12 +32,14 @@ export const notificationAdminRoutes: FastifyPluginAsyncZod<{ db: Db }> = async 
       return {
         id: n.id,
         bookingId: n.bookingId,
+        channel: n.channel,
         audience: n.audience,
         template: n.template,
         status: n.status,
         to: payload.to,
         text: payload.text,
-        waUrl: waLink(payload.to, payload.text),
+        // Solo los de WhatsApp se envían a mano; los de Telegram los entrega el worker.
+        waUrl: n.channel === 'whatsapp' ? waLink(payload.to, payload.text) : null,
         attempts: n.attempts,
         lastError: n.lastError,
         scheduledFor: n.nextAttemptAt,

@@ -99,6 +99,47 @@ describe('pantallas del ADMIN', () => {
     expect(sent).not.toHaveProperty('slug');
   });
 
+  it('Configurações → Telegram: conectar con el enlace, comprobar y desconectar', async () => {
+    let linked = false;
+    const { calls } = mockFetch({
+      ...base,
+      'GET /api/v1/admin/settings': () => ({ json: settings }),
+      'GET /api/v1/admin/settings/telegram': () => ({ json: { available: true, linked, linkedAt: linked ? '2026-09-30T12:00:00.000Z' : null } }),
+      'POST /api/v1/admin/settings/telegram/link': () => ({ json: { url: 'https://t.me/ReservasBot?start=abc', expiresAt: '2026-09-30T12:30:00.000Z' } }),
+      'DELETE /api/v1/admin/settings/telegram': () => {
+        linked = false;
+        return { status: 204 };
+      },
+    });
+    open('/settings');
+    const user = userEvent.setup();
+    const card = within(await screen.findByTestId('telegram'));
+    await user.click(await card.findByRole('button', { name: 'Conectar Telegram' }));
+    expect(card.getByRole('link', { name: 'Abrir o Telegram' }).getAttribute('href')).toBe('https://t.me/ReservasBot?start=abc');
+    // Aún no pulsó Iniciar: se le dice.
+    await user.click(card.getByRole('button', { name: 'Já toquei em Iniciar' }));
+    await card.findByText(/Ainda não está conectado/);
+    // Ya conectado.
+    linked = true;
+    await user.click(card.getByRole('button', { name: 'Já toquei em Iniciar' }));
+    await card.findByText(/Conectado desde/);
+    await user.click(card.getByRole('button', { name: 'Desconectar' }));
+    await card.findByRole('button', { name: 'Conectar Telegram' });
+    expect(calls.filter((c) => c.method === 'DELETE').map((c) => c.path)).toEqual(['/api/v1/admin/settings/telegram']);
+  });
+
+  it('Configurações → Telegram: sin bot en el servidor lo explica y no ofrece conectar', async () => {
+    mockFetch({
+      ...base,
+      'GET /api/v1/admin/settings': () => ({ json: settings }),
+      'GET /api/v1/admin/settings/telegram': () => ({ json: { available: false, linked: false, linkedAt: null } }),
+    });
+    open('/settings');
+    const card = within(await screen.findByTestId('telegram'));
+    await card.findByText(/não estão ativados neste servidor/);
+    expect(card.queryByRole('button', { name: 'Conectar Telegram' })).toBeNull();
+  });
+
   it('Usuários: la contraseña temporal se muestra una sola vez al crear', async () => {
     mockFetch({
       ...base,

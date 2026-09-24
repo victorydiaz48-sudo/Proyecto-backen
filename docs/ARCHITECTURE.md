@@ -217,8 +217,8 @@ cambio de cita ──(misma transacción)──► NotificationOutbox (PENDING, 
                   worker (cada 15 s) ────────┘  reclama con FOR UPDATE SKIP LOCKED + alquiler de 5 min
                         │
                         ▼
-              NotificationTransport.send()   ── hoy: LogTransport (registra, no envía)
-                        │                       futuro: WhatsApp Business Cloud API u otro
+              NotificationTransport.send()   ── por canal: whatsapp → LogTransport (registra, envío a mano)
+                        │                                    telegram → TelegramTransport (Bot API)
               SENT │ reintento (1, 5, 15, 60 min) │ FAILED tras 5 intentos
 ```
 
@@ -237,6 +237,15 @@ cambio de cita ──(misma transacción)──► NotificationOutbox (PENDING, 
   réplicas adicionales o si el worker corre en otro proceso).
 - Para conectar un proveedor real: implementar `NotificationTransport` y añadirlo a
   `NOTIFICATIONS_TRANSPORT`. Nada más cambia.
+
+**Telegram (avisos al negocio).** Un solo bot para la plataforma (`TELEGRAM_BOT_TOKEN`). Cada negocio
+conecta su chat en *Ajustes → Avisos por Telegram*: el panel genera un enlace
+`t.me/<bot>?start=<código>` (código aleatorio, en BD solo su hash, un solo uso, 30 min); al pulsar
+*Iniciar*, el servidor recibe el `/start` por `getUpdates` (sondeo largo, sin webhook ni URL pública),
+guarda el id del chat y responde. Solo la instancia con `NOTIFICATIONS_WORKER=true` consulta a Telegram.
+Cada cita nueva desde la web encola, además del aviso de WhatsApp, uno con canal `telegram`; el worker lo
+entrega con `TelegramTransport` (HTML con el texto escapado) y con los mismos reintentos. Sin bot
+configurado, los avisos de Telegram pendientes se registran como los de WhatsApp.
 
 ## 8. Despliegue (Fase 16, resumen)
 

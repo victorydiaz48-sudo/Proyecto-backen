@@ -18,7 +18,7 @@ export interface AuditEntry {
 }
 
 // Nunca se registran secretos aunque lleguen por error en before/after.
-const SECRET_KEYS = new Set(['password', 'passwordHash', 'currentPassword', 'newPassword', 'tokenHash', 'manageTokenHash']);
+const SECRET_KEYS = new Set(['password', 'passwordHash', 'currentPassword', 'newPassword', 'tokenHash', 'manageTokenHash', 'telegramLinkTokenHash']);
 
 function scrub(value: Prisma.InputJsonValue | undefined): Prisma.InputJsonValue | undefined {
   if (value === undefined || value === null || typeof value !== 'object') return value;

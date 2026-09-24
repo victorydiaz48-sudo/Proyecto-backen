@@ -41,11 +41,16 @@ export function NotificationsPage() {
                   {dateTimeLabel(n.scheduledFor, me.tenant.timezone, lang)}
                   <div><span className="badge">{t[`nstatus_${n.status}`]}</span></div>
                 </td>
-                <td className="small">{t[`audience_${n.audience}`]}<div className="muted">{n.to}</div></td>
+                <td className="small">
+                  {t[`audience_${n.audience}`]} · {t[`channel_${n.channel}`]}
+                  <div className="muted">{n.to}</div>
+                </td>
                 <td className="small pre">{n.text}{n.lastError ? <div className="error">{n.lastError}</div> : null}</td>
                 <td>
-                  {n.status !== 'CANCELLED' ? (
+                  {n.status !== 'CANCELLED' && n.waUrl ? (
                     <a className="button-link" href={n.waUrl} target="_blank" rel="noopener noreferrer">{t.openWhatsapp}</a>
+                  ) : n.channel === 'telegram' ? (
+                    <span className="small muted">{t.telegramSentAuto}</span>
                   ) : null}
                 </td>
               </tr>

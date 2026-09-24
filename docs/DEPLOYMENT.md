@@ -42,6 +42,7 @@ docker build -t reservas:1.0.0 .
 | `DATABASE_URL` | **sí** | `postgresql://reservas_app:<contraseña>@host:5432/db`. Contraseña de 16+ caracteres, solo letras y números (si no, hay que codificarla en la URL). **Nunca** el propietario: el servidor no arranca si la conexión se salta RLS, y `migrate` tampoco la acepta. |
 | `MIGRATION_DATABASE_URL` | para `migrate` | el propietario del esquema. Si puede crear roles (en Railway, `postgres` es superusuario), `migrate` crea `reservas_app` solo; si no, créalo antes a mano (§4). El servidor no la lee; solo hace falta donde se ejecute `migrate`. |
 | `OPERATOR_TOKEN` | no | activa `/operator` (alta de negocios desde el navegador). 32+ caracteres aleatorios. Sin definir, `/operator` no existe (404). Puede quitarse después de crear los negocios. |
+| `TELEGRAM_BOT_TOKEN` | no | token del bot de Telegram para los avisos al negocio (§4c). Sin definir: sin Telegram. |
 | `TRUST_PROXY` | detrás de un proxy | IPs/CIDR de **tus** proxies, separadas por comas, o `uniquelocal` (10/8, 172.16/12, 192.168/16, fc00::/7). `true` está prohibido (permitiría falsear la IP y saltarse los rate limits). Por defecto `false`. Cómo averiguarlo: §4, paso 5. |
 | `PORT` / `HOST` | no | `3000` / `0.0.0.0` (si la plataforma define `PORT`, se usa esa) |
 | `LOG_LEVEL` | no | `info` (JSON por la salida estándar) |
@@ -120,6 +121,7 @@ distinto, cámbialo en las referencias):
 | `MIGRATION_DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
 | `OPERATOR_TOKEN` | 40+ caracteres aleatorios (otro distinto) |
 | `TRUST_PROXY` | `false` al principio; el valor definitivo según §4, paso 5 |
+| `TELEGRAM_BOT_TOKEN` | opcional: el token de @BotFather (§4c) |
 
 El pre-deploy se ejecuta con la misma imagen y las mismas variables antes de cada despliegue: la primera
 vez crea `reservas_app` (el usuario `postgres` de Railway es superusuario) y aplica las migraciones; si
@@ -127,6 +129,21 @@ falla, Railway no despliega. Cambiar `RESERVAS_APP_PASSWORD` y volver a desplega
 
 `MIGRATION_DATABASE_URL` queda en el entorno del servidor porque el pre-deploy usa las variables del
 servicio; el servidor no la lee. Es una credencial de superusuario: no la copies a ningún otro sitio.
+
+## 4c. Avisos por Telegram
+
+Un bot para toda la plataforma; cada negocio conecta su propio chat desde el panel.
+
+1. En Telegram (también desde el móvil), abre **@BotFather** → `/newbot` → un nombre (p. ej.
+   "Reservas Barbería") → un usuario que termine en `bot` (p. ej. `reservas_barberia_bot`).
+2. BotFather responde con el token (`123456789:AA…`): ponlo en la variable `TELEGRAM_BOT_TOKEN` del
+   servidor y vuelve a desplegar.
+3. En el panel, **Ajustes → Avisos por Telegram → Conectar Telegram → Abrir Telegram → Iniciar**. El bot
+   responde "✅ Conectado" y desde ese momento cada cita nueva desde la web llega a ese chat.
+4. Para dejar de recibirlos: *Desconectar* en el mismo sitio.
+
+Solo la instancia con `NOTIFICATIONS_WORKER=true` recibe los *Iniciar*. Si alguien bloquea el bot, el
+aviso queda en *Avisos* como fallido con el motivo.
 
 ## 5. Cada nueva versión
 

@@ -167,6 +167,20 @@ const pt = {
   newPassword: 'Nova senha',
   changePassword: 'Alterar senha',
   language: 'Idioma',
+  // telegram
+  telegramTitle: 'Avisos no Telegram',
+  telegramIntro: 'Receba no Telegram cada novo agendamento feito pelo site, mesmo com o painel fechado.',
+  telegramLinked: 'Conectado desde {date}.',
+  telegramConnect: 'Conectar Telegram',
+  telegramOpen: 'Abrir o Telegram',
+  telegramSteps: 'Toque em “Abrir o Telegram” e depois em “Iniciar”. O link vale 30 minutos e só pode ser usado uma vez.',
+  telegramDone: 'Já toquei em Iniciar',
+  telegramDisconnect: 'Desconectar',
+  telegramNotLinkedYet: 'Ainda não está conectado. Toque em “Iniciar” no Telegram e tente de novo.',
+  telegramUnavailable: 'Os avisos pelo Telegram não estão ativados neste servidor.',
+  telegramSentAuto: 'Enviado automaticamente pelo Telegram',
+  channel_telegram: 'Telegram',
+  channel_whatsapp: 'WhatsApp',
 };
 
 export type Dict = typeof pt;
@@ -322,6 +336,20 @@ const es: Dict = {
   newPassword: 'Nueva contraseña',
   changePassword: 'Cambiar contraseña',
   language: 'Idioma',
+  // telegram
+  telegramTitle: 'Avisos por Telegram',
+  telegramIntro: 'Recibe en Telegram cada cita nueva que llega desde la web, aunque no tengas el panel abierto.',
+  telegramLinked: 'Conectado desde el {date}.',
+  telegramConnect: 'Conectar Telegram',
+  telegramOpen: 'Abrir Telegram',
+  telegramSteps: 'Pulsa «Abrir Telegram» y después «Iniciar». El enlace vale 30 minutos y solo se puede usar una vez.',
+  telegramDone: 'Ya pulsé Iniciar',
+  telegramDisconnect: 'Desconectar',
+  telegramNotLinkedYet: 'Todavía no está conectado. Pulsa «Iniciar» en Telegram y vuelve a probar.',
+  telegramUnavailable: 'Los avisos por Telegram no están activados en este servidor.',
+  telegramSentAuto: 'Enviado automáticamente por Telegram',
+  channel_telegram: 'Telegram',
+  channel_whatsapp: 'WhatsApp',
 };
 
 const DICTS: Record<Lang, Dict> = { pt, es };

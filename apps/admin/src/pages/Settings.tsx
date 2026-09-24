@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { get, patch } from '../api';
+import { del, get, patch, post } from '../api';
+import { dateTimeLabel } from '../format';
 import { useI18n } from '../i18n';
 import { useSession } from '../session';
-import type { Settings } from '../types';
+import type { Settings, TelegramStatus } from '../types';
 import { ErrorBox, Field, Loading, useAction, useLoad } from '../ui';
 
 const TIMEZONES = [
@@ -75,6 +76,71 @@ export function SettingsPage() {
           <button type="submit" disabled={action.busy}>{t.save}</button>
         </div>
       </form>
+      <TelegramCard />
     </section>
+  );
+}
+
+/** Conectar el Telegram del negocio: enlace de un solo uso al bot; al pulsar «Iniciar» queda conectado. */
+function TelegramCard() {
+  const { t, lang } = useI18n();
+  const { me } = useSession();
+  const status = useLoad(() => get<TelegramStatus>('/admin/settings/telegram'), []);
+  const [link, setLink] = useState<string | null>(null);
+  const [notYet, setNotYet] = useState(false);
+  const action = useAction();
+  const s = status.data;
+  if (!s) return status.error ? <ErrorBox error={status.error} /> : null;
+
+  const connect = () =>
+    void action.run(async () => {
+      setNotYet(false);
+      setLink((await post<{ url: string }>('/admin/settings/telegram/link')).url);
+    });
+  const check = () =>
+    void action.run(async () => {
+      const now = await get<TelegramStatus>('/admin/settings/telegram');
+      if (now.linked) {
+        setLink(null);
+        status.reload();
+      } else setNotYet(true);
+    });
+  const disconnect = () =>
+    void action.run(async () => {
+      await del('/admin/settings/telegram');
+      status.reload();
+    });
+
+  return (
+    <div className="form narrow telegram-card" data-testid="telegram">
+      <h2>{t.telegramTitle}</h2>
+      {!s.available ? (
+        <p className="muted small">{t.telegramUnavailable}</p>
+      ) : s.linked ? (
+        <>
+          <p className="ok">{t.telegramLinked.replace('{date}', s.linkedAt ? dateTimeLabel(s.linkedAt, me.tenant.timezone, lang) : '')}</p>
+          <div className="form-actions">
+            <button type="button" className="ghost" disabled={action.busy} onClick={disconnect}>{t.telegramDisconnect}</button>
+          </div>
+        </>
+      ) : link ? (
+        <>
+          <p className="small">{t.telegramSteps}</p>
+          <div className="form-actions">
+            <a className="button-link" href={link} target="_blank" rel="noopener noreferrer">{t.telegramOpen}</a>
+            <button type="button" disabled={action.busy} onClick={check}>{t.telegramDone}</button>
+          </div>
+          {notYet ? <p className="small error">{t.telegramNotLinkedYet}</p> : null}
+        </>
+      ) : (
+        <>
+          <p className="small">{t.telegramIntro}</p>
+          <div className="form-actions">
+            <button type="button" disabled={action.busy} onClick={connect}>{t.telegramConnect}</button>
+          </div>
+        </>
+      )}
+      <ErrorBox error={action.error} />
+    </div>
   );
 }

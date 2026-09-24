@@ -60,20 +60,26 @@ enum NotificationAudience {
 }
 
 model Tenant {
-  id                   String        @id @default(uuid()) @db.Uuid
-  slug                 String        @unique
-  name                 String
-  timezone             String
-  defaultCountryCode   String
-  currency             String        @db.Char(3)
-  locale               String
-  slotIntervalMinutes  Int           @default(15)
-  defaultBookingStatus BookingStatus @default(CONFIRMED)
-  bookingLeadMinutes   Int           @default(60)
-  bookingHorizonDays   Int           @default(60)
-  status               TenantStatus  @default(ACTIVE)
-  createdAt            DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt            DateTime      @updatedAt @db.Timestamptz(3)
+  id                    String        @id @default(uuid()) @db.Uuid
+  slug                  String        @unique
+  name                  String
+  timezone              String
+  defaultCountryCode    String
+  currency              String        @db.Char(3)
+  locale                String
+  slotIntervalMinutes   Int           @default(15)
+  defaultBookingStatus  BookingStatus @default(CONFIRMED)
+  bookingLeadMinutes    Int           @default(60)
+  bookingHorizonDays    Int           @default(60)
+  status                TenantStatus  @default(ACTIVE)
+  /// Avisos del negocio por Telegram: chat conectado desde el panel (enlace de un solo uso).
+  telegramChatId        String?
+  telegramLinkedAt      DateTime?     @db.Timestamptz(3)
+  /// Hash del código del enlace de conexión (el código en claro solo va en el enlace) y su caducidad.
+  telegramLinkTokenHash String?       @unique
+  telegramLinkExpiresAt DateTime?     @db.Timestamptz(3)
+  createdAt             DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime      @updatedAt @db.Timestamptz(3)
 
   locations            Location[]
   users                User[]

@@ -24,6 +24,9 @@ const FUTURE_DATE = '2026-10-01';
 const SPEC: Record<string, RouteSpec> = {
   'GET /api/v1/admin/settings': { access: 'admin' },
   'PATCH /api/v1/admin/settings': { access: 'admin', body: () => ({ name: 'Cambiado' }) },
+  'GET /api/v1/admin/settings/telegram': { access: 'admin' },
+  'POST /api/v1/admin/settings/telegram/link': { access: 'admin' },
+  'DELETE /api/v1/admin/settings/telegram': { access: 'admin' },
   'GET /api/v1/admin/services': { access: 'any' },
   'GET /api/v1/admin/services/:id': { access: 'any', resource: 'service' },
   'POST /api/v1/admin/services': { access: 'admin', body: () => ({ name: 'Nuevo', durationMinutes: 30, priceCents: 100 }) },

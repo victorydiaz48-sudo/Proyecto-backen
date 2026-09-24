@@ -26,7 +26,8 @@ export interface BookingForNotification {
  *
  * - Cliente: confirmación (o "recibida" si queda PENDING), confirmada, movida, cancelada, y un
  *   recordatorio 24 h antes para citas confirmadas.
- * - Negocio: cada cita nueva que llega desde la web, al WhatsApp de su local (o del local por defecto).
+ * - Negocio: cada cita nueva que llega desde la web, al WhatsApp de su local (o del local por defecto) y,
+ *   si conectó Telegram en Ajustes, también por Telegram.
  *   Lo que hace el propio negocio en el panel no se le notifica a sí mismo.
  * - Al mover o cancelar, los avisos aún no enviados de esa cita (p. ej. el recordatorio) se cancelan.
  */
@@ -60,8 +61,9 @@ export async function enqueueBookingNotifications(
     localTime: b.localTime,
     notes: b.customerNotes,
   };
-  const rows: { audience: 'CUSTOMER' | 'BUSINESS'; template: TemplateKey; to: string; at: Date }[] = [];
-  const customer = (template: TemplateKey, at = now) => rows.push({ audience: 'CUSTOMER', template, to: b.customer.phoneE164, at });
+  const rows: { channel: 'whatsapp' | 'telegram'; audience: 'CUSTOMER' | 'BUSINESS'; template: TemplateKey; to: string; at: Date }[] = [];
+  const customer = (template: TemplateKey, at = now) =>
+    rows.push({ channel: 'whatsapp', audience: 'CUSTOMER', template, to: b.customer.phoneE164, at });
 
   if (event === 'created') customer(b.status === 'PENDING' ? 'customer.booking_received' : 'customer.booking_created');
   if (event === 'confirmed') customer('customer.booking_confirmed');
@@ -75,7 +77,12 @@ export async function enqueueBookingNotifications(
     const location = await tx.location.findFirst({ where: { tenantId: tenant.id, id: b.location.id }, select: { whatsapp: true } });
     const fallback = location?.whatsapp ? null : await tx.location.findFirst({ where: { tenantId: tenant.id, isDefault: true }, select: { whatsapp: true } });
     const to = location?.whatsapp ?? fallback?.whatsapp;
-    if (to) rows.push({ audience: 'BUSINESS', template: 'business.booking_created', to, at: now });
+    if (to) rows.push({ channel: 'whatsapp', audience: 'BUSINESS', template: 'business.booking_created', to, at: now });
+    // Y por Telegram, si el negocio conectó su chat (se envía de verdad, no a mano).
+    const telegram = await tx.tenant.findUnique({ where: { id: tenant.id }, select: { telegramChatId: true } });
+    if (telegram?.telegramChatId) {
+      rows.push({ channel: 'telegram', audience: 'BUSINESS', template: 'business.booking_created', to: telegram.telegramChatId, at: now });
+    }
   }
 
   if (rows.length === 0) return;
@@ -83,7 +90,7 @@ export async function enqueueBookingNotifications(
     data: rows.map((r) => ({
       tenantId: tenant.id,
       bookingId: b.id,
-      channel: 'whatsapp',
+      channel: r.channel,
       audience: r.audience,
       template: r.template,
       payload: { to: r.to, text: renderTemplate(r.template, tenant.locale, data), locale: tenant.locale },

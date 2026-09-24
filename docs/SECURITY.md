@@ -190,6 +190,10 @@ con RLS.
   `NOSUPERUSER NOBYPASSRLS`; se niega si `DATABASE_URL` usa otro usuario o si `reservas_app` fuese
   privilegiado. En plataformas donde el pre-deploy comparte variables con el servidor (Railway),
   `MIGRATION_DATABASE_URL` queda en el entorno del servidor, que no la usa.
+- Telegram: `TELEGRAM_BOT_TOKEN` es un secreto (va en la URL de la Bot API; nunca se registra ni aparece
+  en los errores guardados, test). El enlace de conexión lleva un código aleatorio de 256 bits, se guarda
+  solo su hash, caduca a los 30 min y sirve una vez; un código inválido no revela ningún negocio. Los
+  avisos llevan nombre y teléfono del cliente a Telegram: es el chat que el propio negocio conectó.
 - Rate limit en memoria: con varias instancias, cada una cuenta por separado (mover a Redis).
 - Dos usuarios de BD: el propietario del esquema para las migraciones (`MIGRATION_DATABASE_URL`) y
   `reservas_app` para la app (`DATABASE_URL`). La migración de RLS crea `reservas_app` sin login si el

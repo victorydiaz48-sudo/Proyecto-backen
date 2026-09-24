@@ -3,9 +3,9 @@ import type { FastifyBaseLogger } from 'fastify';
 export interface OutgoingMessage {
   id: string;
   tenantId: string;
-  /** Canal lógico ('whatsapp'); el transporte decide cómo se entrega. */
+  /** Canal lógico ('whatsapp' o 'telegram'); el transporte decide cómo se entrega. */
   channel: string;
-  /** E.164 */
+  /** Destino: teléfono E.164 (whatsapp) o id del chat (telegram). */
   to: string;
   text: string;
 }
@@ -13,7 +13,8 @@ export interface OutgoingMessage {
 /**
  * Cómo se entrega un aviso. La lógica de reservas nunca conoce el transporte: solo escribe en el outbox.
  * Un transporte lanza un error si el envío falla (el worker reintenta con espera creciente).
- * Implementaciones: LogTransport (opción C, sin proveedor). Futuro: WhatsApp Business Cloud API.
+ * Implementaciones: LogTransport (opción C, sin proveedor), TelegramTransport (avisos al negocio).
+ * Futuro: WhatsApp Business Cloud API.
  */
 export interface NotificationTransport {
   readonly name: string;

@@ -98,8 +98,13 @@ describe('avisos', () => {
         json: {
           items: [
             {
-              id: 'n1', bookingId: 'b1', audience: 'BUSINESS', template: 'business.booking_created', status: 'SENT', to: '+5541999990000',
+              id: 'n1', bookingId: 'b1', channel: 'whatsapp', audience: 'BUSINESS', template: 'business.booking_created', status: 'SENT', to: '+5541999990000',
               text: 'Novo agendamento pelo site', waUrl: 'https://wa.me/5541999990000?text=Novo', attempts: 1, lastError: null,
+              scheduledFor: '2026-09-30T12:00:00.000Z', sentAt: '2026-09-30T12:00:05.000Z', createdAt: '2026-09-30T12:00:00.000Z',
+            },
+            {
+              id: 'n2', bookingId: 'b1', channel: 'telegram', audience: 'BUSINESS', template: 'business.booking_created', status: 'SENT', to: '777',
+              text: 'Novo agendamento pelo site', waUrl: null, attempts: 1, lastError: null,
               scheduledFor: '2026-09-30T12:00:00.000Z', sentAt: '2026-09-30T12:00:05.000Z', createdAt: '2026-09-30T12:00:00.000Z',
             },
           ],
@@ -111,6 +116,10 @@ describe('avisos', () => {
     const link = await screen.findByRole('link', { name: 'Abrir no WhatsApp' });
     expect(link.getAttribute('href')).toBe('https://wa.me/5541999990000?text=Novo');
     expect(link.getAttribute('rel')).toContain('noopener');
-    expect(screen.getByText('Negócio')).toBeTruthy();
+    expect(screen.getByText('Negócio · WhatsApp')).toBeTruthy();
+    // El de Telegram lo envía el servidor: sin enlace de WhatsApp.
+    expect(screen.getByText('Negócio · Telegram')).toBeTruthy();
+    expect(screen.getByText('Enviado automaticamente pelo Telegram')).toBeTruthy();
+    expect(screen.getAllByRole('link', { name: 'Abrir no WhatsApp' })).toHaveLength(1);
   });
 });

@@ -56,6 +56,14 @@ const EnvSchema = z.object({
   NOTIFICATIONS_TRANSPORT: z.enum(['log']).default('log'),
   /** Worker de avisos dentro del proceso de la API. false si se ejecuta aparte o en varias réplicas. */
   NOTIFICATIONS_WORKER: bool.default(true),
+  /** Token del bot de Telegram (de @BotFather) para los avisos al negocio. Sin definir: sin Telegram. */
+  TELEGRAM_BOT_TOKEN: z
+    .string()
+    .trim()
+    .regex(/^\d{5,}:[A-Za-z0-9_-]{30,}$/, 'formato 123456:ABC…, el que da @BotFather')
+    .optional(),
+  /** Solo para tests (servidor de Telegram simulado). */
+  TELEGRAM_API_URL: z.url().default('https://api.telegram.org'),
   /**
    * Activa /operator (alta de negocios desde el navegador, sin terminal). Sin definir: desactivado (404).
    * Mínimo 32 caracteres; se puede quitar después de crear el primer negocio.

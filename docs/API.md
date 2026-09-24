@@ -158,7 +158,8 @@ Permisos: A = ADMIN, P = PROFESSIONAL (solo sus propios recursos).
 | Customers ✅ | `GET /admin/customers?search&cursor&limit`, `POST`, `GET/PATCH /:id` | A; P solo lectura de clientes con citas suyas |
 | Bookings ✅ | `GET /admin/bookings?from&to&professionalId&locationId&customerId&status`, `POST`, `GET /:id`, `PATCH /:id` (reprogramar), `POST /:id/status` | A; P solo las suyas |
 | Availability ✅ | `GET /admin/availability?serviceId&professionalId&date` (o `from`/`to`) `&locationId` — igual que la pública, sin antelación mínima ni horizonte | A,P |
-| Notifications ✅ | `GET /admin/notifications?status&bookingId&cursor&limit` — `{ items: [{ id, bookingId, audience, template, status, to, text, waUrl, attempts, lastError, scheduledFor, sentAt, createdAt }], nextCursor }` | A |
+| Notifications ✅ | `GET /admin/notifications?status&bookingId&cursor&limit` — `{ items: [{ id, bookingId, channel ∈ {whatsapp, telegram}, audience, template, status, to, text, waUrl (null en Telegram), attempts, lastError, scheduledFor, sentAt, createdAt }], nextCursor }` | A |
+| Telegram ✅ | `GET /admin/settings/telegram` → `{ available, linked, linkedAt }`; `POST /admin/settings/telegram/link` → `{ url: "https://t.me/<bot>?start=<código>", expiresAt }` (un solo uso, 30 min; `409 TELEGRAM_NOT_CONFIGURED` sin bot); `DELETE /admin/settings/telegram` → 204 | A |
 | Audit ✅ | `GET /admin/audit-logs?entityType&entityId&action&cursor&limit` | A |
 
 `DELETE` es borrado lógico en entidades referenciadas por citas.
