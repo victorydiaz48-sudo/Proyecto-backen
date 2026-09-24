@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–14 completadas; Fase 15 (auditoría de seguridad) completada salvo la decisión sobre RLS.** Siguiente: Fase 16 (despliegue).
+Estado: **Fases 0–15 completadas** (Fase 15: auditoría de seguridad y Row-Level Security). Siguiente: Fase 16 (despliegue).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -145,7 +145,7 @@ Aprobadas antes de la Fase 2 (las tres propuestas se aceptaron tal cual):
    **Aprobado:** v1 por CLI del operador; self-service más adelante.
 2. **Aislamiento en BD**: ¿solo capa de aplicación + claves foráneas compuestas `(tenantId, id)`,
    o además **Row-Level Security** de PostgreSQL? **Aprobado:** FKs compuestas + scoping obligatorio
-   ahora; RLS como defensa en profundidad en la Fase 15. Ver [SECURITY](SECURITY.md) §2.
+   ahora; RLS como defensa en profundidad en la Fase 15 (**hecho**, opción "todas las tablas"). Ver [SECURITY](SECURITY.md) §2b.
 3. **Gestión de la cita por el cliente** (cancelar/reprogramar desde un enlace con token): ¿v1 o
    posterior? **Aprobado:** `Booking.manageTokenHash` ya está en el modelo; endpoints en fase posterior.
 

@@ -6,13 +6,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { createTestDb, truncateAll } from './helpers/db.ts';
+import { createTestDb, testAppDatabaseUrl, truncateAll } from './helpers/db.ts';
 import { loadGenerator } from './generator/load.ts';
 
 const run = promisify(execFile);
 const db = createTestDb();
 const cwd = join(import.meta.dirname, '..');
-const env = { ...process.env, DATABASE_URL: process.env.TEST_DATABASE_URL!, LOG_LEVEL: 'silent', NOTIFICATIONS_WORKER: 'false' };
+// Los procesos se conectan como en producción: con el rol de la aplicación (sujeto a RLS).
+const env = { ...process.env, DATABASE_URL: testAppDatabaseUrl(), LOG_LEVEL: 'silent', NOTIFICATIONS_WORKER: 'false' };
 const tsx = (script: string, args: string[], extraEnv: Record<string, string> = {}) =>
   run('npx', ['tsx', script, ...args], { cwd, env: { ...env, ...extraEnv } }).then(
     (r) => ({ code: 0, out: r.stdout + r.stderr }),
@@ -45,6 +46,18 @@ describe('servidor', () => {
     } finally {
       if (child.exitCode === null) child.kill('SIGKILL');
     }
+  }, 30_000);
+
+  it('en producción se niega a arrancar si DATABASE_URL no está sujeta a RLS (propietario)', async () => {
+    const child = spawn(process.execPath, ['--import', 'tsx', 'src/server.ts'], {
+      cwd,
+      env: { ...env, DATABASE_URL: process.env.TEST_DATABASE_URL!, NODE_ENV: 'production', LOG_LEVEL: 'fatal', PORT: String(40_000 + Math.floor(Math.random() * 1000)), HOST: '127.0.0.1' },
+    });
+    let out = '';
+    child.stdout.on('data', (d: Buffer) => (out += d.toString()));
+    const code = await new Promise<number | null>((resolve) => child.on('exit', resolve));
+    expect(code).toBe(1);
+    expect(out).toContain('reservas_app');
   }, 30_000);
 });
 

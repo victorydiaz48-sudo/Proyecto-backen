@@ -2,6 +2,7 @@ import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import type { Db } from '../../db.ts';
 import { AppError, notFound } from '../../lib/errors.ts';
+import { setRequestTenant } from '../../lib/tenant-context.ts';
 import { toE164 } from '../../lib/phone.ts';
 import { localDateOf } from '../../lib/time.ts';
 import { SLUG_RE } from '../../lib/validation.ts';
@@ -73,6 +74,7 @@ export const publicRoutes: FastifyPluginAsyncZod<{ db: Db; now: () => Date }> = 
         })
       : null;
     if (!tenant || tenant.status !== 'ACTIVE') throw notFound();
+    setRequestTenant(tenant.id);
     request.publicTenant = tenant;
   });
   const tenantOf = (request: { publicTenant: PublicTenant | null }): PublicTenant => {

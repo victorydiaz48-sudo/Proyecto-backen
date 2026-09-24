@@ -183,3 +183,11 @@ ALTER TABLE "Booking"
 - Seed (`npm run db:seed`) solo para desarrollo: `barberia-a` (São Paulo, BRL) y `barberia-b` (Madrid, EUR),
   con local, 3 servicios, 2 profesionales y horario partido. Se niega a correr con `NODE_ENV=production`.
   Los usuarios se añaden en la Fase 3.
+
+## Row-Level Security
+
+Migración `20260924120000_row_level_security`: rol `reservas_app` para la aplicación, políticas por
+`tenantId` en todas las tablas de negocio, `Tenant` legible pero solo modificable por su negocio, y dos
+funciones `SECURITY DEFINER` acotadas (sesión por token y reclamación de avisos). Las migraciones se
+aplican con `MIGRATION_DATABASE_URL` (propietario); la app usa `DATABASE_URL` (`reservas_app`).
+Detalles y motivos en [SECURITY](SECURITY.md) §2b.

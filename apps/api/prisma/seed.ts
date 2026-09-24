@@ -2,9 +2,11 @@
 // Solo desarrollo. Usuarios: admin@<slug>.test (ADMIN) y carlos@<slug>.test (PROFESSIONAL),
 // contraseña SEED_PASSWORD (por defecto "dev-password-123").
 import 'dotenv/config';
+import { randomUUID } from 'node:crypto';
 import { loadConfig } from '../src/config.ts';
 import { createDb, type Db } from '../src/db.ts';
 import { hashPassword } from '../src/lib/password.ts';
+import { withTenant } from '../src/lib/tenant-context.ts';
 
 const SEED_PASSWORD = process.env.SEED_PASSWORD ?? 'dev-password-123';
 
@@ -19,8 +21,10 @@ async function seedTenant(db: Db, t: (typeof SEED_TENANTS)[number]): Promise<voi
     return;
   }
   const passwordHash = await hashPassword(SEED_PASSWORD);
-  await db.$transaction(async (tx) => {
-    const tenant = await tx.tenant.create({ data: t });
+  // Id generado aquí para fijar el negocio (RLS) antes de crear sus filas.
+  const tenantId = randomUUID();
+  await withTenant(tenantId, () => db.$transaction(async (tx) => {
+    const tenant = await tx.tenant.create({ data: { ...t, id: tenantId } });
     await tx.user.create({ data: { tenantId: tenant.id, email: `admin@${t.slug}.test`, passwordHash, role: 'ADMIN' } });
     const location = await tx.location.create({ data: { tenantId: tenant.id, name: 'Principal', isDefault: true } });
     const corte = await tx.service.create({ data: { tenantId: tenant.id, name: 'Corte', durationMinutes: 30, priceCents: 4500 } });
@@ -53,7 +57,7 @@ async function seedTenant(db: Db, t: (typeof SEED_TENANTS)[number]): Promise<voi
         data: hours.map((h) => ({ ...h, tenantId: tenant.id, professionalId: pro.id, locationId: location.id })),
       });
     }
-  });
+  }));
   console.log(`+ ${t.slug} creado`);
 }
 

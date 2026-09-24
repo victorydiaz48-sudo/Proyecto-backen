@@ -29,6 +29,11 @@ npm run typecheck && npm run lint && npm test   # lo mismo que ejecuta CI
 npm run db:check-drift                          # schema.prisma coincide con las migraciones
 ```
 
+La app se conecta con el rol `reservas_app` (sujeto a Row-Level Security) y las migraciones con el
+propietario (`MIGRATION_DATABASE_URL`). El PostgreSQL de Docker crea el rol al iniciarse por primera
+vez; con un PostgreSQL propio o un volumen de Docker anterior, créalo una vez como administrador:
+`CREATE ROLE reservas_app LOGIN PASSWORD 'reservas_app';` (ver [docs/SECURITY.md](docs/SECURITY.md) §2b).
+
 Usuarios del seed: `admin@barberia-a.test` (ADMIN) y `carlos@barberia-a.test` (PROFESSIONAL), igual
 para `barberia-b`; contraseña `dev-password-123`. Solo para desarrollo.
 

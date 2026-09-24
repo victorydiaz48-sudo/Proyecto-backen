@@ -1,4 +1,5 @@
 import type { Db } from '../../db.ts';
+import { withTenant } from '../../lib/tenant-context.ts';
 import type { NotificationTransport } from './transport.ts';
 
 export const MAX_ATTEMPTS = 5;
@@ -20,39 +21,39 @@ export interface ProcessResult {
  */
 export async function processDueNotifications(db: Db, transport: NotificationTransport, now: Date, batch = 20): Promise<ProcessResult> {
   const lease = new Date(now.getTime() + LEASE_MS);
-  const claimed = await db.$queryRaw<{ id: string; tenantId: string; channel: string; payload: { to: string; text: string }; attempts: number }[]>`
-    UPDATE "NotificationOutbox" SET attempts = attempts + 1, "nextAttemptAt" = ${lease}, "updatedAt" = ${now}
-    WHERE id IN (
-      SELECT id FROM "NotificationOutbox"
-      WHERE status = 'PENDING' AND "nextAttemptAt" <= ${now}
-      ORDER BY "nextAttemptAt", id
-      LIMIT ${batch}
-      FOR UPDATE SKIP LOCKED
-    )
-    RETURNING id, "tenantId", channel, payload, attempts`;
+  // Reclamar cruza negocios: lo hace una función acotada de la BD (RLS). Cada aviso se procesa después
+  // con su propio negocio fijado.
+  const claimed = await db.$queryRaw<Claimed[]>`
+    SELECT * FROM app_claim_due_notifications(${now}::timestamptz, ${lease}::timestamptz, ${batch}::integer)`;
 
   const result: ProcessResult = { sent: 0, failed: 0, retried: 0 };
   for (const n of claimed) {
-    try {
-      await transport.send({ id: n.id, tenantId: n.tenantId, channel: n.channel, to: n.payload.to, text: n.payload.text });
-      await db.notificationOutbox.updateMany({ where: { id: n.id, status: 'PENDING' }, data: { status: 'SENT', sentAt: now, lastError: null } });
-      result.sent++;
-    } catch (err) {
-      const message = (err instanceof Error ? err.message : String(err)).slice(0, 500);
-      if (n.attempts >= MAX_ATTEMPTS) {
-        await db.notificationOutbox.updateMany({ where: { id: n.id, status: 'PENDING' }, data: { status: 'FAILED', lastError: message } });
-        result.failed++;
-      } else {
-        const wait = BACKOFF_MS[Math.min(n.attempts - 1, BACKOFF_MS.length - 1)]!;
-        await db.notificationOutbox.updateMany({
-          where: { id: n.id, status: 'PENDING' },
-          data: { lastError: message, nextAttemptAt: new Date(now.getTime() + wait) },
-        });
-        result.retried++;
-      }
-    }
+    await withTenant(n.tenant_id, () => deliver(db, transport, n, now, result));
   }
   return result;
+}
+
+type Claimed = { id: string; tenant_id: string; channel: string; payload: { to: string; text: string }; attempts: number };
+
+async function deliver(db: Db, transport: NotificationTransport, n: Claimed, now: Date, result: ProcessResult): Promise<void> {
+  try {
+    await transport.send({ id: n.id, tenantId: n.tenant_id, channel: n.channel, to: n.payload.to, text: n.payload.text });
+    await db.notificationOutbox.updateMany({ where: { id: n.id, status: 'PENDING' }, data: { status: 'SENT', sentAt: now, lastError: null } });
+    result.sent++;
+  } catch (err) {
+    const message = (err instanceof Error ? err.message : String(err)).slice(0, 500);
+    if (n.attempts >= MAX_ATTEMPTS) {
+      await db.notificationOutbox.updateMany({ where: { id: n.id, status: 'PENDING' }, data: { status: 'FAILED', lastError: message } });
+      result.failed++;
+    } else {
+      const wait = BACKOFF_MS[Math.min(n.attempts - 1, BACKOFF_MS.length - 1)]!;
+      await db.notificationOutbox.updateMany({
+        where: { id: n.id, status: 'PENDING' },
+        data: { lastError: message, nextAttemptAt: new Date(now.getTime() + wait) },
+      });
+      result.retried++;
+    }
+  }
 }
 
 /** Bucle del worker dentro del proceso de la API (separable a otro proceso más adelante). */

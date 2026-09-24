@@ -2,13 +2,18 @@ import type { FastifyInstance, LightMyRequestResponse } from 'fastify';
 import { buildApp } from '../../src/app.ts';
 import { loadConfig } from '../../src/config.ts';
 import type { Db } from '../../src/db.ts';
+import { createTestAppDb } from './db.ts';
 import type { Role } from '../../src/generated/prisma/enums.ts';
 import { hashPassword } from '../../src/lib/password.ts';
 
 export const TEST_PASSWORD = 'clave-de-prueba-segura';
 
+/**
+ * App de test. El primer argumento (cliente del propietario) se mantiene por compatibilidad con los tests,
+ * pero la app usa SIEMPRE su propio cliente con el rol reservas_app (RLS), como en producción.
+ */
 export async function buildTestApp(
-  db: Db,
+  _ownerDb: Db,
   now?: () => Date,
   env: Record<string, string> = {},
   logStream?: { write(line: string): void },
@@ -21,7 +26,12 @@ export async function buildTestApp(
     ADMIN_DIST_DIR: '/nonexistent-admin-dist',
     ...env,
   });
-  return buildApp({ config, db, ...(now ? { now } : {}), ...(logStream ? { logStream } : {}) });
+  const appDb = createTestAppDb();
+  const app = await buildApp({ config, db: appDb, ...(now ? { now } : {}), ...(logStream ? { logStream } : {}) });
+  app.addHook('onClose', async () => {
+    await appDb.$disconnect();
+  });
+  return app;
 }
 
 // Hash calculado una sola vez: Argon2 es lento a propósito y no aporta nada repetirlo en cada fixture.

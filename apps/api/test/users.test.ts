@@ -1,4 +1,5 @@
 import type { FastifyInstance, InjectOptions } from 'fastify';
+import pg from 'pg';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { buildTestApp, createUser, login } from './helpers/app.ts';
 import { createTestDb, truncateAll } from './helpers/db.ts';
@@ -76,10 +77,31 @@ describe('usuarios', () => {
 
   it('dos ADMIN que se degradan a la vez no dejan el negocio sin ADMIN', async () => {
     const second = (await call(adminA, 'POST', '/users', { email: 'socio@a.test', role: 'ADMIN', password: 'otra-clave-larga-1' })).json().user;
-    const results = await Promise.all([
+    // Cada uno se degrada a sí mismo con SU sesión: degradar corta las sesiones del afectado, así ninguna
+    // petición depende de una sesión que la otra pueda cortar y ambas llegan al bloqueo del negocio.
+    const secondSession = (await login(app, 'barberia-a', 'socio@a.test', 'otra-clave-larga-1')).cookie;
+    // Para forzar la carrera: otra conexión bloquea las dos filas de usuario, así ambas peticiones leen el
+    // número de ADMIN y esperan justo antes de escribir; luego se liberan a la vez. Sin el bloqueo del
+    // negocio en el servicio, las dos se degradarían y el negocio quedaría sin ADMIN.
+    const gate = new pg.Client({ connectionString: process.env.TEST_DATABASE_URL });
+    await gate.connect();
+    await gate.query('BEGIN');
+    await gate.query('SELECT id FROM "User" WHERE id = ANY($1::uuid[]) FOR UPDATE', [[adminAId, second.id]]);
+    const pending = Promise.all([
       call(adminA, 'PATCH', `/users/${adminAId}`, { role: 'PROFESSIONAL' }),
-      call(adminA, 'PATCH', `/users/${second.id}`, { role: 'PROFESSIONAL' }),
+      call(secondSession, 'PATCH', `/users/${second.id}`, { role: 'PROFESSIONAL' }),
     ]);
+    // Con el bloqueo del negocio, una espera en la fila y la otra en el negocio: dos esperas en cualquier caso.
+    for (let i = 0; i < 100; i++) {
+      const { rows } = await gate.query<{ n: number }>(
+        `SELECT count(DISTINCT pid)::int AS n FROM pg_locks WHERE NOT granted`,
+      );
+      if (rows[0]!.n >= 2) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    await gate.query('COMMIT');
+    await gate.end();
+    const results = await pending;
     expect(results.map((r) => r.statusCode).sort()).toEqual([200, 409]);
     expect(await db.user.count({ where: { tenantId: a.tenantId, role: 'ADMIN', active: true } })).toBe(1);
   });

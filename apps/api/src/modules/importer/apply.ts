@@ -1,5 +1,6 @@
 import type { Db } from '../../db.ts';
 import { AppError, conflict } from '../../lib/errors.ts';
+import { withTenant } from '../../lib/tenant-context.ts';
 import type { Actor } from '../audit/audit.ts';
 import { LocationsService } from '../locations/service.ts';
 import { ProfessionalsService } from '../professionals/service.ts';
@@ -37,10 +38,24 @@ export async function applyImport(
     });
     tenant = r.tenant;
     created = true;
-  } else {
+  }
+  const tenantId = tenant.id;
+  // El resto, con el negocio fijado (RLS).
+  return withTenant(tenantId, () => fill(db, plan, tenantId, created, args));
+}
+
+async function fill(
+  db: Db,
+  plan: ImportPlan,
+  tenantId: string,
+  created: boolean,
+  args: { adminPassword: string; now: () => Date },
+): Promise<ApplyResult> {
+  const tenant = { id: tenantId };
+  if (!created) {
     const [services, professionals] = await Promise.all([
-      db.service.count({ where: { tenantId: tenant.id } }),
-      db.professional.count({ where: { tenantId: tenant.id } }),
+      db.service.count({ where: { tenantId } }),
+      db.professional.count({ where: { tenantId } }),
     ]);
     if (services || professionals) throw conflict('El negocio ya tiene servicios o profesionales: el importador no sobrescribe datos.');
   }

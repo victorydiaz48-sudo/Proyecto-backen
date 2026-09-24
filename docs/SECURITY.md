@@ -18,10 +18,64 @@
    de otro tenant aunque el código falle.
 4. **404, no 403**, para recursos de otro tenant: no se revela su existencia.
 5. **Tests de acceso cruzado** por cada endpoint admin con `:id` y cada endpoint público (ver [TESTING](TESTING.md)).
-6. **Defensa en profundidad (pendiente de aprobación)**: Row-Level Security con
-   `SET LOCAL app.tenant_id` por transacción y un rol de BD sin `BYPASSRLS` para la app.
-   Trade-off: protege ante bugs de scoping, pero exige que *toda* consulta vaya dentro de una
-   transacción con el tenant fijado (Prisma lo complica con el pool) y añade coste a los tests.
+6. **Row-Level Security (Fase 15)**: la BD aísla los negocios aunque una consulta olvide filtrar por
+   `tenantId`. Detalle en §2b.
+
+## 2b. Row-Level Security
+
+**Roles.** La app se conecta con `reservas_app`: sin `BYPASSRLS`, sin ser propietario de las tablas y
+solo con `SELECT/INSERT/UPDATE/DELETE` (sin acceso a `_prisma_migrations` ni DDL). Las migraciones las
+aplica el propietario (`MIGRATION_DATABASE_URL`), que no está sujeto a RLS (no se usa `FORCE`). En
+producción el servidor **se niega a arrancar** si `DATABASE_URL` es superusuario, tiene `BYPASSRLS` o es
+propietario de las tablas (`rlsBypassReason`, `src/server.ts`).
+
+**Políticas** (migración `…_row_level_security`):
+- Las 12 tablas con `tenantId`: solo filas con `tenantId = app_current_tenant()`, al leer y al escribir
+  (`USING` + `WITH CHECK`: no se puede crear ni mover una fila a otro negocio).
+- `Session`: solo las de usuarios visibles (los del negocio fijado).
+- `Tenant`: legible sin negocio (la API pública y el login lo buscan por slug; sin datos personales);
+  solo se modifica o borra el propio negocio.
+- **Sin negocio fijado no se ve ni se escribe nada** (fallo cerrado).
+
+**Cómo se fija el negocio** (`src/lib/tenant-context.ts`, `src/db.ts`). Un `AsyncLocalStorage` guarda el
+negocio de la petición: lo fija la sesión (auth), el slug (API pública) o el código de sistema
+(`withTenant` en CLI, importador, seed y worker), nunca datos del cliente. La extensión de Prisma lo lee
+**en el momento de cada llamada** y ejecuta la consulta como `BEGIN; set_config('app.tenant_id', …, true);
+consulta; COMMIT` (el valor muere con la transacción: no puede quedarse en una conexión del pool). En
+`$transaction(async (tx) => …)`, `set_config` es la primera sentencia. Las transacciones por lotes
+(`$transaction([...])`) se rechazan porque no fijarían el negocio.
+
+Se descartó fijarlo en la conexión del pool: un experimento mostró que Prisma no conserva el contexto
+asíncrono hasta el pool y que agrupa `findUnique` de peticiones distintas en una sola consulta; un
+test de concurrencia (40 consultas simultáneas de A y B) cubre ese caso.
+
+**Excepciones que cruzan negocios**, como funciones `SECURITY DEFINER` acotadas (solo `reservas_app`
+puede ejecutarlas):
+- `app_session_tenant(token_hash)`: devuelve solo el negocio de una cookie de sesión (hay que tener el
+  token) para poder fijarlo antes de leer la sesión.
+- `app_claim_due_notifications(now, lease, limit)`: el worker reclama avisos vencidos de todos los
+  negocios (`FOR UPDATE SKIP LOCKED`); cada aviso se procesa después con su negocio fijado.
+
+**Coste.** Cada consulta fuera de una transacción añade tres idas y vueltas (`BEGIN`, `set_config`,
+`COMMIT`): medido en local, 0,7 → 1,7 ms por consulta. Con la BD en la misma región son unos pocos ms por
+consulta. Si algún día importara, se puede agrupar cada petición en una sola transacción.
+
+**Qué protege y qué no.** Protege contra errores de programación (una consulta sin filtro, un id de otro
+negocio). No protege si alguien ejecuta SQL arbitrario con el rol de la app (podría fijar otro
+`app.tenant_id`), algo que el uso exclusivo de consultas parametrizadas ya impide.
+
+**Pruebas.** `test/rls.test.ts`, con el rol real:
+- sin negocio no se ve ninguna fila de ninguna tabla;
+- con A, una consulta sin filtro solo ve A;
+- no se leen, modifican ni crean filas de B;
+- dentro de transacciones y en SQL crudo también se aplica;
+- concurrencia sin mezclas;
+- las funciones acotadas;
+- el rol no puede desactivar RLS ni leer el historial de migraciones.
+
+Toda la suite de la API se ejecuta con la app conectada como `reservas_app`. **Mutación comprobada**: al
+quitar el filtro `tenantId` del listado de clientes, fallan 3 tests con la app como propietario y ninguno
+con RLS.
 
 ## 3. Autenticación (implementado en la Fase 3)
 
@@ -127,7 +181,11 @@
   rate limit los bloquearía a todos juntos; con `true` sin proxy, cualquiera podría falsear su IP y
   saltarse el límite. Un test comprueba que, sin `TRUST_PROXY`, la cabecera se ignora.
 - Rate limit en memoria: con varias instancias, cada una cuenta por separado (mover a Redis).
-- El usuario de BD de la app no necesita ser propietario del esquema (las migraciones pueden usar otro).
+- Dos usuarios de BD: el propietario del esquema para las migraciones (`MIGRATION_DATABASE_URL`) y
+  `reservas_app` para la app (`DATABASE_URL`). La migración de RLS crea `reservas_app` sin login si el
+  usuario de migraciones puede crear roles; si no (habitual en PostgreSQL gestionado), hay que crearlo
+  antes, una vez, como administrador: `CREATE ROLE reservas_app LOGIN PASSWORD '…';`. Si la migración
+  lo creó, activar el login con `ALTER ROLE reservas_app LOGIN PASSWORD '…';`.
 
 ## 10. Auditoría de la Fase 15
 
@@ -140,6 +198,8 @@ Hallazgos y correcciones:
 | 4 avisos altos de `npm audit` (mysql2, deepmerge-ts vía el CLI de Prisma) | bajo (solo CLI, configuración estática) | `overrides`; comprobado validate/generate/drift/migraciones desde cero |
 | `npm audit` figuraba en esta documentación pero no se ejecutaba en CI | regresiones silenciosas | paso en CI |
 | La documentación citaba un `SESSION_SECRET` inexistente | confusión en el despliegue | corregido |
+| El test "dos ADMIN que se degradan a la vez" no forzaba la carrera: seguía pasando al quitar el bloqueo del servicio | una regresión en el invariante "siempre queda un ADMIN" pasaría desapercibida | el test bloquea las filas desde otra conexión para que ambas peticiones coincidan; sin el bloqueo falla siempre, con él pasa siempre |
+| Aislamiento solo en el código de la aplicación | un olvido de `tenantId` en una consulta filtraría datos de otro negocio | Row-Level Security (§2b) |
 
 Revisado sin hallazgos: esquemas de entrada de todas las rutas (test automático con lista justificada),
 autorización en `onRequest` en todas las rutas, errores 500, cabeceras, cookies, rate limits y CORS con
@@ -156,4 +216,4 @@ Checklist:
 - [x] Cookies `Secure` en producción (el arranque falla si se intenta desactivar); HTTPS obligatorio en el despliegue.
 - [x] Errores 500 sin detalles internos (también con `NODE_ENV=production`).
 - [x] `npm audit` sin vulnerabilidades altas (y en CI).
-- [ ] RLS: pendiente de decisión (ver §2.6).
+- [x] Row-Level Security en todas las tablas de negocio, con la app sin privilegios para saltárselo (§2b).

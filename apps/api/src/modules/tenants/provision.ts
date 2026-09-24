@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { PgErrorCode, pgErrorCode, type Db } from '../../db.ts';
 import { conflict, validationError } from '../../lib/errors.ts';
+import { withTenant } from '../../lib/tenant-context.ts';
 import { hashPassword, passwordProblem } from '../../lib/password.ts';
 import { zCountryCode, zCurrency, zEmail, zLocale, zSlug, zTimeZone } from '../../lib/validation.ts';
 import { writeAudit } from '../audit/audit.ts';
@@ -36,7 +38,9 @@ export async function provisionTenant(db: Db, raw: ProvisionTenantInput) {
 
   const passwordHash = await hashPassword(input.adminPassword);
   try {
-    return await createAll(db, input, passwordHash);
+    // El id se genera aquí para fijar el negocio (RLS) antes de crear sus filas.
+    const tenantId = randomUUID();
+    return await withTenant(tenantId, () => createAll(db, tenantId, input, passwordHash));
   } catch (err) {
     // Dos altas simultáneas con el mismo slug: la segunda choca con el índice único.
     if (pgErrorCode(err) === PgErrorCode.UNIQUE_VIOLATION) throw conflict('Ya existe un negocio con ese slug.');
@@ -44,10 +48,11 @@ export async function provisionTenant(db: Db, raw: ProvisionTenantInput) {
   }
 }
 
-function createAll(db: Db, input: z.output<typeof ProvisionTenantInput>, passwordHash: string) {
+function createAll(db: Db, tenantId: string, input: z.output<typeof ProvisionTenantInput>, passwordHash: string) {
   return db.$transaction(async (tx) => {
     const tenant = await tx.tenant.create({
       data: {
+        id: tenantId,
         slug: input.slug,
         name: input.name,
         timezone: input.timezone,

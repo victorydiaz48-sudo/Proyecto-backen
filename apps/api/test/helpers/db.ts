@@ -1,10 +1,28 @@
 import 'dotenv/config';
-import { createDb, pgErrorCode, type Db } from '../../src/db.ts';
+import { createDb, createOwnerDb, pgErrorCode, type Db } from '../../src/db.ts';
 
+/**
+ * Cliente del PROPIETARIO de la BD de test (no sujeto a RLS): para preparar datos de varios negocios y
+ * comprobar resultados. La app bajo prueba usa `createTestAppDb()` (rol reservas_app, con RLS).
+ */
 export function createTestDb(): Db {
   const url = process.env.TEST_DATABASE_URL;
   if (!url) throw new Error('Falta TEST_DATABASE_URL');
-  return createDb(url);
+  return createOwnerDb(url);
+}
+
+/** URL de la BD de test con el rol de la aplicación (TEST_APP_DATABASE_URL o la de test con reservas_app). */
+export function testAppDatabaseUrl(): string {
+  if (process.env.TEST_APP_DATABASE_URL) return process.env.TEST_APP_DATABASE_URL;
+  const url = new URL(process.env.TEST_DATABASE_URL ?? '');
+  url.username = 'reservas_app';
+  url.password = 'reservas_app';
+  return url.toString();
+}
+
+/** Cliente con el rol de la aplicación y RLS, como en producción. */
+export function createTestAppDb(): Db {
+  return createDb(testAppDatabaseUrl());
 }
 
 /** Vacía todas las tablas de negocio (conserva el esquema y las migraciones). */

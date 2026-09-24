@@ -12,6 +12,7 @@ import type { Config } from './config.ts';
 import type { Db } from './db.ts';
 import { FailureLimiter } from './lib/failure-limiter.ts';
 import { serializeRequest } from './lib/log.ts';
+import { runInRequestContext } from './lib/tenant-context.ts';
 import { authRoutes } from './modules/auth/routes.ts';
 import { AuthService } from './modules/auth/service.ts';
 import { availabilityAdminRoutes } from './modules/availability/routes.admin.ts';
@@ -67,6 +68,10 @@ export async function buildApp({ config, db, now = () => new Date(), logStream }
             ...(logStream ? { stream: logStream } : {}),
           },
   }).withTypeProvider<ZodTypeProvider>();
+
+  // Primer hook: cada petición tiene su propio contexto de negocio (RLS), vacío hasta resolver la sesión
+  // o el slug público.
+  app.addHook('onRequest', (_request, _reply, done) => runInRequestContext(done));
 
   const routeList: RouteInfo[] = [];
   app.decorate('routeList', routeList);

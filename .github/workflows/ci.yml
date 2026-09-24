@@ -18,7 +18,9 @@ jobs:
         options: >-
           --health-cmd "pg_isready -U reservas" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgresql://reservas:reservas@localhost:5432/reservas_dev
+      # La app usa el rol reservas_app (RLS); las migraciones, el propietario.
+      DATABASE_URL: postgresql://reservas_app:reservas_app@localhost:5432/reservas_dev
+      MIGRATION_DATABASE_URL: postgresql://reservas:reservas@localhost:5432/reservas_dev
       TEST_DATABASE_URL: postgresql://reservas:reservas@localhost:5432/reservas_test
       SHADOW_DATABASE_URL: postgresql://reservas:reservas@localhost:5432/reservas_shadow
     steps:
@@ -31,7 +33,7 @@ jobs:
           cache: npm
       - name: Crear BDs de test y sombra
         run: |
-          PGPASSWORD=reservas psql -h localhost -U reservas -d reservas_dev -c 'CREATE DATABASE reservas_test' -c 'CREATE DATABASE reservas_shadow'
+          PGPASSWORD=reservas psql -h localhost -U reservas -d reservas_dev -c 'CREATE DATABASE reservas_test' -c 'CREATE DATABASE reservas_shadow' -c "CREATE ROLE reservas_app LOGIN PASSWORD 'reservas_app'"
       - run: npm ci
       - name: Dependencias sin vulnerabilidades altas
         run: npm audit --audit-level=high

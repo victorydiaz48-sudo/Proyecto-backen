@@ -3,6 +3,7 @@ import type { Db } from '../db.ts';
 import type { Role } from '../generated/prisma/enums.ts';
 import { sha256 } from '../lib/crypto.ts';
 import { AppError, forbidden, unauthenticated } from '../lib/errors.ts';
+import { setRequestTenant } from '../lib/tenant-context.ts';
 
 export const SESSION_COOKIE = 'sid';
 export const SESSION_IDLE_MS = 7 * 24 * 60 * 60 * 1000; // caducidad deslizante
@@ -34,8 +35,14 @@ export function registerAuth(app: FastifyInstance, { db, now }: AuthOptions): vo
   app.addHook('onRequest', async (request) => {
     const token = request.cookies[SESSION_COOKIE];
     if (!token || token.length > 100) return;
+    const tokenHash = sha256(token);
+    // Con RLS, la sesión solo es visible con su negocio fijado: una función acotada de la BD devuelve el
+    // negocio del token (y nada más) para poder fijarlo antes de leerla.
+    const [owner] = await db.$queryRaw<{ tenantId: string | null }[]>`SELECT app_session_tenant(${tokenHash}) AS "tenantId"`;
+    if (!owner?.tenantId) return;
+    setRequestTenant(owner.tenantId);
     const session = await db.session.findUnique({
-      where: { tokenHash: sha256(token) },
+      where: { tokenHash },
       include: { user: { include: { tenant: true, professional: { select: { id: true } } } } },
     });
     if (!session) return;

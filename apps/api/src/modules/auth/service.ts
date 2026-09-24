@@ -2,6 +2,7 @@ import type { Db } from '../../db.ts';
 import { newToken, sha256 } from '../../lib/crypto.ts';
 import { AppError, validationError } from '../../lib/errors.ts';
 import type { FailureLimiter } from '../../lib/failure-limiter.ts';
+import { withTenant } from '../../lib/tenant-context.ts';
 import { burnPasswordCheck, hashPassword, passwordProblem, verifyPassword } from '../../lib/password.ts';
 import { SESSION_IDLE_MS, type AuthContext } from '../../plugins/auth.ts';
 import { writeAudit } from '../audit/audit.ts';
@@ -32,7 +33,18 @@ export class AuthService {
     const key = `${input.tenantSlug}|${input.email}`;
     if (this.limiter.isBlocked(key)) throw tooManyAttempts();
 
-    const tenant = await this.db.tenant.findUnique({ where: { slug: input.tenantSlug } });
+    const found = await this.db.tenant.findUnique({ where: { slug: input.tenantSlug } });
+    // Todo lo demás, con el negocio del slug fijado (RLS). Un slug inexistente sigue el mismo camino
+    // (verificación ficticia y el mismo error) sin negocio: no puede leer ningún usuario.
+    return found ? withTenant(found.id, () => this.attempt(found, input, meta, key)) : this.attempt(null, input, meta, key);
+  }
+
+  private async attempt(
+    tenant: Awaited<ReturnType<Db['tenant']['findUnique']>>,
+    input: { tenantSlug: string; email: string; password: string },
+    meta: RequestMeta,
+    key: string,
+  ): Promise<{ token: string; auth: AuthContext }> {
     const user =
       tenant && tenant.status === 'ACTIVE'
         ? await this.db.user.findUnique({

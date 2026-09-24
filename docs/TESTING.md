@@ -9,7 +9,9 @@ Herramienta: **Vitest**. Tres niveles:
 | Concurrencia | reservas simultáneas contra la BD real | PostgreSQL real |
 
 No se mockea PostgreSQL: la protección contra doble reserva y las FKs compuestas solo se prueban
-con la BD real. `test/helpers/global-setup.ts` borra el esquema de `TEST_DATABASE_URL` y aplica
+con la BD real. La app bajo prueba se conecta con el rol `reservas_app` (sujeto a Row-Level Security,
+`TEST_APP_DATABASE_URL`); los datos se preparan y comprueban como propietario (`TEST_DATABASE_URL`).
+`test/helpers/global-setup.ts` borra el esquema de `TEST_DATABASE_URL` y aplica
 `prisma migrate deploy` (igual que producción) al inicio de cada ejecución; cada archivo trunca las
 tablas en `beforeEach`. Los archivos se ejecutan en serie (`fileParallelism: false`).
 
@@ -63,7 +65,8 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/generator/e2e.test.ts` | **Chromium con la página abierta como `file://`** contra la API real: reserva con horas reales y aviso por WhatsApp; otra reserva se adelanta → aviso, alternativas y reserva con una de ellas; elección de servicio antes de que cargue la API se conserva; varios locales (filtra profesionales por local); API caída → flujo WhatsApp sin horas inventadas; página sin backend igual que antes; "Probar conexión" del generador. Se salta si no hay Chromium (en CI se instala) |
 | `test/importer.test.ts` | interpretación de servicios (categorías, precios, marcadores, sin precio), equipo (servicios por nombre, inexistentes), horarios (24 h, cruce de medianoche), locales, monedas y locales; importación completa y reserva posterior por la API pública; negocio existente con datos → se niega sin tocar nada; sin email de ADMIN → error |
 | `test/route-matrix.test.ts` | las 39 rutas `/admin` (lista tomada de la app): 401 sin sesión, 403 para PROFESSIONAL en rutas de ADMIN, 404 con ids de B y B intacto, sin `tenantId` en cuerpos, listados sin ids de B; sesión de A en la API pública de B; 20 reservas públicas simultáneas desde 20 IPs → 1 |
-| `test/entrypoints.test.ts` | `server.ts` real: arranca, `/healthz` y `/readyz`, SIGTERM → salida 0; `tenant:create` e `import:generator` como procesos (éxito, errores y código de salida); el seed de desarrollo se niega con `NODE_ENV=production` y en una BD con negocios reales |
+| `test/entrypoints.test.ts` | procesos conectados como `reservas_app`; `server.ts` real: arranca, `/healthz` y `/readyz`, SIGTERM → salida 0; `tenant:create` e `import:generator` como procesos (éxito, errores y código de salida); el seed de desarrollo se niega con `NODE_ENV=production` y en una BD con negocios reales; en producción el servidor no arranca si `DATABASE_URL` no está sujeta a RLS |
+| `test/rls.test.ts` | Row-Level Security con el rol real `reservas_app`: el rol no puede saltárselo; sin negocio no ve ninguna fila de ninguna tabla ni puede escribir; con A, consultas sin filtro solo ven A y no puede leer, modificar, borrar ni crear filas de B; transacciones y SQL crudo; 40 consultas simultáneas A/B sin mezclas; transacciones simultáneas; funciones de sesión y del worker; sin DDL ni acceso a `_prisma_migrations` |
 | `test/input-fields.test.ts` | **todas** las rutas (esquemas tomados de la app): ningún body/query acepta `tenantId`; cada campo sensible aceptado (precio, duración, rol, estado, contraseña, `professionalId`, `active`…) está en una lista justificada; la API pública solo acepta `professionalId` |
 | `test/logging.test.ts` | logs reales con `LOG_LEVEL=info`: sin contraseñas, cookie de sesión, teléfonos, nombres ni el texto de búsqueda de clientes (`search=[REDACTED]`) |
 | `test/production.test.ts` | app con `NODE_ENV=production`: cookie `Secure; HttpOnly; SameSite=Strict`, HSTS/CSP/nosniff/X-Frame-Options, 500 sin detalles, rate limit de reservas públicas y de login activos, `X-Forwarded-For` no salta el límite sin `TRUST_PROXY` |
