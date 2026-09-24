@@ -1217,6 +1217,39 @@ function cardRuntime(R,C){
       return {d:{Sun:0,Mon:1,Tue:2,Wed:3,Thu:4,Fri:5,Sat:6}[o.weekday],m:(+o.hour%24)*60+(+o.minute)};
     }catch(e){var n=new Date();return {d:n.getDay(),m:n.getHours()*60+n.getMinutes()};}
   }
+  /* Lo que el cliente va escribiendo (carrito, reserva) se guarda en el navegador para que no se pierda si la
+     pestaña se recarga al volver de WhatsApp (el móvil suele descartarla). Clave propia de la página, distinta
+     del borrador del generador. Al pulsar el botón final de WhatsApp queda marcado como enviado: se recupera si
+     vuelve en los 30 min siguientes (p. ej. para corregir algo) y después se borra solo, también en la pestaña
+     abierta; lo que nunca se envió caduca a las 24 h. En la vista previa del generador no se guarda nada. */
+  var SENT_TTL=18e5,IDLE_TTL=864e5,store=null,onBack=[];
+  if(!C.preview){try{store=window.localStorage;store.setItem('gpc-page-t','1');store.removeItem('gpc-page-t');}catch(e){store=null;}}
+  function h32(s){var h=2166136261;for(var i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return (h>>>0).toString(36);}
+  function keep(key){
+    var sent=0,last='',data=null;
+    if(store){try{
+      var raw=JSON.parse(store.getItem(key)||'null');
+      if(raw&&raw.d&&typeof raw.d==='object'){
+        var age=Date.now()-(raw.sent||raw.ts||0);
+        if(age<(raw.sent?SENT_TTL:IDLE_TTL)){data=raw.d;sent=+raw.sent||0;}else store.removeItem(key);   /* un reloj atrasado (edad negativa) no lo invalida */
+      }
+    }catch(e){}}
+    return {
+      data:data,
+      adopt:function(d){last=d?JSON.stringify(d):'';},   /* lo recién restaurado cuenta como ya guardado (conserva la marca de enviado) */
+      save:function(d,isSent){
+        if(!store)return;
+        var s=d?JSON.stringify(d):'';
+        if(s===last&&!isSent)return;
+        last=s;sent=isSent?Date.now():0;
+        try{if(d)store.setItem(key,JSON.stringify({d:d,ts:Date.now(),sent:sent}));else store.removeItem(key);}catch(e){}
+      },
+      stale:function(){return !!sent&&Date.now()-sent>=SENT_TTL;},
+      clear:function(){last='';sent=0;if(store)try{store.removeItem(key);}catch(e){}}
+    };
+  }
+  var onShow=function(){if(document.visibilityState==='hidden')return;for(var i=0;i<onBack.length;i++)onBack[i]();};
+  if(store){document.addEventListener('visibilitychange',onShow);window.addEventListener('pageshow',onShow);}
   var b=q('.save');
   if(b){
     var lbl=b.querySelector('.lbl'),live=q('.sv'),busy=false,t0=0;
@@ -1403,6 +1436,33 @@ function cardRuntime(R,C){
       if(timeEl0&&timeEl0.value)setErr('time',timeMsg(dateEl.value,timeEl0.value));
     });
     if(timeEl0)timeEl0.addEventListener('change',function(){setErr('time',timeMsg(dateEl?dateEl.value:'',timeEl0.value));});
+    /* formulario en curso: se guarda al escribir y se recupera solo (sin abrir el diálogo) al volver a la página */
+    var BK_F=['bkName','bkPhone','bkService','bkPro','bkDate','bkTime','bkNotes'];
+    var bkKeep=keep('gpc-page-book:'+cfg.wa+':'+h32(cfg.name));
+    var bkRead=function(){
+      var o={},any=false;
+      for(var i=0;i<BK_F.length;i++){var el=q('#'+BK_F[i]);if(el&&el.value){o[BK_F[i]]=el.value;any=true;}}
+      return any?o:null;
+    };
+    var bkFill=function(o){
+      for(var i=0;i<BK_F.length;i++){
+        var el=q('#'+BK_F[i]),v=o[BK_F[i]];
+        if(!el||typeof v!=='string'||(BK_F[i]==='bkDate'&&v<minDate))continue;   /* una fecha que ya pasó no se recupera */
+        if(el.tagName==='SELECT'&&!Array.prototype.some.call(el.options,function(op){return op.value===v&&!op.disabled;}))continue;
+        el.value=v;
+        if(BK_F[i]==='bkService'){try{el.dispatchEvent(new Event('change'));}catch(e){}}   /* rehace la lista de profesionales */
+      }
+      syncTimeRange();
+    };
+    if(bkKeep.data){bkFill(bkKeep.data);bkKeep.adopt(bkRead());}
+    var bkSave=function(){bkKeep.save(bkRead());};
+    form.addEventListener('input',bkSave);form.addEventListener('change',bkSave);
+    onBack.push(function(){
+      if(!bkKeep.stale())return;
+      form.reset();try{q('#bkService').dispatchEvent(new Event('change'));}catch(e){}
+      for(var i=0;i<BK_F.length;i++)setErr(BK_F[i].slice(2).toLowerCase(),'');
+      review.hidden=true;form.hidden=false;syncTimeRange();bkKeep.clear();
+    });
     form.addEventListener('submit',function(ev){
       ev.preventDefault();
       var nameEl=q('#bkName'),phoneEl=q('#bkPhone'),svcEl=q('#bkService'),proEl=q('#bkPro'),timeEl=q('#bkTime'),notesEl=q('#bkNotes');
@@ -1436,7 +1496,7 @@ function cardRuntime(R,C){
       form.hidden=true;review.hidden=false;
       var gb=q('[data-bkback]');if(gb)gb.focus();
     });
-    go.addEventListener('click',function(){setTimeout(closeBk,300);});
+    go.addEventListener('click',function(){bkKeep.save(bkRead(),true);setTimeout(closeBk,300);});
   }
   /* Carrito del cardápio: tocar +/- en una fila añade o quita unidades; el carrito flotante aparece
      solo cuando hay algo dentro, y el pedido se arma como texto y se manda por WhatsApp. */
@@ -1526,6 +1586,7 @@ function cardRuntime(R,C){
       if(ctTotalRow)ctTotalRow.hidden=!any;
       if(ctTotalEl)ctTotalEl.textContent=any?(sym?sym+' ':'')+total.toFixed(2).replace('.',',')+(hasUnpriced?' +':''):'';
       if(ctSend){ctSend.setAttribute('aria-disabled',any?'false':'true');ctSend.href=buildHref(any);}
+      if(ctKeep)ctKeep.save(ctRead());
     };
     var setCtErr=function(id,msg){
       var fld=R.querySelector('.ctf[data-f="'+id+'"]'),el=q('#ct'+id.charAt(0).toUpperCase()+id.slice(1)+'-e');
@@ -1572,7 +1633,38 @@ function cardRuntime(R,C){
       if(modeEl&&modeEl.value==='dine'&&ctTable&&!ctTable.value.trim()){
         ev.preventDefault();setCtErr('table',ck.e.table);ctTable.focus();return;
       }
+      ctKeep.save(ctRead(),true);
       setTimeout(closeCt,300);
+    });
+    /* pedido en curso: productos, cantidades y datos de entrega. Las claves del carrito son posiciones en la
+       carta, así que lo guardado solo vale para esta misma carta (firma); si el negocio la cambia, se descarta. */
+    var ctSig=h32(JSON.stringify(ck.items.map(function(it){return [it.n,it.p,it.sizes,it.opts];})));
+    var ctKeep=keep('gpc-page-cart:'+ck.wa+':'+h32(ck.name));
+    var radioVal=function(name){var el=R.querySelector('input[name="'+name+'"]:checked');return el?el.value:'';};
+    var ctRead=function(){
+      var qq={},n=0;
+      for(var k in qty)if(qty[k]>0&&resolveKey(k)){qq[k]=qty[k];n++;}
+      var o={sig:ctSig,qty:qq,mode:radioVal('ctmode'),pay:radioVal('ctpay'),chg:needsChange?1:0,
+        change:ctChange?ctChange.value:'',address:ctAddress?ctAddress.value:'',table:ctTable?ctTable.value:'',notes:ctNotes?ctNotes.value:''};
+      return (n||o.change||o.address||o.table||o.notes)?o:null;
+    };
+    var setChg=function(yes){needsChange=yes;for(var ci=0;ci<chgBtns.length;ci++)chgBtns[ci].setAttribute('aria-pressed',(chgBtns[ci].getAttribute('data-chg')==='yes')===yes?'true':'false');};
+    var ctFill=function(o){
+      if(o.sig!==ctSig||!o.qty||typeof o.qty!=='object')return false;
+      for(var k in o.qty){var v=+o.qty[k];if(resolveKey(k)&&v>0&&v<1000)qty[k]=Math.floor(v);}   /* solo claves válidas de esta carta */
+      var pick=function(name,v){var els=R.querySelectorAll('input[name="'+name+'"]');for(var i=0;i<els.length;i++)if(els[i].value===v)els[i].checked=true;};
+      pick('ctmode',o.mode);pick('ctpay',o.pay);setChg(!!o.chg);
+      var put=function(el,v){if(el&&typeof v==='string')el.value=v;};
+      put(ctChange,o.change);put(ctAddress,o.address);put(ctTable,o.table);put(ctNotes,o.notes);
+      return true;
+    };
+    if(ctKeep.data){if(ctFill(ctKeep.data))ctKeep.adopt(ctRead());else ctKeep.clear();}
+    onBack.push(function(){
+      if(!ctKeep.stale())return;
+      qty={};setChg(false);setCtErr('address','');setCtErr('table','');
+      var els=R.querySelectorAll('#ctDlg input,#ctDlg textarea');
+      for(var i=0;i<els.length;i++){if(els[i].type==='radio')els[i].checked=els[i].defaultChecked;else els[i].value=els[i].defaultValue;}
+      ctKeep.clear();render();
     });
     /* Cardápio completo: se abre con el CTA "Ver cardápio". En la página solo se ven los destacados;
        tocar cualquier producto —ahí o dentro del cardápio completo— abre siempre la misma ficha con
@@ -1633,7 +1725,10 @@ function cardRuntime(R,C){
     }
     render();
   }
-  return function(){for(var i=0;i<timers.length;i++)clearInterval(timers[i]);for(var j=0;j<obs.length;j++)obs[j].disconnect();};
+  return function(){
+    for(var i=0;i<timers.length;i++)clearInterval(timers[i]);for(var j=0;j<obs.length;j++)obs[j].disconnect();
+    if(store){document.removeEventListener('visibilitychange',onShow);window.removeEventListener('pageshow',onShow);}
+  };
 }
 
 /* ============ Variables de diseño (cada personalidad ajusta variables, no reescribe estilos) ============ */
