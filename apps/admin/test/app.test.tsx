@@ -88,3 +88,29 @@ describe('panel', () => {
     expect(await screen.findByRole('link', { name: 'Servicios' })).toBeTruthy();
   });
 });
+
+describe('avisos', () => {
+  it('ADMIN ve los avisos con su enlace de WhatsApp para enviarlos a mano', async () => {
+    window.history.replaceState(null, '', '/notifications');
+    mockFetch({
+      'GET /api/v1/auth/me': () => ({ json: admin }),
+      'GET /api/v1/admin/notifications': () => ({
+        json: {
+          items: [
+            {
+              id: 'n1', bookingId: 'b1', audience: 'BUSINESS', template: 'business.booking_created', status: 'SENT', to: '+5541999990000',
+              text: 'Novo agendamento pelo site', waUrl: 'https://wa.me/5541999990000?text=Novo', attempts: 1, lastError: null,
+              scheduledFor: '2026-09-30T12:00:00.000Z', sentAt: '2026-09-30T12:00:05.000Z', createdAt: '2026-09-30T12:00:00.000Z',
+            },
+          ],
+          nextCursor: null,
+        },
+      }),
+    });
+    renderApp();
+    const link = await screen.findByRole('link', { name: 'Abrir no WhatsApp' });
+    expect(link.getAttribute('href')).toBe('https://wa.me/5541999990000?text=Novo');
+    expect(link.getAttribute('rel')).toContain('noopener');
+    expect(screen.getByText('Negócio')).toBeTruthy();
+  });
+});

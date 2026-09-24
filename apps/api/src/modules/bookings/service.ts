@@ -5,6 +5,7 @@ import { AppError, conflict, forbidden, notFound, validationError } from '../../
 import { localToInstant, parseClock } from '../../lib/time.ts';
 import { writeAudit, type Actor } from '../audit/audit.ts';
 import { AvailabilityService } from '../availability/service.ts';
+import { enqueueBookingNotifications } from '../notifications/outbox.ts';
 import { OCCUPANCY_REASONS, type SlotReason } from '../../domain/availability/check.ts';
 import { rankProfessionals } from '../../domain/availability/slots.ts';
 import { findOrCreateCustomer, normalizePhoneOrThrow } from '../customers/service.ts';
@@ -27,7 +28,7 @@ const TRANSITIONS: Record<BookingStatus, Partial<Record<BookingStatus, { adminOn
   NO_SHOW: { COMPLETED: { adminOnly: true } },
 };
 
-type TenantRow = TenantRules & { currency: string; defaultCountryCode: string; defaultBookingStatus: BookingStatus };
+type TenantRow = TenantRules & { name: string; locale: string; currency: string; defaultCountryCode: string; defaultBookingStatus: BookingStatus };
 
 export interface Viewer {
   role: Role;
@@ -203,6 +204,7 @@ export class BookingsService {
         entityId: booking.id,
         after: { ...(auditView(dto) as object), ...(input.professionalId === 'any' ? { assignedFromAny: true } : {}) },
       });
+      await enqueueBookingNotifications(tx, { tenant, booking: dto, event: 'created', source: opts.source, now: this.now() });
       return dto;
     });
   }
@@ -284,6 +286,7 @@ export class BookingsService {
         const updated = await tx.booking.update({ where: { tenantId_id: { tenantId: tenant.id, id } }, data, include: BOOKING_INCLUDE });
         const after = toBookingDto(updated, tenant.timezone);
         await writeAudit(tx, { ...actor, action: 'booking.rescheduled', entityType: 'Booking', entityId: id, before: auditView(before), after: auditView(after) });
+        await enqueueBookingNotifications(tx, { tenant, booking: after, event: 'rescheduled', source: current.source, now: this.now() });
         return after;
       }),
     );
@@ -331,7 +334,10 @@ export class BookingsService {
           before: { status: current.status },
           after: { status, ...(reason ? { reason } : {}) },
         });
-        return toBookingDto(updated, tenant.timezone);
+        const dto = toBookingDto(updated, tenant.timezone);
+        const event = status === 'CANCELLED' ? 'cancelled' : status === 'CONFIRMED' ? 'confirmed' : null;
+        if (event) await enqueueBookingNotifications(tx, { tenant, booking: dto, event, source: current.source, now: this.now() });
+        return dto;
       }),
     );
   }
@@ -362,7 +368,10 @@ export class BookingsService {
   private tenant(db: Db | Tx, tenantId: string): Promise<TenantRow> {
     return db.tenant.findUniqueOrThrow({
       where: { id: tenantId },
-      select: { id: true, timezone: true, bookingLeadMinutes: true, bookingHorizonDays: true, currency: true, defaultCountryCode: true, defaultBookingStatus: true },
+      select: {
+        id: true, name: true, locale: true, timezone: true, bookingLeadMinutes: true, bookingHorizonDays: true,
+        currency: true, defaultCountryCode: true, defaultBookingStatus: true,
+      },
     });
   }
 

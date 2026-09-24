@@ -37,7 +37,8 @@ export function UsersPage() {
       </header>
       <ErrorBox error={action.error ?? users.error} />
       {users.loading ? <Loading /> : (
-        <table>
+        <div className="table-wrap">
+<table>
           <thead><tr><th>{t.email}</th><th>{t.role}</th><th>{t.linkedProfessional}</th><th>{t.lastLogin}</th><th /></tr></thead>
           <tbody>
             {(users.data ?? []).map((u) => (
@@ -69,6 +70,7 @@ export function UsersPage() {
             ))}
           </tbody>
         </table>
+</div>
       )}
       {creating ? (
         <UserForm

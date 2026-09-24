@@ -25,7 +25,8 @@ export function ServicesPage() {
       </header>
       <ErrorBox error={action.error ?? list.error} />
       {list.loading ? <Loading /> : (
-        <table>
+        <div className="table-wrap">
+<table>
           <thead><tr><th>{t.name}</th><th>{t.category}</th><th>{t.duration}</th><th>{t.buffer}</th><th>{t.price}</th><th /></tr></thead>
           <tbody>
             {(list.data ?? []).map((s) => (
@@ -49,6 +50,7 @@ export function ServicesPage() {
             ))}
           </tbody>
         </table>
+</div>
       )}
       {editing ? <ServiceForm service={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); list.reload(); }} /> : null}
     </section>

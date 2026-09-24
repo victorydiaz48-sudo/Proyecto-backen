@@ -14,6 +14,10 @@ const EnvSchema = z.object({
   TRUST_PROXY: bool.default(false),
   /** Cookie de sesión solo por HTTPS. Por defecto: activado en producción. */
   COOKIE_SECURE: bool.optional(),
+  /** Cómo se entregan los avisos. 'log' = opción C: se registran sin enviarse (ver docs/ARCHITECTURE.md). */
+  NOTIFICATIONS_TRANSPORT: z.enum(['log']).default('log'),
+  /** Worker de avisos dentro del proceso de la API. false si se ejecuta aparte o en varias réplicas. */
+  NOTIFICATIONS_WORKER: bool.default(true),
   /** Build del panel (apps/admin/dist). Si no existe, la API funciona sin servir el panel. */
   ADMIN_DIST_DIR: z.string().optional(),
 });

@@ -50,6 +50,13 @@ enum NotificationStatus {
   PENDING
   SENT
   FAILED
+  /// Ya no procede (p. ej. recordatorio de una cita cancelada o movida).
+  CANCELLED
+}
+
+enum NotificationAudience {
+  CUSTOMER
+  BUSINESS
 }
 
 model Tenant {
@@ -325,24 +332,27 @@ model AuditLog {
 }
 
 model NotificationOutbox {
-  id            String             @id @default(uuid()) @db.Uuid
-  tenantId      String             @db.Uuid
-  bookingId     String?            @db.Uuid
+  id            String               @id @default(uuid()) @db.Uuid
+  tenantId      String               @db.Uuid
+  bookingId     String?              @db.Uuid
   channel       String
+  audience      NotificationAudience
   template      String
   payload       Json
-  status        NotificationStatus @default(PENDING)
-  attempts      Int                @default(0)
-  nextAttemptAt DateTime           @default(now()) @db.Timestamptz(3)
+  status        NotificationStatus   @default(PENDING)
+  attempts      Int                  @default(0)
+  nextAttemptAt DateTime             @default(now()) @db.Timestamptz(3)
   lastError     String?
-  sentAt        DateTime?          @db.Timestamptz(3)
-  createdAt     DateTime           @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime           @updatedAt @db.Timestamptz(3)
+  sentAt        DateTime?            @db.Timestamptz(3)
+  createdAt     DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime             @updatedAt @db.Timestamptz(3)
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   booking Booking? @relation(fields: [tenantId, bookingId], references: [tenantId, id], onDelete: Cascade)
 
   @@index([status, nextAttemptAt])
+  @@index([tenantId, bookingId])
+  @@index([tenantId, createdAt(sort: Desc)])
 }
 
 model IdempotencyKey {

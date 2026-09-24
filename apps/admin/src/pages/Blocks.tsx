@@ -37,7 +37,8 @@ export function BlocksPage() {
       </header>
       <ErrorBox error={action.error ?? blocks.error} />
       {blocks.loading ? <Loading /> : (
-        <table>
+        <div className="table-wrap">
+<table>
           <thead><tr><th>{t.start}</th><th>{t.end}</th><th>{t.professional}</th><th>{t.location}</th><th>{t.reason}</th><th /></tr></thead>
           <tbody>
             {(blocks.data ?? []).map((b) => (
@@ -59,6 +60,7 @@ export function BlocksPage() {
             ))}
           </tbody>
         </table>
+</div>
       )}
       {creating ? (
         <BlockForm

@@ -35,7 +35,8 @@ export function CustomersPage() {
       </header>
       <ErrorBox error={action.error ?? page.error} />
       {page.loading ? <Loading /> : (
-        <table>
+        <div className="table-wrap">
+<table>
           <thead><tr><th>{t.name}</th><th>{t.phone}</th><th>{t.email}</th><th>{t.notes}</th><th /></tr></thead>
           <tbody>
             {items.map((c) => (
@@ -49,6 +50,7 @@ export function CustomersPage() {
             ))}
           </tbody>
         </table>
+</div>
       )}
       {next ? <button type="button" className="ghost" onClick={loadMore} disabled={action.busy}>{t.more}</button> : null}
       {editing ? (

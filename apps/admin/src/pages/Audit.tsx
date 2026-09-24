@@ -23,7 +23,8 @@ export function AuditPage() {
       <h1>{t.navAudit}</h1>
       <ErrorBox error={action.error ?? first.error} />
       {first.loading ? <Loading /> : (
-        <table className="audit">
+        <div className="table-wrap">
+<table className="audit">
           <thead><tr><th>{t.when}</th><th>{t.who}</th><th>{t.action}</th><th>{t.entity}</th><th /></tr></thead>
           <tbody>
             {items.map((l) => (
@@ -40,6 +41,7 @@ export function AuditPage() {
             ))}
           </tbody>
         </table>
+</div>
       )}
       {next ? (
         <button type="button" className="ghost" disabled={action.busy}

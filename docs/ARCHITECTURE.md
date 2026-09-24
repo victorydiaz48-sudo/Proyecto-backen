@@ -207,6 +207,37 @@ base del motor de disponibilidad (Fase 7).
 - Usuario PROFESSIONAL sin ficha vinculada: aviso claro en vez de pantallas vacías.
 - En pantallas estrechas la navegación es una barra fija, compacta y desplazable.
 
+## 7c. Notificaciones (Fase 12)
+
+Decisión (aprobada): **opción C** — sin proveedor de WhatsApp por ahora; avisos **al cliente y al negocio**.
+
+```
+cambio de cita ──(misma transacción)──► NotificationOutbox (PENDING, nextAttemptAt)
+                                             │
+                  worker (cada 15 s) ────────┘  reclama con FOR UPDATE SKIP LOCKED + alquiler de 5 min
+                        │
+                        ▼
+              NotificationTransport.send()   ── hoy: LogTransport (registra, no envía)
+                        │                       futuro: WhatsApp Business Cloud API u otro
+              SENT │ reintento (1, 5, 15, 60 min) │ FAILED tras 5 intentos
+```
+
+- `enqueueBookingNotifications` (`src/modules/notifications/outbox.ts`) se llama dentro de la transacción
+  de la cita: si la cita no se guarda, no hay avisos; si se guarda, los avisos no se pierden aunque el
+  envío falle. La lógica de reservas no conoce el transporte.
+- Cliente: `booking_created` (o `booking_received` si queda `PENDING`), `booking_confirmed`,
+  `booking_rescheduled`, `booking_cancelled` y `booking_reminder` 24 h antes (solo citas confirmadas y si
+  faltan más de 24 h). Negocio: `business.booking_created` para cada cita que llega desde la web, al
+  WhatsApp del local de la cita o, si no tiene, del local por defecto; sin WhatsApp no se encola.
+- Mover o cancelar una cita marca `CANCELLED` todos sus avisos aún pendientes (p. ej. el recordatorio) y
+  encola los nuevos. Los textos se generan al encolar, en pt/es según el `locale` del negocio.
+- Entrega "al menos una vez"; dos workers nunca envían el mismo aviso (test).
+- Con el transporte `log`, el panel (Avisos) muestra cada mensaje con su enlace `wa.me` para enviarlo a
+  mano. Configuración: `NOTIFICATIONS_TRANSPORT=log`, `NOTIFICATIONS_WORKER=true|false` (desactivar en
+  réplicas adicionales o si el worker corre en otro proceso).
+- Para conectar un proveedor real: implementar `NotificationTransport` y añadirlo a
+  `NOTIFICATIONS_TRANSPORT`. Nada más cambia.
+
 ## 8. Despliegue (Fase 16, resumen)
 
 Una imagen Docker: `api` sirve `/api/*` y los estáticos de la SPA. `prisma migrate deploy` en el

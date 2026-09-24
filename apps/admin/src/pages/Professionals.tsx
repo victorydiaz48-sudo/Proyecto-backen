@@ -26,7 +26,8 @@ export function ProfessionalsPage() {
       </header>
       <ErrorBox error={action.error ?? list.error ?? services.error} />
       {list.loading ? <Loading /> : (
-        <table>
+        <div className="table-wrap">
+<table>
           <thead><tr><th>{t.displayName}</th><th>{t.title}</th><th>{t.servicesOffered}</th><th /></tr></thead>
           <tbody>
             {(list.data ?? []).map((p) => (
@@ -49,6 +50,7 @@ export function ProfessionalsPage() {
             ))}
           </tbody>
         </table>
+</div>
       )}
       {editing ? (
         <ProfessionalForm

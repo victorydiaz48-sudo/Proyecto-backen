@@ -85,8 +85,9 @@ input[aria-invalid='true'] { border-color: var(--danger); }
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .check { display: inline-flex; gap: 6px; align-items: center; margin-right: 12px; }
 
-table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; display: block; overflow-x: auto; }
-thead, tbody { display: table; width: 100%; border-collapse: collapse; }
+/* La tabla conserva su maquetación normal (columnas alineadas); el contenedor se desplaza en el móvil. */
+.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
 th { font-size: 0.85em; color: var(--muted); font-weight: 600; }
 tr.inactive td { color: var(--muted); }
@@ -132,3 +133,8 @@ legend { font-weight: 600; font-size: 0.9em; padding: 0 4px; }
 button.link { background: none; border: 0; padding: 0; color: var(--accent); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
 .notice { background: color-mix(in srgb, var(--accent) 10%, transparent); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; }
 .upcoming { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.pre { white-space: pre-line; }
+a.button-link {
+  display: inline-block; white-space: nowrap; padding: 4px 10px; font-size: 0.85em; font-weight: 600;
+  border: 1px solid var(--accent); border-radius: var(--radius); text-decoration: none;
+}

@@ -10,6 +10,7 @@ Archivos: `apps/api/prisma/schema.prisma`, `apps/api/prisma/migrations/`, `apps/
 |---|---|
 | `20260923231000_init` | Tablas, enums, índices y FKs compuestas generadas por Prisma. |
 | `20260923231001_db_constraints` | SQL escrito a mano: `btree_gist`, exclusion constraint, CHECKs, índices únicos parciales. |
+| `…_notifications` | Fase 12: `NotificationAudience`, estado `CANCELLED`, columna `audience`, índices del outbox. |
 
 ## 1. Convenciones
 
@@ -113,8 +114,11 @@ before jsonb?, after jsonb?, ip?, requestId, createdAt`. Solo inserción; sin da
 (nunca hashes ni tokens).
 
 ### NotificationOutbox
-`id, tenantId, bookingId?, channel, template, payload jsonb, status (PENDING|SENT|FAILED),
-attempts, nextAttemptAt, lastError?`.
+`id, tenantId, bookingId?, channel ('whatsapp'), audience (CUSTOMER|BUSINESS), template,
+payload jsonb { to (E.164), text, locale }, status (PENDING|SENT|FAILED|CANCELLED), attempts,
+nextAttemptAt (cuándo enviarlo; para recordatorios, 24 h antes de la cita), lastError?, sentAt?`.
+Índices por `(status, nextAttemptAt)`, `(tenantId, bookingId)` y `(tenantId, createdAt DESC)`
+(migración `…_notifications`).
 
 ### IdempotencyKey
 `tenantId, key, requestHash, responseStatus, responseBody jsonb, createdAt` — PK `(tenantId, key)`,

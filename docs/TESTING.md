@@ -27,7 +27,7 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 11)
+## Estado actual (hasta la Fase 12)
 
 | Archivo | Cubre |
 |---|---|
@@ -52,6 +52,7 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/spa.test.ts` | index.html en `/` y rutas del panel (no-cache), assets `immutable`, `/api` inexistente sigue siendo 404 JSON, CSP |
 | `apps/admin/test/*.test.ts(x)` | importes y fechas en la zona del negocio (incluido cambio de hora), cliente de la API (errores, 401, sin red, sin tenantId), login y error traducido, navegación por rol (PROFESSIONAL solo su columna), idioma por defecto del negocio |
 | `apps/admin/test/professional.test.tsx` | panel del profesional: resumen del día sin canceladas y solo su columna; vista de 7 días (rango pedido, agrupación, sin canceladas); nueva cita limitada a sus servicios y a su agenda; aviso si no tiene ficha vinculada |
+| `test/notifications.test.ts` | reserva web → confirmación al cliente, aviso al negocio y recordatorio 24 h antes; panel → solo cliente; WhatsApp del local por defecto como respaldo y sin WhatsApp no hay aviso al negocio; PENDING → "recibida" y al confirmar "confirmada" + recordatorio; cancelar y mover anulan lo pendiente; sin recordatorio a < 24 h; reserva fallida no deja avisos (misma transacción); textos en español; worker: solo lo vencido, reintentos con espera y FAILED tras 5, la cita no se ve afectada, dos workers no duplican; endpoint del panel con `wa.me`, sin filas de B, solo ADMIN; plantillas pt/es |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria
@@ -131,3 +132,10 @@ Pendiente (Fase 14): convertirlo en una suite E2E automatizada en CI.
 Chromium con viewport de móvil (390×844) como `carlos@barberia-a.test`: navegación en una sola barra,
 creación de una cita propia desde el móvil (primera hora libre), resumen del día, vista de próximos
 7 días y formulario de bloqueo sin selector de profesional ni de local. Sin errores de consola.
+
+## Prueba manual (Fase 12)
+
+Servidor real con el worker: una reserva por la API pública genera 3 avisos; en el siguiente ciclo el
+worker registra los 2 vencidos (log con teléfono enmascarado) y deja el recordatorio pendiente para su
+hora. La página Avisos del panel los muestra con "Abrir no WhatsApp". Se detectó y corrigió que las
+columnas de todas las tablas del panel estaban desalineadas.

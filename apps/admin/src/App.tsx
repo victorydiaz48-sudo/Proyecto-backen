@@ -9,6 +9,7 @@ import { CustomersPage } from './pages/Customers';
 import { LocationsPage } from './pages/Locations';
 import { LoginPage } from './pages/Login';
 import { MyHoursPage } from './pages/MyHours';
+import { NotificationsPage } from './pages/Notifications';
 import { ProfessionalsPage } from './pages/Professionals';
 import { ServicesPage } from './pages/Services';
 import { SettingsPage } from './pages/Settings';
@@ -36,6 +37,7 @@ const ROUTES: RouteDef[] = [
   { path: '/locations', label: (t) => t.navLocations, page: () => <LocationsPage />, adminOnly: true },
   { path: '/users', label: (t) => t.navUsers, page: () => <UsersPage />, adminOnly: true },
   { path: '/settings', label: (t) => t.navSettings, page: () => <SettingsPage />, adminOnly: true },
+  { path: '/notifications', label: (t) => t.navNotifications, page: () => <NotificationsPage />, adminOnly: true },
   { path: '/audit', label: (t) => t.navAudit, page: () => <AuditPage />, adminOnly: true },
   { path: '/account', label: (t) => t.navAccount, page: () => <AccountPage /> },
 ];

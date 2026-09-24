@@ -22,7 +22,8 @@ export function LocationsPage() {
       </header>
       <ErrorBox error={action.error ?? list.error} />
       {list.loading ? <Loading /> : (
-        <table>
+        <div className="table-wrap">
+<table>
           <thead><tr><th>{t.name}</th><th>{t.address}</th><th>{t.whatsapp}</th><th /></tr></thead>
           <tbody>
             {(list.data ?? []).map((l) => (
@@ -49,6 +50,7 @@ export function LocationsPage() {
             ))}
           </tbody>
         </table>
+</div>
       )}
       {editing ? <LocationForm location={editing === 'new' ? null : editing} onClose={() => setEditing(null)} onDone={() => { setEditing(null); list.reload(); }} /> : null}
     </section>

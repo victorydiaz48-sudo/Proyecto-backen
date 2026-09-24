@@ -93,7 +93,9 @@
 - Audit log de: login (éxito/fallo), cambios de usuarios/roles, servicios, precios, horarios,
   bloqueos, creación y cambios de estado de citas.
 - Dependencias: `npm audit` en CI, lockfile commiteado.
-- Datos personales (teléfono, nombre): mínimos necesarios; política de retención a definir.
+- Datos personales (teléfono, nombre): mínimos necesarios; política de retención a definir. El outbox
+  guarda teléfono y texto del aviso (necesarios para enviarlo); el log del worker solo registra el
+  teléfono enmascarado y la longitud del texto. Solo un ADMIN ve los avisos de su negocio.
 
 ## 9. Checklist para la Fase 15
 

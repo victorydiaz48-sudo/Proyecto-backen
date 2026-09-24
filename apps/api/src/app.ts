@@ -17,6 +17,7 @@ import { availabilityAdminRoutes } from './modules/availability/routes.admin.ts'
 import { bookingAdminRoutes } from './modules/bookings/routes.admin.ts';
 import { customerAdminRoutes } from './modules/customers/routes.admin.ts';
 import { locationAdminRoutes } from './modules/locations/routes.admin.ts';
+import { notificationAdminRoutes } from './modules/notifications/routes.admin.ts';
 import { professionalAdminRoutes } from './modules/professionals/routes.admin.ts';
 import { publicRoutes } from './modules/public/routes.ts';
 import { scheduleAdminRoutes } from './modules/schedule/routes.admin.ts';
@@ -104,6 +105,7 @@ export async function buildApp({ config, db, now = () => new Date() }: AppDeps):
             await admin.register(bookingAdminRoutes, { db, now });
             await admin.register(availabilityAdminRoutes, { db, now });
             await admin.register(userAdminRoutes, { db });
+            await admin.register(notificationAdminRoutes, { db });
           },
           { prefix: '/admin' },
         );

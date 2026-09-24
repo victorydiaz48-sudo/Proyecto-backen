@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–11 completadas.** Siguiente: Fase 12 (servicio de notificaciones).
+Estado: **Fases 0–12 completadas.** Siguiente: Fase 13 (integración con el generador HTML).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -136,9 +136,9 @@ Nada en el repositorio contradice estas decisiones.
 - Panel sin librería de componentes ni router externo (menos dependencias): router mínimo propio.
 - Notificaciones vía tabla **outbox** (se escribe en la misma transacción que la cita; un worker envía).
 
-## 4. Decisiones adicionales (aprobadas antes de la Fase 2)
+## 4. Decisiones adicionales
 
-Las tres propuestas se aceptaron tal cual:
+Aprobadas antes de la Fase 2 (las tres propuestas se aceptaron tal cual):
 
 1. **Alta de tenants**: ¿registro self-service público o alta por el operador de la plataforma?
    **Aprobado:** v1 por CLI del operador; self-service más adelante.
@@ -147,6 +147,12 @@ Las tres propuestas se aceptaron tal cual:
    ahora; RLS como defensa en profundidad en la Fase 15. Ver [SECURITY](SECURITY.md) §2.
 3. **Gestión de la cita por el cliente** (cancelar/reprogramar desde un enlace con token): ¿v1 o
    posterior? **Aprobado:** `Booking.manageTokenHash` ya está en el modelo; endpoints en fase posterior.
+
+Decisiones posteriores:
+
+4. **Notificaciones (Fase 12)**: **Aprobado:** opción C (sin proveedor de WhatsApp todavía, transporte
+   `log` y envío manual desde el panel), avisos al cliente y al negocio. Conectar la WhatsApp Business
+   Cloud API más adelante = implementar un `NotificationTransport`.
 
 ---
 
@@ -169,7 +175,7 @@ que el generador (que no se toca) sigue igual.
 | 9 | API pública | 5 endpoints, CORS `*` sin credenciales, rate limit, idempotencia. ✅ |
 | 10 | API admin + panel React | CRUD completo, agenda, auditoría. Usuarios y auditoría en la API; panel React (pt/es) servido por la API. ✅ |
 | 11 | Panel de profesional | Agenda propia, cambiar estado de sus citas, bloqueos propios. Vista de próximos 7 días, resumen del día, formulario limitado a sus servicios, navegación móvil. ✅ |
-| 12 | Notificaciones | Interfaz `NotificationChannel`, outbox + worker, WhatsApp como implementación. |
+| 12 | Notificaciones | Interfaz `NotificationChannel`, outbox + worker, WhatsApp como implementación. Opción C aprobada: transporte `log` + envío manual desde el panel; avisos a cliente y negocio. ✅ |
 | 13 | Integración con el generador | Campos `apiUrl`/`tenantSlug`, selector de horas reales, fallback a WhatsApp, importador del JSON v4. |
 | 14 | Testing completo | Cobertura de la matriz de [TESTING](TESTING.md). |
 | 15 | Auditoría de seguridad | Checklist de [SECURITY](SECURITY.md), RLS si se aprueba. |

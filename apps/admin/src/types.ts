@@ -137,3 +137,21 @@ export interface Page<T> {
   items: T[];
   nextCursor?: string | null;
 }
+
+export type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED' | 'CANCELLED';
+
+export interface Notification {
+  id: string;
+  bookingId: string | null;
+  audience: 'CUSTOMER' | 'BUSINESS';
+  template: string;
+  status: NotificationStatus;
+  to: string;
+  text: string;
+  waUrl: string;
+  attempts: number;
+  lastError: string | null;
+  scheduledFor: string;
+  sentAt: string | null;
+  createdAt: string;
+}
