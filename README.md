@@ -29,7 +29,8 @@ npm run typecheck && npm run lint && npm test   # lo mismo que ejecuta CI
 npm run db:check-drift                          # schema.prisma coincide con las migraciones
 ```
 
-Producción: `docker build --target runtime` y `--target migrate`; guía completa en
+Producción: una imagen (`docker build -t reservas .`) con los comandos `serve` y `migrate`; guía completa
+(incluido Railway) en
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 La app se conecta con el rol `reservas_app` (sujeto a Row-Level Security) y las migraciones con el

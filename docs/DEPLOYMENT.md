@@ -1,7 +1,8 @@
 # Despliegue (Fase 16)
 
 Un único servicio HTTP (API + panel en el mismo origen) sobre PostgreSQL 16. Todo lo de esta guía está
-probado: el job `docker` de CI construye las imágenes y repite la instalación completa en cada push.
+probado: el job `docker` de CI construye la imagen y repite la instalación completa (como en Railway)
+en cada push.
 
 ```
 Internet ──HTTPS──▶ balanceador / proxy (TLS) ──HTTP──▶ contenedor "reservas" :3000 ──▶ PostgreSQL 16
@@ -16,65 +17,63 @@ Internet ──HTTPS──▶ balanceador / proxy (TLS) ──HTTP──▶ cont
   la cookie de sesión es `Secure` y la app envía HSTS.
 - **PostgreSQL 16 gestionado** con copias automáticas y recuperación a un momento dado (PITR). Extensión
   `btree_gist` disponible (la crea la primera migración; en PostgreSQL gestionado suele estar permitida).
-- Dos usuarios de base de datos (ver §4): el **propietario** del esquema, para migrar, y
-  **`reservas_app`**, para la app, sujeto a Row-Level Security.
+- Dos usuarios de base de datos: el **propietario** del esquema, para migrar, y **`reservas_app`**,
+  para la app, sujeto a Row-Level Security (`migrate` lo crea si el propietario puede crear roles).
 
-## 2. Imágenes
+## 2. Imagen
 
-Un solo `Dockerfile`, dos objetivos:
+Un solo `Dockerfile` y una sola imagen (Node 22 slim, JavaScript compilado, panel compilado, solo
+dependencias de producción, usuario sin privilegios, `HEALTHCHECK` sobre `/readyz`). Comandos:
 
-| Imagen | Para qué | Contenido |
-|---|---|---|
-| `runtime` (por defecto) | el servidor | Node 22 slim, JavaScript compilado, panel compilado, solo dependencias de producción. Usuario sin privilegios, `HEALTHCHECK` incluido. **Sin** la herramienta de línea de comandos de Prisma. |
-| `migrate` | aplicar migraciones en cada versión | la herramienta de Prisma + migraciones. Se ejecuta y termina. |
+| Comando | Para qué |
+|---|---|
+| `serve` (por defecto) | el servidor |
+| `migrate` | **antes de cada versión** (pre-deploy): crea o actualiza el usuario `reservas_app` con la contraseña de `DATABASE_URL` y aplica las migraciones con el propietario. Idempotente. |
+| `tenant-create …`, `import-generator …` | tareas del operador desde terminal (alternativa: `/operator`, §4) |
 
 ```bash
-docker build --target runtime -t reservas:1.0.0 .
-docker build --target migrate -t reservas-migrate:1.0.0 .
+docker build -t reservas:1.0.0 .
 ```
-
-Comandos de la imagen `runtime`: `serve` (por defecto), `tenant-create …`, `import-generator …`.
 
 ## 3. Variables de entorno
 
-| Variable | Imagen | Obligatoria | Valor |
-|---|---|---|---|
-| `DATABASE_URL` | runtime | sí | `postgresql://reservas_app:…@host:5432/db?sslmode=require`. **Nunca** el propietario: en producción el servidor no arranca si la conexión se salta RLS. |
-| `MIGRATION_DATABASE_URL` | migrate | sí | el propietario del esquema. Solo la usa la imagen de migraciones. |
-| `TRUST_PROXY` | runtime | detrás de un proxy | IPs/CIDR de **tus** proxies, separadas por comas, o `uniquelocal` si el balanceador llega desde una red privada (10/8, 172.16/12, 192.168/16). `true` está prohibido (permitiría falsear la IP y saltarse los rate limits). Por defecto `false`. |
-| `PORT` / `HOST` | runtime | no | `3000` / `0.0.0.0` |
-| `LOG_LEVEL` | runtime | no | `info` (JSON por la salida estándar) |
-| `NOTIFICATIONS_WORKER` | runtime | no | `true`. Con varias réplicas puede quedarse en todas (no duplican avisos) o activarse en una sola. |
-| `NOTIFICATIONS_TRANSPORT` | runtime | no | `log` (opción C: los avisos se ven en el panel y se envían a mano) |
-| `NODE_ENV` | ambas | — | la imagen ya trae `production` |
-| `COOKIE_SECURE` | runtime | — | siempre `true` en producción (no se puede desactivar) |
+| Variable | Obligatoria | Valor |
+|---|---|---|
+| `DATABASE_URL` | **sí** | `postgresql://reservas_app:<contraseña>@host:5432/db`. Contraseña de 16+ caracteres, solo letras y números (si no, hay que codificarla en la URL). **Nunca** el propietario: el servidor no arranca si la conexión se salta RLS, y `migrate` tampoco la acepta. |
+| `MIGRATION_DATABASE_URL` | para `migrate` | el propietario del esquema. Si puede crear roles (en Railway, `postgres` es superusuario), `migrate` crea `reservas_app` solo; si no, créalo antes a mano (§4). El servidor no la lee; solo hace falta donde se ejecute `migrate`. |
+| `OPERATOR_TOKEN` | no | activa `/operator` (alta de negocios desde el navegador). 32+ caracteres aleatorios. Sin definir, `/operator` no existe (404). Puede quitarse después de crear los negocios. |
+| `TRUST_PROXY` | detrás de un proxy | IPs/CIDR de **tus** proxies, separadas por comas, o `uniquelocal` (10/8, 172.16/12, 192.168/16, fc00::/7). `true` está prohibido (permitiría falsear la IP y saltarse los rate limits). Por defecto `false`. Cómo averiguarlo: §4, paso 5. |
+| `PORT` / `HOST` | no | `3000` / `0.0.0.0` (si la plataforma define `PORT`, se usa esa) |
+| `LOG_LEVEL` | no | `info` (JSON por la salida estándar) |
+| `NOTIFICATIONS_WORKER` | no | `true`. Con varias réplicas puede quedarse en todas (no duplican avisos). |
+| `NOTIFICATIONS_TRANSPORT` | no | `log` (opción C: los avisos se ven en el panel y se envían a mano) |
+| `NODE_ENV` | — | la imagen ya trae `production` |
+| `COOKIE_SECURE` | — | siempre `true` en producción (no se puede desactivar) |
 
 No hay más secretos: las sesiones son tokens aleatorios guardados como hash, no se firman con una clave.
 
 ## 4. Primera instalación
 
-**1. Base de datos y usuarios.** Como administrador de PostgreSQL:
+**1. Base de datos.** Una base PostgreSQL 16 vacía y su propietario (en PostgreSQL gestionado, el
+usuario que te da el proveedor). Si ese usuario **no** puede crear roles, crea una vez, como
+administrador: `CREATE ROLE reservas_app LOGIN PASSWORD '<contraseña de DATABASE_URL>';`.
 
-```sql
-CREATE DATABASE reservas;
--- El propietario (si tu proveedor ya te da uno, úsalo y sáltate esta línea).
-CREATE ROLE reservas_owner LOGIN PASSWORD '<contraseña larga>';
-ALTER DATABASE reservas OWNER TO reservas_owner;
--- La app: sin BYPASSRLS y sin ser propietario. Los permisos se los da la migración.
-CREATE ROLE reservas_app LOGIN PASSWORD '<otra contraseña larga>';
-```
-
-Si el propietario puede crear roles, la migración crea `reservas_app` sin login; en ese caso actívalo
-después con `ALTER ROLE reservas_app LOGIN PASSWORD '…';`.
-
-**2. Migraciones:**
+**2. Migraciones** (el pre-deploy de la plataforma, o a mano):
 
 ```bash
-docker run --rm -e MIGRATION_DATABASE_URL='postgresql://reservas_owner:…@host:5432/reservas?sslmode=require' \
-  reservas-migrate:1.0.0
+docker run --rm -e MIGRATION_DATABASE_URL='postgresql://<propietario>:…@host:5432/db' \
+  -e DATABASE_URL='postgresql://reservas_app:…@host:5432/db' reservas:1.0.0 migrate
 ```
 
-**3. Primer negocio**, con su ADMIN:
+Salida esperada: `Usuario reservas_app: creado.` (o `ya estaba listo.`) y
+`All migrations have been successfully applied.` (o `No pending migrations to apply.`).
+
+**3. Servidor:** `docker run -d -p 3000:3000 -e DATABASE_URL='…' -e OPERATOR_TOKEN='…' reservas:1.0.0`.
+Comprobación: `https://tu-dominio/readyz` → `{"status":"ok"}`.
+
+**4. Primer negocio**, desde el navegador (también desde el móvil): `https://tu-dominio/operator`,
+con el `OPERATOR_TOKEN`. Muestra la contraseña inicial del ADMIN **una sola vez**; se cambia en
+*Cuenta*. Máximo 10 intentos cada 15 minutos por IP. Desde terminal, lo mismo con `tenant-create`:
 
 ```bash
 docker run --rm -e DATABASE_URL='postgresql://reservas_app:…' reservas:1.0.0 tenant-create \
@@ -82,34 +81,59 @@ docker run --rm -e DATABASE_URL='postgresql://reservas_app:…' reservas:1.0.0 t
   --currency BRL --locale pt-BR --admin-email dono@exemplo.com
 ```
 
-Imprime una contraseña temporal una sola vez; el ADMIN la cambia en *Cuenta*. Para no generarla,
-pasa `-e TENANT_ADMIN_PASSWORD=…`. Para crear el negocio a partir del JSON exportado por el generador:
+Para crear el negocio a partir del JSON exportado por el generador:
+`import-generator --file /datos.json --slug … --admin-email …` con el archivo montado
+(`-v "$PWD/datos.json:/datos.json:ro"`; `--dry-run` para ver el plan; ver
+[FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md) §4).
 
-```bash
-docker run --rm -v "$PWD/datos.json:/datos.json:ro" -e DATABASE_URL='postgresql://reservas_app:…' \
-  reservas:1.0.0 import-generator --file /datos.json --slug barbearia-central --admin-email dono@exemplo.com --dry-run
-```
-
-(sin `--dry-run` para guardar; ver [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md) §4).
-
-**4. Servidor:**
-
-```bash
-docker run -d --name reservas -p 3000:3000 \
-  -e DATABASE_URL='postgresql://reservas_app:…' -e TRUST_PROXY='uniquelocal' reservas:1.0.0
-```
-
-**5. Comprobación:** `https://tu-dominio/readyz` → `{"status":"ok"}`; `https://tu-dominio/` abre el panel.
+**5. `TRUST_PROXY`.** Con `TRUST_PROXY=false`, abre `https://tu-dominio/readyz` y busca en los logs la
+línea `incoming request` de esa petición: su `"remoteAddress"` es la IP del proxy de la plataforma (no la
+tuya). Si es privada (10.x, 172.16–31.x, 192.168.x, fd…/fc…) usa `uniquelocal`; si es 100.64–100.127.x,
+`100.64.0.0/10`; si no, esa IP o su rango. Con `false` todo funciona, pero todos los visitantes cuentan
+como una sola IP para los rate limits.
 
 **6. Páginas del generador:** en "Reservas en línea", *Dirección del sistema de reservas* =
 `https://tu-dominio` e *Identificador* = el slug; "Probar conexión".
 
+## 4b. Railway
+
+Un proyecto con dos servicios: **Postgres** (plantilla de Railway) y el **backend** (este repositorio).
+
+Servicio del backend → *Settings*:
+
+| Ajuste | Valor |
+|---|---|
+| Source → Branch | la rama con el backend (hoy `claude/barbershop-multitenant-backend-wr779k`) |
+| Root Directory | vacío (la raíz del repo: el `Dockerfile` está ahí) |
+| Deploy → **Pre-deploy Command** | `/usr/local/bin/entrypoint migrate` |
+| Deploy → Custom Start Command | vacío (la imagen arranca el servidor) |
+| Deploy → Healthcheck Path | `/readyz` |
+| Networking | generar un dominio público |
+
+Variables del servicio del backend (`Postgres` es el nombre del servicio de base de datos; si se llama
+distinto, cámbialo en las referencias):
+
+| Variable | Valor |
+|---|---|
+| `RESERVAS_APP_PASSWORD` | 32+ letras y números aleatorios (de un gestor de contraseñas) |
+| `DATABASE_URL` | `postgresql://reservas_app:${{RESERVAS_APP_PASSWORD}}@${{Postgres.PGHOST}}:${{Postgres.PGPORT}}/${{Postgres.PGDATABASE}}` |
+| `MIGRATION_DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
+| `OPERATOR_TOKEN` | 40+ caracteres aleatorios (otro distinto) |
+| `TRUST_PROXY` | `false` al principio; el valor definitivo según §4, paso 5 |
+
+El pre-deploy se ejecuta con la misma imagen y las mismas variables antes de cada despliegue: la primera
+vez crea `reservas_app` (el usuario `postgres` de Railway es superusuario) y aplica las migraciones; si
+falla, Railway no despliega. Cambiar `RESERVAS_APP_PASSWORD` y volver a desplegar actualiza la contraseña.
+
+`MIGRATION_DATABASE_URL` queda en el entorno del servidor porque el pre-deploy usa las variables del
+servicio; el servidor no la lee. Es una credencial de superusuario: no la copies a ningún otro sitio.
+
 ## 5. Cada nueva versión
 
-1. Construir las dos imágenes con la misma etiqueta.
-2. **Migrar primero** con `reservas-migrate:<versión>` (si falla, no se despliega nada).
-3. Desplegar `reservas:<versión>`. Con varias réplicas, de una en una: la plataforma espera a que
-   `/readyz` responda antes de retirar la anterior.
+1. Construir la imagen.
+2. **Migrar primero** con `migrate` (el pre-deploy; si falla, no se despliega nada).
+3. Desplegar. Con varias réplicas, de una en una: la plataforma espera a que `/readyz` responda antes de
+   retirar la anterior.
 4. Las migraciones deben ser **compatibles con la versión anterior** mientras conviven (añadir columnas
    opcionales, no renombrar ni borrar en el mismo paso). Las migraciones no se revierten: volver a la
    imagen anterior es seguro si la migración era compatible; si no, se restaura la copia (§7).

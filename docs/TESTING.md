@@ -67,6 +67,8 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/route-matrix.test.ts` | las 39 rutas `/admin` (lista tomada de la app): 401 sin sesión, 403 para PROFESSIONAL en rutas de ADMIN, 404 con ids de B y B intacto, sin `tenantId` en cuerpos, listados sin ids de B; sesión de A en la API pública de B; 20 reservas públicas simultáneas desde 20 IPs → 1 |
 | `test/entrypoints.test.ts` | procesos conectados como `reservas_app`; `server.ts` real: arranca, `/healthz` y `/readyz`, SIGTERM → salida 0; `tenant:create` e `import:generator` como procesos (éxito, errores y código de salida); el seed de desarrollo se niega con `NODE_ENV=production` y en una BD con negocios reales; en producción el servidor no arranca si `DATABASE_URL` no está sujeta a RLS |
 | `test/rls.test.ts` | Row-Level Security con el rol real `reservas_app`: el rol no puede saltárselo; sin negocio no ve ninguna fila de ninguna tabla ni puede escribir; con A, consultas sin filtro solo ven A y no puede leer, modificar, borrar ni crear filas de B; transacciones y SQL crudo; 40 consultas simultáneas A/B sin mezclas; transacciones simultáneas; funciones de sesión y del worker; sin DDL ni acceso a `_prisma_migrations` |
+| `test/operator.test.ts` | `/operator`: sin `OPERATOR_TOKEN` no existe; token corto rechazado; formulario sin JavaScript, `no-store` y CSP; alta completa (negocio, local, ADMIN, auditoría) y login con la contraseña mostrada; token incorrecto/ausente → 403 sin crear nada; errores junto a cada campo con HTML escapado; slug repetido → 409; límite de intentos por IP; el resto de la API sigue sin aceptar formularios |
+| `test/app-role.test.ts` | preparación de `reservas_app` en el pre-deploy: rechaza otro usuario (p. ej. el propietario), contraseñas cortas y una URL de migraciones con `reservas_app`; con propietario superusuario sincroniza la contraseña y si ya coincide no toca nada; sin permiso para crear roles, error con la instrucción |
 | `test/input-fields.test.ts` | **todas** las rutas (esquemas tomados de la app): ningún body/query acepta `tenantId`; cada campo sensible aceptado (precio, duración, rol, estado, contraseña, `professionalId`, `active`…) está en una lista justificada; la API pública solo acepta `professionalId` |
 | `test/logging.test.ts` | logs reales con `LOG_LEVEL=info`: sin contraseñas, cookie de sesión, teléfonos, nombres ni el texto de búsqueda de clientes (`search=[REDACTED]`) |
 | `test/production.test.ts` | app con `NODE_ENV=production`: cookie `Secure; HttpOnly; SameSite=Strict`, HSTS/CSP/nosniff/X-Frame-Options, 500 sin detalles, rate limit de reservas públicas y de login activos, `X-Forwarded-For` no salta el límite sin `TRUST_PROXY` ni cambiando la IP falsa detrás de un proxy de confianza (mutación comprobada) |
@@ -115,13 +117,14 @@ en ambos casos los tests fallan; restaurado, pasan.
 en Fastify va *después* de validar el cuerpo: una petición anónima con cuerpo inválido recibía 400 en
 vez de 401 (revelando el esquema). Ahora se comprueban en `onRequest`.
 
-## Imágenes de producción (job `docker` de CI)
+## Imagen de producción (job `docker` de CI)
 
-Construye `runtime` y `migrate` y repite una instalación real contra PostgreSQL 16: migraciones con el
-propietario, alta de negocio con `reservas_app`, servidor con `NODE_ENV=production` hasta `healthy`,
-API pública, login con cookie `Secure`, panel, parada con `SIGTERM` (salida 0), y negativa a arrancar
-conectado como propietario. Lo mismo, más el importador y una copia `pg_dump`/`pg_restore` que conserva
-RLS, se probó a mano en la Fase 16.
+Construye la imagen y repite una instalación como en Railway contra un PostgreSQL 16 cuyo propietario es
+el superusuario `postgres`: `migrate` crea `reservas_app` y migra (y repetirlo no cambia nada), servidor
+con `NODE_ENV=production` hasta `healthy`, primer negocio desde `/operator`, login con cookie `Secure`
+con la contraseña mostrada, API pública, panel, parada con `SIGTERM` (salida 0), y negativa a arrancar
+conectado como propietario. Probado también a mano: contraseña cambiada → `migrate` la actualiza;
+`DATABASE_URL` con el propietario → `migrate` se niega; importador y copia `pg_dump`/`pg_restore`.
 
 ## Matriz obligatoria (requisitos)
 

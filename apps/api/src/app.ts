@@ -21,6 +21,7 @@ import { customerAdminRoutes } from './modules/customers/routes.admin.ts';
 import { locationAdminRoutes } from './modules/locations/routes.admin.ts';
 import { notificationAdminRoutes } from './modules/notifications/routes.admin.ts';
 import { professionalAdminRoutes } from './modules/professionals/routes.admin.ts';
+import { operatorRoutes } from './modules/ops/operator.ts';
 import { publicRoutes } from './modules/public/routes.ts';
 import { scheduleAdminRoutes } from './modules/schedule/routes.admin.ts';
 import { serviceAdminRoutes } from './modules/services/routes.admin.ts';
@@ -159,6 +160,9 @@ export async function buildApp({ config, db, now = () => new Date(), logStream }
     },
     { prefix: '/api/v1' },
   );
+
+  // Alta de negocios desde el navegador, solo si el operador definió OPERATOR_TOKEN.
+  if (config.OPERATOR_TOKEN) await app.register(operatorRoutes, { db, token: config.OPERATOR_TOKEN });
 
   return app;
 }

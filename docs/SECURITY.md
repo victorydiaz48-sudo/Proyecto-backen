@@ -182,6 +182,14 @@ con RLS.
   falla): confiaría en todos los saltos y tomaría la primera IP de la cabecera, que escribe el cliente.
   Con `false` detrás de un proxy, todos los clientes comparten la IP del proxy y el rate limit los
   bloquearía a la vez. Ver [DEPLOYMENT](DEPLOYMENT.md).
+- `/operator` (alta de negocios desde el navegador) solo existe con `OPERATOR_TOKEN` (32+ caracteres):
+  token comparado en tiempo constante, 10 intentos cada 15 min por IP, sin cookies (un sitio ajeno no
+  puede enviar el formulario sin el token), sin JavaScript, `no-store`, alta auditada como `SYSTEM`.
+  Recomendado quitarlo cuando no se necesite.
+- `migrate` (pre-deploy) crea o actualiza `reservas_app` con la contraseña de `DATABASE_URL`, siempre con
+  `NOSUPERUSER NOBYPASSRLS`; se niega si `DATABASE_URL` usa otro usuario o si `reservas_app` fuese
+  privilegiado. En plataformas donde el pre-deploy comparte variables con el servidor (Railway),
+  `MIGRATION_DATABASE_URL` queda en el entorno del servidor, que no la usa.
 - Rate limit en memoria: con varias instancias, cada una cuenta por separado (mover a Redis).
 - Dos usuarios de BD: el propietario del esquema para las migraciones (`MIGRATION_DATABASE_URL`) y
   `reservas_app` para la app (`DATABASE_URL`). La migración de RLS crea `reservas_app` sin login si el

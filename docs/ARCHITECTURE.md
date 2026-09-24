@@ -240,8 +240,9 @@ cambio de cita ──(misma transacción)──► NotificationOutbox (PENDING, 
 
 ## 8. Despliegue (Fase 16, resumen)
 
-Dos imágenes desde el mismo `Dockerfile`: `runtime` (JavaScript compilado, panel, solo dependencias de
-producción, usuario sin privilegios, `HEALTHCHECK`) y `migrate` (`prisma migrate deploy` con el
-propietario del esquema, antes de cada versión). PostgreSQL 16 gestionado con PITR. Configuración por
-variables de entorno. Escalar a varias instancias requiere mover el rate limit a Redis. Detalle en
+Una imagen Docker (JavaScript compilado, panel, solo dependencias de producción, usuario sin
+privilegios, `HEALTHCHECK`) con dos comandos: `serve` y `migrate` (pre-deploy: prepara el usuario
+`reservas_app` y aplica las migraciones con el propietario). PostgreSQL 16 gestionado con PITR.
+Configuración por variables de entorno. `/operator` (con `OPERATOR_TOKEN`) da de alta negocios sin
+terminal. Escalar a varias instancias requiere mover el rate limit a Redis. Detalle en
 [DEPLOYMENT](DEPLOYMENT.md).

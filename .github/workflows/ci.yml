@@ -54,47 +54,50 @@ jobs:
         run: npm run db:deploy -w apps/api
 
   docker:
-    # Las imágenes de producción, probadas como en un despliegue: migrar, alta de negocio, servidor.
+    # La imagen de producción, probada como en Railway: pre-deploy (`migrate` crea reservas_app y migra
+    # con el propietario superusuario), servidor, alta del primer negocio desde /operator.
     runs-on: ubuntu-latest
     services:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_USER: reservas
-          POSTGRES_PASSWORD: reservas
-          POSTGRES_DB: reservas
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: railway
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U reservas" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      OWNER_URL: postgresql://reservas:reservas@127.0.0.1:5432/reservas
-      APP_URL: postgresql://reservas_app:reservas_app@127.0.0.1:5432/reservas
+      OWNER_URL: postgresql://postgres:postgres@127.0.0.1:5432/railway
+      APP_URL: postgresql://reservas_app:clave-de-la-app-en-ci-1234@127.0.0.1:5432/railway
+      OPERATOR_TOKEN: token-de-operador-en-ci-0123456789abcdef
     steps:
       - uses: actions/checkout@v4
-      - name: Build de las imágenes (servidor y migraciones)
+      - name: Build de la imagen
+        run: docker build -t reservas .
+      - name: Pre-deploy (crea reservas_app y migra); repetirlo no cambia nada
         run: |
-          docker build --target runtime -t reservas .
-          docker build --target migrate -t reservas-migrate .
-      - name: Rol de la aplicación (sujeto a RLS)
-        run: PGPASSWORD=reservas psql -h 127.0.0.1 -U reservas -d reservas -c "CREATE ROLE reservas_app LOGIN PASSWORD 'reservas_app'"
-      - name: Migraciones
-        run: docker run --rm --network host -e MIGRATION_DATABASE_URL="$OWNER_URL" reservas-migrate
-      - name: Alta de un negocio
+          docker run --rm --network host -e MIGRATION_DATABASE_URL="$OWNER_URL" -e DATABASE_URL="$APP_URL" reservas migrate | tee migrate.log
+          grep -q 'reservas_app: creado' migrate.log
+          docker run --rm --network host -e MIGRATION_DATABASE_URL="$OWNER_URL" -e DATABASE_URL="$APP_URL" reservas migrate | grep -q 'No pending migrations'
+      - name: Servidor en producción y primer negocio desde /operator
         run: |
-          docker run --rm --network host -e DATABASE_URL="$APP_URL" -e TENANT_ADMIN_PASSWORD=clave-humo-segura-1 reservas \
-            tenant-create --slug barberia-humo --name Humo --timezone America/Sao_Paulo --country 55 --currency BRL \
-            --locale pt-BR --admin-email dono@humo.test
-      - name: Servidor en producción
-        run: |
-          docker run -d --name api --network host -e DATABASE_URL="$APP_URL" reservas
+          docker run -d --name api --network host -e DATABASE_URL="$APP_URL" -e MIGRATION_DATABASE_URL="$OWNER_URL" \
+            -e OPERATOR_TOKEN="$OPERATOR_TOKEN" reservas
           for i in $(seq 1 40); do
             [ "$(docker inspect -f '{{.State.Health.Status}}' api)" = healthy ] && break
             sleep 1
           done
           docker inspect -f '{{.State.Health.Status}}' api | grep -qx healthy
+          curl -fsS localhost:3000/operator | grep -q 'action="/operator/tenants"'
+          curl -sS -o created.html -w '%{http_code}' \
+            -d "token=$OPERATOR_TOKEN&name=Humo&slug=barberia-humo&adminEmail=dono%40humo.test&timezone=America%2FSao_Paulo&country=55&currency=BRL&locale=pt-BR&location=Centro" \
+            localhost:3000/operator/tenants | grep -qx 201
+          PASSWORD=$(grep -o 'Contraseña inicial: <code>[^<]*' created.html | sed 's/.*<code>//')
+          test -n "$PASSWORD"
           curl -fsS localhost:3000/api/v1/public/barberia-humo | grep -q '"slug":"barberia-humo"'
           curl -fsS -D - -o /dev/null -H 'content-type: application/json' \
-            -d '{"tenantSlug":"barberia-humo","email":"dono@humo.test","password":"clave-humo-segura-1"}' \
+            -d "{\"tenantSlug\":\"barberia-humo\",\"email\":\"dono@humo.test\",\"password\":\"$PASSWORD\"}" \
             localhost:3000/api/v1/auth/login | grep -qi 'set-cookie: sid=.*Secure'
           curl -fsS -H 'accept: text/html' localhost:3000/agenda | grep -q '<div id="root">'
           docker stop api

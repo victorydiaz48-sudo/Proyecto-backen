@@ -56,6 +56,11 @@ const EnvSchema = z.object({
   NOTIFICATIONS_TRANSPORT: z.enum(['log']).default('log'),
   /** Worker de avisos dentro del proceso de la API. false si se ejecuta aparte o en varias réplicas. */
   NOTIFICATIONS_WORKER: bool.default(true),
+  /**
+   * Activa /operator (alta de negocios desde el navegador, sin terminal). Sin definir: desactivado (404).
+   * Mínimo 32 caracteres; se puede quitar después de crear el primer negocio.
+   */
+  OPERATOR_TOKEN: z.string().min(32, 'mínimo 32 caracteres').optional(),
   /** Build del panel (apps/admin/dist). Si no existe, la API funciona sin servir el panel. */
   ADMIN_DIST_DIR: z.string().optional(),
 });

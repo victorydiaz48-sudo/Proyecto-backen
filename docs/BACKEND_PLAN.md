@@ -180,4 +180,4 @@ que el generador (que no se toca) sigue igual.
 | 13 | Integración con el generador | Campos `apiUrl`/`tenantSlug`, selector de horas reales, fallback a WhatsApp, importador del JSON v4. Páginas sin backend idénticas byte a byte (hashes congelados). ✅ |
 | 14 | Testing completo | Cobertura de la matriz de [TESTING](TESTING.md). Matriz de rutas automática, pruebas en navegador del panel, puntos de entrada, cobertura con umbrales, suite en UTC+14. ✅ |
 | 15 | Auditoría de seguridad | Checklist de [SECURITY](SECURITY.md) y Row-Level Security en todas las tablas de negocio. ✅ |
-| 16 | Despliegue | Imágenes `runtime` (sin la herramienta de Prisma) y `migrate`, TypeScript compilado, health checks, copia/restauración probadas, `TRUST_PROXY` seguro, prueba de humo en CI, [guía](DEPLOYMENT.md). ✅ |
+| 16 | Despliegue | Imagen única con `serve` y `migrate` (pre-deploy que crea `reservas_app` y migra), `/operator` para dar de alta negocios sin terminal, TypeScript compilado, health checks, copia/restauración probadas, `TRUST_PROXY` seguro, prueba de humo en CI, [guía](DEPLOYMENT.md). ✅ |
