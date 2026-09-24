@@ -1690,9 +1690,8 @@ function cardRuntime(R,C){
         mdFromMenu=!!(mnDlg&&mnDlg.open);
         if(mdFromMenu)closeMenu();
         if(mdTitle)mdTitle.textContent=it.n;
-        /* la foto no viaja en C.cart (sería otra copia en base64): se toma de la fila de la carta completa */
-        var src=it.photo?R.querySelector('#mnDlg [data-mdopen="'+pi3+'"] img'):null;
-        if(mdPhoto){mdPhoto.innerHTML='';if(src){var im=document.createElement('img');im.src=src.getAttribute('src');im.alt='';mdPhoto.appendChild(im);}mdPhoto.hidden=!src;}
+        /* la foto no viaja en C.cart (sería otra copia en base64): la ficha usa la misma regla .miN que las filas */
+        if(mdPhoto){mdPhoto.className='mdph'+(it.photo?' mi'+pi3:'');mdPhoto.hidden=!it.photo;}
         if(mdDesc){if(it.desc){mdDesc.textContent=it.desc;mdDesc.hidden=false;}else{mdDesc.hidden=true;mdDesc.textContent='';}}
         var hasSz=!!(it.sizes&&it.sizes.length),hasOpt=!!(it.opts&&it.opts.length);
         if(mdSizeWrap)mdSizeWrap.hidden=!hasSz;
@@ -1910,8 +1909,7 @@ a.row:active .go{transform:translateX(3px);opacity:.9}
 .mcatn{margin:0 0 8px 2px;font-size:.78rem;font-weight:700;letter-spacing:.05em;color:var(--accent-text)}
 .mrow{display:flex;align-items:center;gap:12px;width:100%;padding:12px 14px;border:0;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer}
 .mrow:active{background:var(--surface-2)}
-.mph{flex:none;width:56px;height:56px;border-radius:calc(var(--c-r)*.5 + 4px);overflow:hidden;background:var(--surface-2)}
-.mph img{display:block;width:100%;height:100%;object-fit:cover}
+.mph{flex:none;width:56px;height:56px;border-radius:calc(var(--c-r)*.5 + 4px);overflow:hidden;background:var(--surface-2) center/cover no-repeat}
 .mtxt{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .mn{font-size:.9375rem;font-weight:600;overflow-wrap:anywhere;display:inline-flex;align-items:center;gap:6px}
 .mhot{width:14px;height:14px;color:var(--gold,var(--accent))}
@@ -1951,9 +1949,8 @@ a.row:active .go{transform:translateX(3px);opacity:.9}
 .chgopt[aria-pressed="true"]{border-color:var(--accent);background:var(--primary-light);color:var(--text)}
 #ctChangeAmtWrap{margin-top:2px}
 #ctChangeAmtWrap input{width:100%;min-height:48px;padding:10px 14px;border-radius:calc(var(--c-r)*.5 + 4px);border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);font:16px/1.3 var(--fb)}
-.mdph{display:block;width:100%;aspect-ratio:16/10;border-radius:var(--c-r);overflow:hidden;background:var(--surface-2)}
+.mdph{display:block;width:100%;aspect-ratio:16/10;border-radius:var(--c-r);overflow:hidden;background:var(--surface-2) center/cover no-repeat}
 .mdph[hidden]{display:none}
-.mdph img{display:block;width:100%;height:100%;object-fit:cover}
 .mddesc{margin:0;font-size:.9rem;line-height:1.5;color:var(--text-muted)}
 .mddesc[hidden]{display:none}
 .mdprice{margin:0;font-size:1.25rem;font-weight:700;color:var(--accent-text);font-variant-numeric:tabular-nums}
@@ -2070,8 +2067,16 @@ ${P.inset?'.list>li+li{border-top:0;background:linear-gradient(var(--border),var
 ${P.prem?'.ph{filter:saturate(.94) contrast(1.03)}.kind{letter-spacing:.14em}.desc{line-height:1.65}footer{padding-top:14px;position:relative}footer::before{content:"";display:block;width:28px;height:1px;margin:0 auto 14px;background:var(--line)}':''}
 ${P.sheen?'.cta{position:relative;overflow:hidden}.cta::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.28) 50%,transparent 62%);transform:translateX(-130%);transition:transform .9s ease;pointer-events:none}@media(hover:hover){.cta:hover::after{transform:translateX(130%)}}':''}
 @media(prefers-reduced-motion:reduce){.rv{animation:none}.pg *,.pg *::after{transition:none!important}.bkdlg,.bkdlg .bkpanel{animation:none!important}}
-${pv?(desk?deskCss(m,true)+'.pv .fab,.pv .topbar{display:none}':'.pv .fab{position:sticky;right:auto;bottom:16px;margin:-72px 16px 16px auto}.pv .topbar{position:sticky;top:0;margin-bottom:-56px;padding-top:0;height:56px}'):`@media(min-width:600px){${deskCss(m,false)}}`}`;
+${pv?(desk?deskCss(m,true)+'.pv .fab,.pv .topbar{display:none}':'.pv .fab{position:sticky;right:auto;bottom:16px;margin:-72px 16px 16px auto}.pv .topbar{position:sticky;top:0;margin-bottom:-56px;padding-top:0;height:56px}'):`@media(min-width:600px){${deskCss(m,false)}}`}
+${menuPhotoCss(m)}`;
   return css.replace(/\n\s*/g,'');
+}
+
+/* Fotos de la carta: cada una va una sola vez en la página, como una regla .miN (N = posición en la carta).
+   La fila de destacados, la de la carta completa y la ficha del producto usan esa misma clase, así que la foto
+   no se repite en el HTML ni depende de JavaScript para verse. */
+function menuPhotoCss(m){
+  return m.cartOn?m.services.map((s,i)=>s.photo?'.mi'+i+'{background-image:url("'+s.photo+'")}':'').join(''):'';
 }
 
 /* ============ Marcado ============ */
@@ -2194,7 +2199,7 @@ function pgHtml(m,opt){
 function rowClean(s,i,showStar,T){
   const priceTxt=s.sizes&&s.sizes.length?T.ctFrom+' '+s.sizes[0].p:s.p;
   return '<li><button type="button" class="mrow'+(s.photo?' has-ph':'')+'" data-mdopen="'+i+'">'+
-    (s.photo?'<span class="mph"><img src="'+esc(s.photo)+'" width="88" height="88" alt="" decoding="async" loading="lazy"></span>':'')+
+    (s.photo?'<span class="mph mi'+i+'" aria-hidden="true"></span>':'')+
     '<div class="mtxt"><span class="mn">'+esc(s.n)+(showStar&&s.hot?'<span class="mhot" aria-hidden="true">'+ICONS.rev+'</span>':'')+'</span>'+
     (priceTxt?'<span class="mp">'+esc(priceTxt)+'</span>':'')+'</div>'+ICONS.plus+'</button></li>';
 }
@@ -2216,7 +2221,7 @@ function detailDialog(T){
     '<div class="bkpanel">'+
       '<div class="bkhead"><h2 id="mdTitle"></h2><button type="button" class="bkx" data-mdclose aria-label="'+esc(T.ctClose)+'">'+ICONS.x+'</button></div>'+
       '<div class="ctbody">'+
-        '<span class="mdph" id="mdPhoto" hidden></span>'+
+        '<span class="mdph" id="mdPhoto" aria-hidden="true" hidden></span>'+
         '<p class="mddesc" id="mdDesc" hidden></p>'+
         '<div class="ctf" id="mdSizeWrap" hidden><label class="lbl2">'+esc(T.ctSize)+'</label><div class="modes" id="mdSizes"></div></div>'+
         '<div class="ctf" id="mdOptWrap" hidden><label class="lbl2">'+esc(T.ctOption)+'</label><div class="modes" id="mdOpts"></div></div>'+
