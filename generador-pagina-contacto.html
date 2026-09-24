@@ -1436,6 +1436,42 @@ function cardRuntime(R,C){
       if(timeEl0&&timeEl0.value)setErr('time',timeMsg(dateEl.value,timeEl0.value));
     });
     if(timeEl0)timeEl0.addEventListener('change',function(){setErr('time',timeMsg(dateEl?dateEl.value:'',timeEl0.value));});
+    /* Teléfono: formato visual de Brasil mientras se escribe, (41) 99999-9999, solo si el negocio es de Brasil.
+       Es una ayuda y nunca bloquea: con +, un 0 inicial, letras u otro formato se deja tal cual lo escribe el
+       cliente, y la validación sigue siendo la misma (mínimo de dígitos). Conserva la posición del cursor y deja
+       borrar "a través" de ), espacio y guion. */
+    var phEl=q('#bkPhone');
+    var maskBR=function(dg){
+      if(!dg)return '';
+      if(dg.length<=2)return '('+dg;
+      var cut=dg.length===11?7:6;
+      return '('+dg.slice(0,2)+') '+dg.slice(2,cut)+(dg.length>cut?'-'+dg.slice(cut):'');
+    };
+    var fmtBR=function(v,dg){
+      if(/[^\d\s().\-+]/.test(v)||/.\+/.test(v.replace(/^\s+/,'')))return null;
+      if(/^\s*\+/.test(v))return dg.slice(0,2)==='55'&&dg.length>2&&dg.length<=13?'+55 '+maskBR(dg.slice(2)):null;   /* +55: sí; otro país: tal cual */
+      if(dg.charAt(0)==='0')return null;
+      if(dg.length>11)return /^55\d{10,11}$/.test(dg)?'+55 '+maskBR(dg.slice(2)):dg;
+      return maskBR(dg);
+    };
+    if(phEl&&cfg.cc==='55'){
+      var phLast=phEl.value;
+      phEl.addEventListener('input',function(e){
+        if(e.isComposing)return;
+        var v=phEl.value,pos=phEl.selectionStart==null?v.length:phEl.selectionStart,atEnd=pos>=v.length;
+        var dg=v.replace(/\D/g,''),nb=v.slice(0,pos).replace(/\D/g,'').length;
+        if(dg===phLast.replace(/\D/g,'')){   /* se borró un ), espacio o guion: se lleva el dígito de al lado */
+          if(e.inputType==='deleteContentBackward'&&nb>0){dg=dg.slice(0,nb-1)+dg.slice(nb);nb--;}
+          else if(e.inputType==='deleteContentForward')dg=dg.slice(0,nb)+dg.slice(nb+1);
+        }
+        var f=fmtBR(v,dg);
+        if(f===null||f===v){phLast=v;return;}
+        phEl.value=f;phLast=f;
+        var i=0,n=0;
+        if(atEnd)i=f.length;else while(i<f.length&&n<nb){if(/\d/.test(f.charAt(i)))n++;i++;}
+        try{phEl.setSelectionRange(i,i);}catch(x){}
+      });
+    }
     /* formulario en curso: se guarda al escribir y se recupera solo (sin abrir el diálogo) al volver a la página */
     var BK_F=['bkName','bkPhone','bkService','bkPro','bkDate','bkTime','bkNotes'];
     var bkKeep=keep('gpc-page-book:'+cfg.wa+':'+h32(cfg.name));
@@ -2325,7 +2361,7 @@ function buildParts(raw,opt){
         pros:m.team.map(x=>({n:x.n,label:x.r?x.n+' — '+x.r:x.n,svc:x.svc})),
         l:{name:T.bkLName,phone:T.bkLPhone,service:T.bkLService,pro:T.bkLPro,proAny:T.bkProAny,date:T.bkLDate,time:T.bkLTime,notes:T.bkLNotes,days:T.days,h24:T.h24},
         /* el mismo horario (y la misma zona horaria) que usa "abierto ahora"; null si el negocio no declaró horarios */
-        hd:m.hours.cfg?m.hours.cfg.d:null,tz:m.d.tz,
+        hd:m.hours.cfg?m.hours.cfg.d:null,tz:m.d.tz,cc:m.d.cc,
         e:{req:T.bkErrReq,phone:T.bkErrPhone,date:T.bkErrDate,closed:T.closed,time:T.bkErrTime}}:null}};
 }
 function faviconOf(m,icon){
