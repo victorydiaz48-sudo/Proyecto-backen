@@ -144,7 +144,7 @@ Permisos: A = ADMIN, P = PROFESSIONAL (solo sus propios recursos).
 | Time blocks ✅ | `GET /admin/time-blocks?from&to&professionalId&locationId`, `POST`, `DELETE /:id` | A; P solo los suyos (y ve los generales) |
 | Customers ✅ | `GET /admin/customers?search&cursor&limit`, `POST`, `GET/PATCH /:id` | A; P solo lectura de clientes con citas suyas |
 | Bookings ✅ | `GET /admin/bookings?from&to&professionalId&locationId&customerId&status`, `POST`, `GET /:id`, `PATCH /:id` (reprogramar), `POST /:id/status` | A; P solo las suyas |
-| Availability | `GET /admin/availability` (igual que la pública, sin límite de antelación) | A,P |
+| Availability ✅ | `GET /admin/availability?serviceId&professionalId&date` (o `from`/`to`) `&locationId` — igual que la pública, sin antelación mínima ni horizonte | A,P |
 | Audit | `GET /admin/audit-logs` | A |
 
 `DELETE` es borrado lógico en entidades referenciadas por citas.
@@ -262,7 +262,18 @@ Respuesta (también en listados y detalle):
 | 422 | `SLOT_INVALID` | `PROFESSIONAL_NOT_FOUND`, `PROFESSIONAL_INACTIVE`, `SERVICE_NOT_FOUND`, `PROFESSIONAL_DOES_NOT_OFFER_SERVICE`, `NOT_WORKING_THAT_DAY`, `OUTSIDE_WORKING_HOURS`, `EXCEEDS_CLOSING_TIME`, `IN_THE_PAST`, `TOO_SOON`, `BEYOND_HORIZON`, `INVALID_LOCAL_TIME` |
 | 409 | `SLOT_UNAVAILABLE` | `OVERLAPS_BOOKING`, `OVERLAPS_TIME_BLOCK` |
 
-Un id de otro negocio produce el mismo motivo que uno inexistente. Las `alternatives` llegan en la Fase 7.
+Un id de otro negocio produce el mismo motivo que uno inexistente.
+
+**Alternativas** (Fase 7): cuando el motivo es de horario u ocupación (`NOT_WORKING_THAT_DAY`,
+`OUTSIDE_WORKING_HOURS`, `EXCEEDS_CLOSING_TIME`, `OVERLAPS_*`, `IN_THE_PAST`, `TOO_SOON`,
+`BEYOND_HORIZON`, `INVALID_LOCAL_TIME`), el error incluye `details.alternatives`: hasta 6 huecos reales
+del mismo servicio y profesional, los más cercanos a la hora pedida ese día y, si faltan, los primeros
+de los 7 días siguientes. Formato: `{ startAt, localDate, localTime, locationId, professionalIds }`.
+Nunca se reserva otra hora automáticamente. Con motivos de servicio/profesional no hay alternativas.
+
+**Disponibilidad en el panel** — `GET /admin/availability`: mismo formato que la pública (§2).
+`professionalId` = uuid o `any`. Servicio o profesional inexistente, inactivo, de otro negocio o que
+no hace el servicio → `404`. Rango máx. 14 días. No ofrece horas pasadas.
 
 **Listado**: por defecto desde hace 24 h y 8 días; rango máx. 92 días; `status=PENDING,CONFIRMED`.
 

@@ -27,7 +27,7 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 6)
+## Estado actual (hasta la Fase 7)
 
 | Archivo | Cubre |
 |---|---|
@@ -44,6 +44,8 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/check-slot.test.ts` | motor puro: orden de validación, fuera de horario y pausa, duración completa antes del cierre (y de la pausa), limpieza posterior, solape parcial vs contiguo, bloqueos por profesional/local/generales, pasado/antelación/horizonte, local pedido, cruce de medianoche, zona horaria |
 | `test/customers.test.ts` | E.164 y duplicados escritos distinto (409 con id), edición sin robar teléfono, búsqueda por nombre/dígitos, paginación, PROFESSIONAL solo clientes con cita suya, mismo teléfono en B aislado |
 | `test/bookings.test.ts` | el servidor fija precio/duración/fin/local/estado; estado por defecto del negocio; campos prohibidos → 400; reutiliza cliente sin renombrarlo; motivos 422 por regla; ocupado/bloqueado → 409 y contiguo OK; ids de B = inexistentes; hora inexistente por DST; **10 creaciones simultáneas → 1 cita, 9 × 409**; PROFESSIONAL solo en su agenda; agenda y detalle por rol; A no ve ni toca citas de B; reprogramar conserva precio pactado o toma el nuevo al cambiar de servicio; no mueve a hueco ocupado ni canceladas; transiciones, reactivación solo ADMIN y si el hueco sigue libre, COMPLETED/NO_SHOW solo tras el inicio |
+| `test/slots.test.ts` | huecos cada N min donde cabe la duración completa (pausa y cierre), intervalo configurable, citas y bloqueos, pasado/antelación/horizonte, día sin horario, unión de profesionales ("sin preferencia"), locales, medianoche, Madrid con cambio de hora, **coherencia total con `checkSlot`**, `pickProfessional`, alternativas por cercanía y días siguientes |
+| `test/availability.test.ts` | endpoint del panel: huecos del día, intervalo del negocio, citas y bloqueos reales, `any` con profesionales libres, sin pasado, rango ≤ 14 días, 404 para servicio/profesional inválido o de B, todo hueco ofrecido se reserva; alternativas en 409/422 (cercanas, reservables, días siguientes en domingo, ninguna si el profesional no hace el servicio, también al reprogramar) |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria

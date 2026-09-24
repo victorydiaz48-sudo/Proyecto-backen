@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–6 completadas.** Siguiente: Fase 7 (motor de disponibilidad: huecos, alternativas, `any`).
+Estado: **Fases 0–7 completadas.** Siguiente: Fase 8 (doble reserva: creación con `any`, pruebas de concurrencia).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -162,7 +162,7 @@ que el generador (que no se toca) sigue igual.
 | 4 | Profesionales + servicios | CRUD admin, `ProfessionalService`, tests cruzados de tenant. ✅ |
 | 5 | Horarios + bloqueos | `WorkingHour` (varios intervalos, validación de solapes), `TimeBlock`. Incluye CRUD de locales. ✅ |
 | 6 | Clientes + reservas | `Customer` E.164 único por tenant, `Booking` con snapshot de precio/duración, máquina de estados. Incluye `checkSlot` (validación pura de una franja) y la creación transaccional con bloqueo. ✅ |
-| 7 | Motor de disponibilidad | Módulo puro (sin BD) + adaptador; tests de cierre, solapes, TZ/DST. |
+| 7 | Motor de disponibilidad | Módulo puro (sin BD) + adaptador; tests de cierre, solapes, TZ/DST. `GET /admin/availability` y alternativas en los errores de reserva. ✅ |
 | 8 | Doble reserva | Exclusion constraint + transacción; test concurrente con N peticiones simultáneas. |
 | 9 | API pública | 5 endpoints, CORS `*` sin credenciales, rate limit, idempotencia. |
 | 10 | API admin + panel React | CRUD completo, agenda, auditoría. |

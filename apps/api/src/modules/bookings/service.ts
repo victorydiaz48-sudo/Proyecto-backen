@@ -2,11 +2,13 @@ import { PgErrorCode, pgErrorCode, type Db, type Tx } from '../../db.ts';
 import type { Prisma } from '../../generated/prisma/client.ts';
 import type { BookingSource, BookingStatus, Role } from '../../generated/prisma/enums.ts';
 import { AppError, conflict, forbidden, notFound, validationError } from '../../lib/errors.ts';
+import { localToInstant, parseClock } from '../../lib/time.ts';
 import { writeAudit, type Actor } from '../audit/audit.ts';
+import { AvailabilityService } from '../availability/service.ts';
 import { findOrCreateCustomer, normalizePhoneOrThrow } from '../customers/service.ts';
 import { lockProfessionals } from '../schedule/locks.ts';
 import { BOOKING_INCLUDE, toBookingDto, type BookingDto } from './dto.ts';
-import { evaluateSlot, localSlotToInstant, slotError, type TenantRules } from './slots.ts';
+import { evaluateSlot, localSlotToInstant, REASONS_WITH_ALTERNATIVES, slotError, type TenantRules } from './slots.ts';
 
 const ACTIVE: BookingStatus[] = ['PENDING', 'CONFIRMED'];
 const DAY_MS = 86_400_000;
@@ -44,10 +46,14 @@ export interface CreateBookingInput {
 }
 
 export class BookingsService {
+  private readonly availability: AvailabilityService;
+
   constructor(
     private readonly db: Db,
     private readonly now: () => Date,
-  ) {}
+  ) {
+    this.availability = new AvailabilityService(db, now);
+  }
 
   async list(
     tenantId: string,
@@ -90,10 +96,11 @@ export class BookingsService {
   async create(actor: Actor, viewer: Viewer, input: CreateBookingInput): Promise<BookingDto> {
     if (viewer.role !== 'ADMIN' && viewer.professionalId !== input.professionalId) throw forbidden();
     const tenant = await this.tenant(this.db, actor.tenantId);
-    const startAt = localSlotToInstant(input.date, input.time, tenant.timezone);
     const phoneE164 = input.customer ? normalizePhoneOrThrow(input.customer.phone, tenant.defaultCountryCode, 'body.customer.phone') : null;
+    const alt = { serviceId: input.serviceId, professionalId: input.professionalId, date: input.date, time: input.time, locationId: input.locationId };
+    const startAt = await this.withAlternatives(tenant, alt, async () => localSlotToInstant(input.date, input.time, tenant.timezone));
 
-    return this.mapExclusion(() =>
+    return this.withAlternatives(tenant, alt, () =>
       this.db.$transaction(async (tx) => {
         await lockProfessionals(tx, tenant.id, [input.professionalId]);
         const slot = await evaluateSlot(tx, tenant, {
@@ -146,8 +153,16 @@ export class BookingsService {
     input: { date: string; time: string; professionalId?: string | undefined; serviceId?: string | undefined; locationId?: string | null | undefined },
   ): Promise<BookingDto> {
     const tenant = await this.tenant(this.db, actor.tenantId);
-    const startAt = localSlotToInstant(input.date, input.time, tenant.timezone);
-    return this.mapExclusion(() =>
+    const current0 = await this.find(this.db, tenant.id, viewer, id);
+    const alt = {
+      serviceId: input.serviceId ?? current0.serviceId,
+      professionalId: input.professionalId ?? current0.professionalId,
+      date: input.date,
+      time: input.time,
+      locationId: input.locationId,
+    };
+    const startAt = await this.withAlternatives(tenant, alt, async () => localSlotToInstant(input.date, input.time, tenant.timezone));
+    return this.withAlternatives(tenant, alt, () =>
       this.db.$transaction(async (tx) => {
         const current = await this.find(tx, tenant.id, viewer, id);
         if (!ACTIVE.includes(current.status)) throw conflict('Solo se pueden mover citas pendientes o confirmadas.');
@@ -265,6 +280,31 @@ export class BookingsService {
       where: { id: tenantId },
       select: { id: true, timezone: true, bookingLeadMinutes: true, bookingHorizonDays: true, currency: true, defaultCountryCode: true, defaultBookingStatus: true },
     });
+  }
+
+  /**
+   * Ejecuta `fn` y, si falla por la franja (hora ocupada, fuera de horario…), añade al error
+   * `details.alternatives`: huecos reales cercanos del mismo servicio y profesional. Nunca reserva otra hora.
+   */
+  private async withAlternatives<T>(
+    tenant: TenantRow,
+    q: { serviceId: string; professionalId: string; date: string; time: string; locationId?: string | null | undefined },
+    fn: () => Promise<T>,
+  ): Promise<T> {
+    try {
+      return await this.mapExclusion(fn);
+    } catch (err) {
+      const reason = err instanceof AppError ? err.details?.reason : undefined;
+      if (!(err instanceof AppError) || typeof reason !== 'string' || !REASONS_WITH_ALTERNATIVES.has(reason)) throw err;
+      // Para una hora inexistente por DST, se busca alrededor de la misma hora ya normalizada.
+      const requested = localToInstant(q.date, parseClock(q.time)!, tenant.timezone);
+      const alternatives = await this.availability.alternatives(
+        tenant.id,
+        { serviceId: q.serviceId, professionalId: q.professionalId, requested, locationId: q.locationId },
+        { publicRules: false },
+      );
+      throw new AppError(err.statusCode, err.code, err.message, { ...err.details, alternatives });
+    }
   }
 
   /** Última red de seguridad: si el exclusion constraint salta, es un hueco ocupado (409), no un 500. */

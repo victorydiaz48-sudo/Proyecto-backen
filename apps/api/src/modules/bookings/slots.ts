@@ -112,6 +112,19 @@ const MESSAGES: Record<SlotReason, string> = {
   BEYOND_HORIZON: 'Todavía no se puede reservar en esa fecha.',
 };
 
+/** Motivos en los que tiene sentido proponer otras horas (el servicio y el profesional son válidos). */
+export const REASONS_WITH_ALTERNATIVES: ReadonlySet<string> = new Set([
+  'NOT_WORKING_THAT_DAY',
+  'OUTSIDE_WORKING_HOURS',
+  'EXCEEDS_CLOSING_TIME',
+  'OVERLAPS_BOOKING',
+  'OVERLAPS_TIME_BLOCK',
+  'IN_THE_PAST',
+  'TOO_SOON',
+  'BEYOND_HORIZON',
+  'INVALID_LOCAL_TIME',
+]);
+
 /** 409 SLOT_UNAVAILABLE si el hueco está ocupado; 422 SLOT_INVALID si la franja no es reservable. */
 export function slotError(reason: SlotReason, extra: Record<string, unknown> = {}): AppError {
   const occupied = OCCUPANCY_REASONS.has(reason);

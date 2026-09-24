@@ -124,8 +124,21 @@ a `checkSlot`. Lo usan crear, reprogramar y reactivar citas. Ya en la Fase 6 la 
 del §4: bloqueo del profesional → `checkSlot` → alta del cliente con `INSERT … ON CONFLICT DO NOTHING`
 (no aborta la transacción) → insert de la cita; un `23P01` residual se traduce a `409`.
 
-Alternativas: hasta N slots libres más cercanos a la hora pedida (antes y después) ese día; si no
-hay, los primeros de los siguientes días hasta un límite.
+Alternativas: hasta 6 huecos libres más cercanos a la hora pedida (antes y después) ese día; si no
+hay suficientes, los primeros de los 7 días siguientes (`findAlternatives`).
+
+**Implementación (Fase 7)** — `src/domain/availability/slots.ts` (puro) y
+`src/modules/availability/service.ts` (carga desde la BD, siempre por tenant):
+- `computeSlots`: por candidato, tramos de trabajo reales (`workingRanges`, uniendo contiguos y la
+  medianoche) → inicios cada `slotIntervalMinutes` **alineados al comienzo del tramo** → se descarta el
+  inicio si `[inicio, inicio + duración + limpieza)` no cabe en el tramo, pisa una cita activa o un
+  bloqueo aplicable (del profesional, del local o general), es anterior a `ahora + antelación` o pasa
+  del horizonte. Huecos de varios candidatos a la misma hora y local se unen con `professionalIds`.
+- Un test de coherencia recorre un día entero y comprueba que `computeSlots` y `checkSlot` coinciden:
+  todo hueco ofrecido es reservable y todo inicio alineado reservable se ofrece.
+- "Sin preferencia" (`rankProfessionals` / `pickProfessional`): entre los libres, el que tiene menos
+  citas activas **ese día local** (la "franja" del requisito E); desempate por `sortOrder` y luego id.
+  La asignación ocurre al crear la cita (Fase 8), no al consultar.
 
 ## 5b. Concurrencia de la agenda
 
