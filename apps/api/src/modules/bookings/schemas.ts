@@ -12,7 +12,8 @@ const instant = z.iso.datetime({ offset: true }).transform((s) => new Date(s));
 export const BookingCreate = z
   .object({
     serviceId: z.uuid(),
-    professionalId: z.uuid(),
+    /** Un profesional concreto o 'any' ("sin preferencia": lo asigna el servidor). */
+    professionalId: z.union([z.uuid(), z.literal('any')]),
     date: zLocalDate,
     time: zLocalTime,
     locationId: z.uuid().nullable().optional(),

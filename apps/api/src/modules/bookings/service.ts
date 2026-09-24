@@ -5,6 +5,8 @@ import { AppError, conflict, forbidden, notFound, validationError } from '../../
 import { localToInstant, parseClock } from '../../lib/time.ts';
 import { writeAudit, type Actor } from '../audit/audit.ts';
 import { AvailabilityService } from '../availability/service.ts';
+import { OCCUPANCY_REASONS, type SlotReason } from '../../domain/availability/check.ts';
+import { rankProfessionals } from '../../domain/availability/slots.ts';
 import { findOrCreateCustomer, normalizePhoneOrThrow } from '../customers/service.ts';
 import { lockProfessionals } from '../schedule/locks.ts';
 import { BOOKING_INCLUDE, toBookingDto, type BookingDto } from './dto.ts';
@@ -33,8 +35,16 @@ export interface Viewer {
   professionalId: string | null;
 }
 
+export interface CreateOptions {
+  /** Web pública: antelación mínima y horizonte del negocio. */
+  publicRules?: boolean;
+  /** Por defecto según el rol (ADMIN / PROFESSIONAL). */
+  source?: BookingSource;
+}
+
 export interface CreateBookingInput {
   serviceId: string;
+  /** uuid o 'any' ("sin preferencia"). */
   professionalId: string;
   date: string;
   time: string;
@@ -92,57 +102,130 @@ export class BookingsService {
     return toBookingDto(await this.find(this.db, tenantId, viewer, id), tenant.timezone);
   }
 
-  /** Crea una cita desde el panel. Precio, duración, fin, local y estado se deciden aquí, nunca en el cliente. */
-  async create(actor: Actor, viewer: Viewer, input: CreateBookingInput): Promise<BookingDto> {
+  /**
+   * Crea una cita. Precio, duración, fin, local, estado y (con "sin preferencia") profesional se deciden
+   * aquí, nunca en el cliente.
+   *
+   * Con `professionalId: 'any'` se prueban los profesionales elegibles en orden (menos citas ese día,
+   * luego orden del negocio): cada intento es una transacción propia que bloquea a ese profesional,
+   * revalida la franja y crea la cita. Si otra reserva se adelanta, se pasa al siguiente. Si se agotan
+   * todos, la respuesta es la misma que con un profesional concreto: 409 SLOT_UNAVAILABLE (alguno estaba
+   * ocupado) o 422 SLOT_INVALID (ninguno podía por reglas), con alternativas.
+   */
+  async create(actor: Actor, viewer: Viewer, input: CreateBookingInput, opts: CreateOptions = {}): Promise<BookingDto> {
     if (viewer.role !== 'ADMIN' && viewer.professionalId !== input.professionalId) throw forbidden();
+    const publicRules = opts.publicRules ?? false;
+    const source = opts.source ?? (viewer.role === 'ADMIN' ? 'ADMIN' : 'PROFESSIONAL');
     const tenant = await this.tenant(this.db, actor.tenantId);
     const phoneE164 = input.customer ? normalizePhoneOrThrow(input.customer.phone, tenant.defaultCountryCode, 'body.customer.phone') : null;
     const alt = { serviceId: input.serviceId, professionalId: input.professionalId, date: input.date, time: input.time, locationId: input.locationId };
-    const startAt = await this.withAlternatives(tenant, alt, async () => localSlotToInstant(input.date, input.time, tenant.timezone));
+    const altOpts = { publicRules };
+    const startAt = await this.withAlternatives(tenant, alt, altOpts, async () => localSlotToInstant(input.date, input.time, tenant.timezone));
 
-    return this.withAlternatives(tenant, alt, () =>
-      this.db.$transaction(async (tx) => {
-        await lockProfessionals(tx, tenant.id, [input.professionalId]);
-        const slot = await evaluateSlot(tx, tenant, {
-          professionalId: input.professionalId,
-          serviceId: input.serviceId,
-          startAt,
-          locationId: input.locationId,
-          publicRules: false,
-          now: this.now(),
-        });
-        if (!slot.ok) throw slotError(slot.reason);
+    return this.withAlternatives(tenant, alt, altOpts, async () => {
+      if (input.professionalId !== 'any') {
+        return this.createFor(actor, tenant, input.professionalId, input, startAt, phoneE164, { publicRules, source });
+      }
+      const candidates = await this.rankCandidates(tenant, input.serviceId, input.date);
+      if (candidates.length === 0) {
+        const service = await this.db.service.findFirst({ where: { tenantId: tenant.id, id: input.serviceId, active: true }, select: { id: true } });
+        throw slotError(service ? 'PROFESSIONAL_DOES_NOT_OFFER_SERVICE' : 'SERVICE_NOT_FOUND');
+      }
+      let occupied = false;
+      let ruleReason: SlotReason | undefined;
+      for (const professionalId of candidates) {
+        try {
+          return await this.mapExclusion(() => this.createFor(actor, tenant, professionalId, input, startAt, phoneE164, { publicRules, source }));
+        } catch (err) {
+          const reason = err instanceof AppError && err.details?.reason;
+          if (typeof reason !== 'string' || !(err instanceof AppError) || !['SLOT_UNAVAILABLE', 'SLOT_INVALID'].includes(err.code)) throw err;
+          if (OCCUPANCY_REASONS.has(reason as SlotReason)) occupied = true;
+          else ruleReason ??= reason as SlotReason;
+        }
+      }
+      throw slotError(occupied ? 'OVERLAPS_BOOKING' : (ruleReason ?? 'OVERLAPS_BOOKING'));
+    });
+  }
 
-        const customerId = input.customerId
-          ? await this.ensureCustomer(tx, tenant.id, input.customerId)
-          : (await findOrCreateCustomer(tx, tenant.id, { name: input.customer!.name, phoneE164: phoneE164!, email: input.customer!.email ?? null })).id;
-        const service = await tx.service.findFirstOrThrow({ where: { tenantId: tenant.id, id: input.serviceId } });
+  /** Un intento de crear la cita con un profesional concreto, en su propia transacción. */
+  private createFor(
+    actor: Actor,
+    tenant: TenantRow,
+    professionalId: string,
+    input: CreateBookingInput,
+    startAt: Date,
+    phoneE164: string | null,
+    opts: { publicRules: boolean; source: BookingSource },
+  ): Promise<BookingDto> {
+    return this.db.$transaction(async (tx) => {
+      await lockProfessionals(tx, tenant.id, [professionalId]);
+      const slot = await evaluateSlot(tx, tenant, {
+        professionalId,
+        serviceId: input.serviceId,
+        startAt,
+        locationId: input.locationId,
+        publicRules: opts.publicRules,
+        now: this.now(),
+      });
+      if (!slot.ok) throw slotError(slot.reason);
 
-        const booking = await tx.booking.create({
-          data: {
-            tenantId: tenant.id,
-            locationId: slot.locationId,
-            professionalId: input.professionalId,
-            serviceId: service.id,
-            customerId,
-            startAt: slot.startAt,
-            endAt: slot.endAt,
-            status: input.status ?? tenant.defaultBookingStatus,
-            serviceNameSnapshot: service.name,
-            priceCentsSnapshot: service.priceCents,
-            durationMinutesSnapshot: service.durationMinutes,
-            currencySnapshot: tenant.currency,
-            customerNotes: input.notes || null,
-            source: (viewer.role === 'ADMIN' ? 'ADMIN' : 'PROFESSIONAL') satisfies BookingSource,
-            createdByUserId: actor.actorUserId ?? null,
-          },
-          include: BOOKING_INCLUDE,
-        });
-        const dto = toBookingDto(booking, tenant.timezone);
-        await writeAudit(tx, { ...actor, action: 'booking.created', entityType: 'Booking', entityId: booking.id, after: auditView(dto) });
-        return dto;
-      }),
-    );
+      const customerId = input.customerId
+        ? await this.ensureCustomer(tx, tenant.id, input.customerId)
+        : (await findOrCreateCustomer(tx, tenant.id, { name: input.customer!.name, phoneE164: phoneE164!, email: input.customer!.email ?? null })).id;
+      const service = await tx.service.findFirstOrThrow({ where: { tenantId: tenant.id, id: input.serviceId } });
+
+      const booking = await tx.booking.create({
+        data: {
+          tenantId: tenant.id,
+          locationId: slot.locationId,
+          professionalId,
+          serviceId: service.id,
+          customerId,
+          startAt: slot.startAt,
+          endAt: slot.endAt,
+          status: input.status ?? tenant.defaultBookingStatus,
+          serviceNameSnapshot: service.name,
+          priceCentsSnapshot: service.priceCents,
+          durationMinutesSnapshot: service.durationMinutes,
+          currencySnapshot: tenant.currency,
+          customerNotes: input.notes || null,
+          source: opts.source,
+          createdByUserId: actor.actorUserId ?? null,
+        },
+        include: BOOKING_INCLUDE,
+      });
+      const dto = toBookingDto(booking, tenant.timezone);
+      await writeAudit(tx, {
+        ...actor,
+        action: 'booking.created',
+        entityType: 'Booking',
+        entityId: booking.id,
+        after: { ...(auditView(dto) as object), ...(input.professionalId === 'any' ? { assignedFromAny: true } : {}) },
+      });
+      return dto;
+    });
+  }
+
+  /**
+   * Profesionales elegibles para "sin preferencia", en el orden en que se intentan: activos, que hacen
+   * el servicio, con menos citas activas ese día local primero; desempate por orden del negocio e id.
+   * Los que no estén libres en la franja fallan su intento y se pasa al siguiente.
+   */
+  private async rankCandidates(tenant: TenantRow, serviceId: string, date: string): Promise<string[]> {
+    const pros = await this.db.professional.findMany({
+      where: { tenantId: tenant.id, active: true, services: { some: { serviceId, service: { active: true } } } },
+      select: { id: true, sortOrder: true },
+    });
+    if (pros.length === 0) return [];
+    const dayStart = localToInstant(date, 0, tenant.timezone);
+    const dayEnd = localToInstant(date, 1440, tenant.timezone);
+    const counts = await this.db.booking.groupBy({
+      by: ['professionalId'],
+      where: { tenantId: tenant.id, professionalId: { in: pros.map((p) => p.id) }, status: { in: ACTIVE }, startAt: { gte: dayStart, lt: dayEnd } },
+      _count: { _all: true },
+    });
+    const byPro = new Map(counts.map((c) => [c.professionalId, c._count._all]));
+    return rankProfessionals(pros.map((p) => ({ ...p, bookingsThatDay: byPro.get(p.id) ?? 0 }))).map((p) => p.id);
   }
 
   /** Mueve una cita activa a otra fecha/hora (y opcionalmente profesional, servicio o local). */
@@ -161,8 +244,8 @@ export class BookingsService {
       time: input.time,
       locationId: input.locationId,
     };
-    const startAt = await this.withAlternatives(tenant, alt, async () => localSlotToInstant(input.date, input.time, tenant.timezone));
-    return this.withAlternatives(tenant, alt, () =>
+    const startAt = await this.withAlternatives(tenant, alt, { publicRules: false }, async () => localSlotToInstant(input.date, input.time, tenant.timezone));
+    return this.withAlternatives(tenant, alt, { publicRules: false }, () =>
       this.db.$transaction(async (tx) => {
         const current = await this.find(tx, tenant.id, viewer, id);
         if (!ACTIVE.includes(current.status)) throw conflict('Solo se pueden mover citas pendientes o confirmadas.');
@@ -289,6 +372,7 @@ export class BookingsService {
   private async withAlternatives<T>(
     tenant: TenantRow,
     q: { serviceId: string; professionalId: string; date: string; time: string; locationId?: string | null | undefined },
+    opts: { publicRules: boolean },
     fn: () => Promise<T>,
   ): Promise<T> {
     try {
@@ -301,7 +385,7 @@ export class BookingsService {
       const alternatives = await this.availability.alternatives(
         tenant.id,
         { serviceId: q.serviceId, professionalId: q.professionalId, requested, locationId: q.locationId },
-        { publicRules: false },
+        opts,
       );
       throw new AppError(err.statusCode, err.code, err.message, { ...err.details, alternatives });
     }

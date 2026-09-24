@@ -27,7 +27,7 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 7)
+## Estado actual (hasta la Fase 8)
 
 | Archivo | Cubre |
 |---|---|
@@ -46,6 +46,7 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/bookings.test.ts` | el servidor fija precio/duración/fin/local/estado; estado por defecto del negocio; campos prohibidos → 400; reutiliza cliente sin renombrarlo; motivos 422 por regla; ocupado/bloqueado → 409 y contiguo OK; ids de B = inexistentes; hora inexistente por DST; **10 creaciones simultáneas → 1 cita, 9 × 409**; PROFESSIONAL solo en su agenda; agenda y detalle por rol; A no ve ni toca citas de B; reprogramar conserva precio pactado o toma el nuevo al cambiar de servicio; no mueve a hueco ocupado ni canceladas; transiciones, reactivación solo ADMIN y si el hueco sigue libre, COMPLETED/NO_SHOW solo tras el inicio |
 | `test/slots.test.ts` | huecos cada N min donde cabe la duración completa (pausa y cierre), intervalo configurable, citas y bloqueos, pasado/antelación/horizonte, día sin horario, unión de profesionales ("sin preferencia"), locales, medianoche, Madrid con cambio de hora, **coherencia total con `checkSlot`**, `pickProfessional`, alternativas por cercanía y días siguientes |
 | `test/availability.test.ts` | endpoint del panel: huecos del día, intervalo del negocio, citas y bloqueos reales, `any` con profesionales libres, sin pasado, rango ≤ 14 días, 404 para servicio/profesional inválido o de B, todo hueco ofrecido se reserva; alternativas en 409/422 (cercanas, reservables, días siguientes en domingo, ninguna si el profesional no hace el servicio, también al reprogramar) |
+| `test/bookings-any.test.ts` | "sin preferencia": menos citas ese día, desempate por orden, salta a quien no está libre (cita o bloqueo), solo activos/que hacen el servicio/del local; todos ocupados → mismo 409 con alternativas `any`; reglas → 422; PROFESSIONAL no puede usar `any`. **Concurrencia**: 8 `any` simultáneas con 3 libres → 3 citas (una por profesional) + 5 × 409; 3 rondas de 14 peticiones mixtas (concretas + `any`) sin duplicados y comprobación SQL de cero solapes; solapes parciales simultáneos → 1; cliente nuevo en 5 reservas simultáneas → 1 cliente; bloqueo y cita a la vez → nunca ambos |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria
@@ -62,6 +63,11 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 - Sesión de A usada con `tenantSlug` de B en la URL pública no cambia nada (el público no usa sesión).
 
 ### Doble reserva / concurrencia
+
+Verificado con mutación (Fase 8): quitando el bloqueo del profesional en la creación de citas, el
+test "bloqueo y cita a la vez" falla (quedan ambos); con el bloqueo, pasa. Los tests de concurrencia
+se ejecutaron 5 veces seguidas sin fallos.
+
 - 20 `POST /bookings` simultáneos al mismo profesional y hora → exactamente 1 `201`, 19 `409`.
 - Solapamiento parcial simultáneo (10:00–10:30 y 10:15–10:45) → solo una.
 - `professionalId=any` con 2 profesionales libres y 5 peticiones simultáneas → 2 citas, una por profesional.

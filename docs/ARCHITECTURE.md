@@ -82,15 +82,19 @@ docker-compose.yml                  postgres dev + test
 3. Cargar servicio (activo, del tenant) → precio y duración **desde BD**.
 4. Convertir `date` + `time` locales a instante UTC con `Tenant.timezone` (rechazar horas
    inexistentes por DST; horas ambiguas → primera ocurrencia).
-5. Si `professionalId=any`: candidatos = profesionales activos que hacen el servicio.
-6. **Transacción** (`READ COMMITTED` + exclusion constraint como garantía final):
-   1. Para cada candidato (ordenado por menos citas activas ese día en esa franja, luego id):
-      bloquear fila del profesional (`SELECT ... FOR UPDATE`), re-verificar con `checkSlot` usando
+5. Si `professionalId=any`: candidatos = profesionales activos que hacen el servicio (activo),
+   ordenados por menos citas activas **ese día local**, luego `sortOrder`, luego id (`rankCandidates`).
+6. **Una transacción por intento** (`READ COMMITTED` + exclusion constraint como garantía final),
+   implementado en la Fase 8 (`BookingsService.create` / `createFor`):
+   1. Bloquear la fila del profesional (`SELECT … FOR UPDATE`) y re-verificar con `checkSlot` usando
       datos leídos dentro de la transacción.
-   2. Primer candidato válido → upsert `Customer` (tenant + teléfono), insert `Booking` con
-      snapshot, insert `AuditLog`, insert `NotificationOutbox`.
-   3. Si el insert choca con la exclusion constraint (`23P01`) → probar siguiente candidato o
-      terminar con conflicto.
+   2. Válido → cliente con `INSERT … ON CONFLICT DO NOTHING` (tenant + teléfono), insert `Booking` con
+      snapshot, insert `AuditLog` (y desde la Fase 12, `NotificationOutbox`), commit.
+   3. Si la franja ya no es válida o el insert choca con el constraint (`23P01`), la transacción se
+      deshace y, con `any`, se prueba el siguiente candidato en una transacción nueva.
+   4. Se agotan todos: si alguno estaba ocupado → `409 SLOT_UNAVAILABLE` (`OVERLAPS_BOOKING`); si
+      ninguno podía por reglas → `422 SLOT_INVALID` con el primer motivo. Es la misma respuesta que con
+      un profesional concreto, con `alternatives` calculadas para `any`.
 7. Conflicto → `409 SLOT_UNAVAILABLE` con `alternatives` reales calculadas por el motor. Nunca se
    mueve la cita automáticamente.
 8. Idempotencia: cabecera `Idempotency-Key` guardada por tenant para reintentos de red.

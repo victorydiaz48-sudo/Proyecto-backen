@@ -236,6 +236,10 @@ Búsqueda `search` por nombre o por dígitos del teléfono (≥ 3). Paginación 
 
 - `date`/`time` son locales del negocio; el servidor aplica la zona. Una hora inexistente o repetida
   por el cambio de horario → `422 SLOT_INVALID` con `reason: INVALID_LOCAL_TIME`.
+- `professionalId`: un uuid o `"any"` ("sin preferencia", solo ADMIN). Con `any` el servidor asigna al
+  profesional libre con menos citas ese día (desempate por orden del negocio); si otra reserva se
+  adelanta, prueba el siguiente. Si se agotan todos: el mismo `409 SLOT_UNAVAILABLE` con alternativas
+  (o `422 SLOT_INVALID` si ninguno podía por reglas). La respuesta indica el profesional asignado.
 - `customerId` **o** `customer` (uno de los dos). Con `customer`, se reutiliza el cliente con ese
   teléfono si existe (sin cambiarle el nombre).
 - `status` opcional: solo `PENDING`/`CONFIRMED`; por defecto el del negocio.
