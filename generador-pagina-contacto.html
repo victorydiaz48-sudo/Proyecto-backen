@@ -1406,6 +1406,7 @@ function cardRuntime(R,C){
     var dateMsg=function(v){
       if(!v)return '';
       var w=dayOf(v);
+      minDate=today();if(dateEl)dateEl.min=minDate;   /* la página puede seguir abierta al pasar la medianoche */
       if(w<0||v<minDate)return cfg.e.date;
       if(H&&!spans(w).length)return cfg.e.closed+' ('+cfg.l.days[w]+'). '+cfg.e.date;
       return '';
