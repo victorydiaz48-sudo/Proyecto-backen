@@ -59,3 +59,14 @@ export function bookingData(
 }
 
 export const at = (iso: string): Date => new Date(iso);
+
+/** Lunes a sábado 09:00–13:00 y 14:00–19:00 en el local por defecto del fixture. */
+export async function giveStandardHours(db: Db, f: TenantFixture, professionalId = f.professionalId): Promise<void> {
+  const rows = [1, 2, 3, 4, 5, 6].flatMap((weekday) => [
+    { weekday, startMinute: 9 * 60, endMinute: 13 * 60 },
+    { weekday, startMinute: 14 * 60, endMinute: 19 * 60 },
+  ]);
+  await db.workingHour.createMany({
+    data: rows.map((r) => ({ ...r, tenantId: f.tenantId, professionalId, locationId: f.locationId })),
+  });
+}

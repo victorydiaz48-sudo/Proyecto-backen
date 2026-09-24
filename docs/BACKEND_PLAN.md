@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–5 completadas.** Siguiente: Fase 6 (clientes + reservas).
+Estado: **Fases 0–6 completadas.** Siguiente: Fase 7 (motor de disponibilidad: huecos, alternativas, `any`).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -161,7 +161,7 @@ que el generador (que no se toca) sigue igual.
 | 3 | Tenants + auth + roles | Login/logout, sesiones, `requireRole`, resolución de tenant, tests de aislamiento base. ✅ |
 | 4 | Profesionales + servicios | CRUD admin, `ProfessionalService`, tests cruzados de tenant. ✅ |
 | 5 | Horarios + bloqueos | `WorkingHour` (varios intervalos, validación de solapes), `TimeBlock`. Incluye CRUD de locales. ✅ |
-| 6 | Clientes + reservas | `Customer` E.164 único por tenant, `Booking` con snapshot de precio/duración, máquina de estados. |
+| 6 | Clientes + reservas | `Customer` E.164 único por tenant, `Booking` con snapshot de precio/duración, máquina de estados. Incluye `checkSlot` (validación pura de una franja) y la creación transaccional con bloqueo. ✅ |
 | 7 | Motor de disponibilidad | Módulo puro (sin BD) + adaptador; tests de cierre, solapes, TZ/DST. |
 | 8 | Doble reserva | Exclusion constraint + transacción; test concurrente con N peticiones simultáneas. |
 | 9 | API pública | 5 endpoints, CORS `*` sin credenciales, rate limit, idempotencia. |

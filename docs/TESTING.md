@@ -27,7 +27,7 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 5)
+## Estado actual (hasta la Fase 6)
 
 | Archivo | Cubre |
 |---|---|
@@ -41,6 +41,9 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/locations.test.ts` | WhatsApp → E.164, URL https; un único local por defecto (no se quita ni se desactiva); no se desactiva con horarios o citas pendientes; PROFESSIONAL solo lee; locales de B → 404 y fuera de los listados |
 | `test/schedule.test.ts` | horario con varios intervalos/día, contiguos, hasta 24:00; solapes en locales distintos → 400; validación y locales de B/inactivos; no deja citas futuras fuera de horario (ignora pasadas/canceladas, respeta el local); cita que cruza medianoche; permisos de PROFESSIONAL; horario de B → 404. Bloqueos: por profesional/local/negocio, PROFESSIONAL solo los suyos, choque con citas (contiguo sí), fechas sin zona → 400, refs de B, listado por rango y visibilidad, borrado por rol, sin filas de B |
 | `test/time-phone.test.ts` | HH:MM y 24:00, día de la semana, misma hora local en São Paulo vs Madrid, cambio de hora de Madrid (hora inexistente y repetida), unión de tramos y cruce de medianoche, teléfonos a E.164 |
+| `test/check-slot.test.ts` | motor puro: orden de validación, fuera de horario y pausa, duración completa antes del cierre (y de la pausa), limpieza posterior, solape parcial vs contiguo, bloqueos por profesional/local/generales, pasado/antelación/horizonte, local pedido, cruce de medianoche, zona horaria |
+| `test/customers.test.ts` | E.164 y duplicados escritos distinto (409 con id), edición sin robar teléfono, búsqueda por nombre/dígitos, paginación, PROFESSIONAL solo clientes con cita suya, mismo teléfono en B aislado |
+| `test/bookings.test.ts` | el servidor fija precio/duración/fin/local/estado; estado por defecto del negocio; campos prohibidos → 400; reutiliza cliente sin renombrarlo; motivos 422 por regla; ocupado/bloqueado → 409 y contiguo OK; ids de B = inexistentes; hora inexistente por DST; **10 creaciones simultáneas → 1 cita, 9 × 409**; PROFESSIONAL solo en su agenda; agenda y detalle por rol; A no ve ni toca citas de B; reprogramar conserva precio pactado o toma el nuevo al cambiar de servicio; no mueve a hueco ocupado ni canceladas; transiciones, reactivación solo ADMIN y si el hueco sigue libre, COMPLETED/NO_SHOW solo tras el inicio |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria

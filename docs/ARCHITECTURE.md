@@ -111,9 +111,18 @@ Algoritmo por profesional:
 `professionalId=any`: unión de los inicios de todos los candidatos; cada slot lleva la lista de
 profesionales libres. La asignación final ocurre en la creación (paso 6), no en la consulta.
 
-`checkSlot` valida en el orden exigido y devuelve el primer motivo de fallo:
+`checkSlot` (`src/domain/availability/check.ts`, implementado en la Fase 6) valida en el orden exigido
+y devuelve el primer motivo de fallo:
 `PROFESSIONAL_NOT_FOUND | PROFESSIONAL_INACTIVE | SERVICE_NOT_FOUND | PROFESSIONAL_DOES_NOT_OFFER_SERVICE |
-NOT_WORKING_THAT_DAY | OUTSIDE_WORKING_HOURS | EXCEEDS_CLOSING_TIME | OVERLAPS_BOOKING | OVERLAPS_TIME_BLOCK | IN_THE_PAST`.
+NOT_WORKING_THAT_DAY | OUTSIDE_WORKING_HOURS | EXCEEDS_CLOSING_TIME | OVERLAPS_BOOKING | OVERLAPS_TIME_BLOCK |
+IN_THE_PAST | TOO_SOON | BEYOND_HORIZON`. La zona del tenant se aplica al convertir fecha/hora local
+(`localSlotToInstant`) y al calcular los tramos de trabajo.
+
+El adaptador `evaluateSlot` (`src/modules/bookings/slots.ts`) carga, dentro de la transacción y con el
+profesional bloqueado, su horario, los bloqueos y las citas activas de una ventana de ±1–2 días y llama
+a `checkSlot`. Lo usan crear, reprogramar y reactivar citas. Ya en la Fase 6 la creación sigue el flujo
+del §4: bloqueo del profesional → `checkSlot` → alta del cliente con `INSERT … ON CONFLICT DO NOTHING`
+(no aborta la transacción) → insert de la cita; un `23P01` residual se traduce a `409`.
 
 Alternativas: hasta N slots libres más cercanos a la hora pedida (antes y después) ese día; si no
 hay, los primeros de los siguientes días hasta un límite.

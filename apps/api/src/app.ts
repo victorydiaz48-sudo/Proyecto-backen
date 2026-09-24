@@ -9,6 +9,8 @@ import type { Db } from './db.ts';
 import { FailureLimiter } from './lib/failure-limiter.ts';
 import { authRoutes } from './modules/auth/routes.ts';
 import { AuthService } from './modules/auth/service.ts';
+import { bookingAdminRoutes } from './modules/bookings/routes.admin.ts';
+import { customerAdminRoutes } from './modules/customers/routes.admin.ts';
 import { locationAdminRoutes } from './modules/locations/routes.admin.ts';
 import { professionalAdminRoutes } from './modules/professionals/routes.admin.ts';
 import { scheduleAdminRoutes } from './modules/schedule/routes.admin.ts';
@@ -73,6 +75,8 @@ export async function buildApp({ config, db, now = () => new Date() }: AppDeps):
           await admin.register(professionalAdminRoutes, { db, now });
           await admin.register(locationAdminRoutes, { db, now });
           await admin.register(scheduleAdminRoutes, { db, now });
+          await admin.register(customerAdminRoutes, { db });
+          await admin.register(bookingAdminRoutes, { db, now });
         },
         { prefix: '/admin' },
       );

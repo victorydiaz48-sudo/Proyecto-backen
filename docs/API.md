@@ -142,8 +142,8 @@ Permisos: A = ADMIN, P = PROFESSIONAL (solo sus propios recursos).
 | Services ✅ | `GET /admin/services?includeInactive`, `POST`, `GET/PATCH/DELETE /:id` | A (GET: A,P) |
 | Working hours ✅ | `GET/PUT /admin/professionals/:id/working-hours` (reemplazo completo de la semana) | A; P solo lectura de lo suyo |
 | Time blocks ✅ | `GET /admin/time-blocks?from&to&professionalId&locationId`, `POST`, `DELETE /:id` | A; P solo los suyos (y ve los generales) |
-| Customers | `GET /admin/customers?search=`, `GET/PATCH /:id` | A; P solo clientes con citas suyas (lectura) |
-| Bookings | `GET /admin/bookings?from&to&professionalId&status`, `POST`, `GET /:id`, `PATCH /:id` (reprogramar), `POST /:id/status` | A; P solo las suyas |
+| Customers ✅ | `GET /admin/customers?search&cursor&limit`, `POST`, `GET/PATCH /:id` | A; P solo lectura de clientes con citas suyas |
+| Bookings ✅ | `GET /admin/bookings?from&to&professionalId&locationId&customerId&status`, `POST`, `GET /:id`, `PATCH /:id` (reprogramar), `POST /:id/status` | A; P solo las suyas |
 | Availability | `GET /admin/availability` (igual que la pública, sin límite de antelación) | A,P |
 | Audit | `GET /admin/audit-logs` | A |
 
@@ -220,13 +220,65 @@ con el país del negocio; inválido → 400), `sortOrder`, `isDefault`, `active`
 Cambios de horario, bloqueos (y más adelante citas) bloquean la fila del profesional
 (`SELECT … FOR UPDATE`) dentro de su transacción, así no se pisan entre sí.
 
+### Clientes y citas (Fase 6)
+
+**Cliente**: `name` (1–80), `phone` (se normaliza a E.164 con el país del negocio; único por negocio →
+`409` con `details.customerId` del existente), `email`, `notes` (≤ 500). Sin borrado (retención: pendiente).
+Búsqueda `search` por nombre o por dígitos del teléfono (≥ 3). Paginación `{ items, nextCursor }`.
+
+**Crear cita** — `POST /admin/bookings`:
+
+```json
+{ "serviceId": "…", "professionalId": "…", "date": "2026-10-01", "time": "10:00",
+  "locationId": null, "customer": { "name": "Pedro", "phone": "41 98888-7777" },
+  "notes": "Degradê", "status": "CONFIRMED" }
+```
+
+- `date`/`time` son locales del negocio; el servidor aplica la zona. Una hora inexistente o repetida
+  por el cambio de horario → `422 SLOT_INVALID` con `reason: INVALID_LOCAL_TIME`.
+- `customerId` **o** `customer` (uno de los dos). Con `customer`, se reutiliza el cliente con ese
+  teléfono si existe (sin cambiarle el nombre).
+- `status` opcional: solo `PENDING`/`CONFIRMED`; por defecto el del negocio.
+- Precio, duración, `endAt` (= inicio + duración + limpieza), local, origen (`ADMIN`/`PROFESSIONAL`) los
+  decide el servidor. Campos como `priceCents`, `durationMinutes`, `endAt`, `source` → 400.
+- El panel no aplica antelación mínima ni horizonte (la web pública sí); sí rechaza el pasado.
+- PROFESSIONAL solo crea citas en su propia agenda.
+
+Respuesta (también en listados y detalle):
+
+```json
+{ "id": "…", "status": "CONFIRMED", "startAt": "2026-10-01T13:00:00.000Z", "endAt": "2026-10-01T13:30:00.000Z",
+  "localDate": "2026-10-01", "localTime": "10:00",
+  "service": { "id": "…", "name": "Corte", "durationMinutes": 30 }, "priceCents": 4500, "currency": "BRL",
+  "professional": { "id": "…", "displayName": "Carlos" }, "location": { "id": "…", "name": "Principal" },
+  "customer": { "id": "…", "name": "Pedro", "phoneE164": "+5541988887777" },
+  "customerNotes": "Degradê", "source": "ADMIN", "cancelledAt": null, "cancelReason": null, … }
+```
+
+**Errores de franja** (también en reprogramar y reactivar):
+
+| HTTP | code | `details.reason` |
+|---|---|---|
+| 422 | `SLOT_INVALID` | `PROFESSIONAL_NOT_FOUND`, `PROFESSIONAL_INACTIVE`, `SERVICE_NOT_FOUND`, `PROFESSIONAL_DOES_NOT_OFFER_SERVICE`, `NOT_WORKING_THAT_DAY`, `OUTSIDE_WORKING_HOURS`, `EXCEEDS_CLOSING_TIME`, `IN_THE_PAST`, `TOO_SOON`, `BEYOND_HORIZON`, `INVALID_LOCAL_TIME` |
+| 409 | `SLOT_UNAVAILABLE` | `OVERLAPS_BOOKING`, `OVERLAPS_TIME_BLOCK` |
+
+Un id de otro negocio produce el mismo motivo que uno inexistente. Las `alternatives` llegan en la Fase 7.
+
+**Listado**: por defecto desde hace 24 h y 8 días; rango máx. 92 días; `status=PENDING,CONFIRMED`.
+
+**Reprogramar** — `PATCH /admin/bookings/:id { date, time, professionalId?, serviceId?, locationId? }`:
+solo citas `PENDING`/`CONFIRMED`. Sin cambio de servicio conserva precio y duración pactados; con
+cambio de servicio toma los vigentes. PROFESSIONAL no puede pasar la cita a otro profesional.
+
 **Transiciones de estado** (`POST /admin/bookings/:id/status { status, reason? }`):
 ```
 PENDING   → CONFIRMED | CANCELLED
-CONFIRMED → COMPLETED | CANCELLED | NO_SHOW
-CANCELLED → CONFIRMED   (solo A, re-verifica disponibilidad)
-COMPLETED, NO_SHOW → (final; A puede corregir a la otra)
+CONFIRMED → COMPLETED | CANCELLED | NO_SHOW      (COMPLETED/NO_SHOW solo si ya empezó)
+CANCELLED → CONFIRMED                            (solo ADMIN; re-verifica la franja)
+COMPLETED ⇄ NO_SHOW                              (solo ADMIN, para corregir)
 ```
+Transición no permitida → `409 CONFLICT` con `details { from, to }`. Cancelar guarda `cancelledAt` y
+`cancelReason`; reactivar los borra.
 
 ## 5. Salud
 
