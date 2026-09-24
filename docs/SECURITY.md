@@ -176,10 +176,12 @@ con RLS.
 ## 9. Despliegue: requisitos de seguridad
 
 - HTTPS obligatorio (la cookie es `Secure`; HSTS activo).
-- `TRUST_PROXY`: `true` **solo** si hay un proxy/balanceador delante que sobrescribe
-  `X-Forwarded-For`. Con `false` detrás de un proxy, todos los clientes comparten la IP del proxy y el
-  rate limit los bloquearía a todos juntos; con `true` sin proxy, cualquiera podría falsear su IP y
-  saltarse el límite. Un test comprueba que, sin `TRUST_PROXY`, la cabecera se ignora.
+- `TRUST_PROXY`: `false` (por defecto; `X-Forwarded-For` se ignora) o la lista de IPs/CIDR de **tus**
+  proxies (o `uniquelocal` si el balanceador está en una red privada). La IP del cliente es la última de
+  `X-Forwarded-For` que no pertenece a un proxy de confianza. **`true` está prohibido** (el arranque
+  falla): confiaría en todos los saltos y tomaría la primera IP de la cabecera, que escribe el cliente.
+  Con `false` detrás de un proxy, todos los clientes comparten la IP del proxy y el rate limit los
+  bloquearía a la vez. Ver [DEPLOYMENT](DEPLOYMENT.md).
 - Rate limit en memoria: con varias instancias, cada una cuenta por separado (mover a Redis).
 - Dos usuarios de BD: el propietario del esquema para las migraciones (`MIGRATION_DATABASE_URL`) y
   `reservas_app` para la app (`DATABASE_URL`). La migración de RLS crea `reservas_app` sin login si el
@@ -199,6 +201,7 @@ Hallazgos y correcciones:
 | `npm audit` figuraba en esta documentación pero no se ejecutaba en CI | regresiones silenciosas | paso en CI |
 | La documentación citaba un `SESSION_SECRET` inexistente | confusión en el despliegue | corregido |
 | El test "dos ADMIN que se degradan a la vez" no forzaba la carrera: seguía pasando al quitar el bloqueo del servicio | una regresión en el invariante "siempre queda un ADMIN" pasaría desapercibida | el test bloquea las filas desde otra conexión para que ambas peticiones coincidan; sin el bloqueo falla siempre, con él pasa siempre |
+| `TRUST_PROXY=true` confiaba en todos los saltos: detrás de un balanceador que añade la IP a `X-Forwarded-For`, el cliente podía poner cualquier IP delante y saltarse todos los rate limits (demostrado) | abuso de la API pública y fuerza bruta del login | `TRUST_PROXY` es ahora una lista de IPs/CIDR de proxies de confianza; `true` hace fallar el arranque; test con mutación (con el comportamiento anterior falla) |
 | Aislamiento solo en el código de la aplicación | un olvido de `tenantId` en una consulta filtraría datos de otro negocio | Row-Level Security (§2b) |
 
 Revisado sin hallazgos: esquemas de entrada de todas las rutas (test automático con lista justificada),

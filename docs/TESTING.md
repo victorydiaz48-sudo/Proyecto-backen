@@ -69,7 +69,7 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/rls.test.ts` | Row-Level Security con el rol real `reservas_app`: el rol no puede saltárselo; sin negocio no ve ninguna fila de ninguna tabla ni puede escribir; con A, consultas sin filtro solo ven A y no puede leer, modificar, borrar ni crear filas de B; transacciones y SQL crudo; 40 consultas simultáneas A/B sin mezclas; transacciones simultáneas; funciones de sesión y del worker; sin DDL ni acceso a `_prisma_migrations` |
 | `test/input-fields.test.ts` | **todas** las rutas (esquemas tomados de la app): ningún body/query acepta `tenantId`; cada campo sensible aceptado (precio, duración, rol, estado, contraseña, `professionalId`, `active`…) está en una lista justificada; la API pública solo acepta `professionalId` |
 | `test/logging.test.ts` | logs reales con `LOG_LEVEL=info`: sin contraseñas, cookie de sesión, teléfonos, nombres ni el texto de búsqueda de clientes (`search=[REDACTED]`) |
-| `test/production.test.ts` | app con `NODE_ENV=production`: cookie `Secure; HttpOnly; SameSite=Strict`, HSTS/CSP/nosniff/X-Frame-Options, 500 sin detalles, rate limit de reservas públicas y de login activos, `X-Forwarded-For` no salta el límite sin `TRUST_PROXY` |
+| `test/production.test.ts` | app con `NODE_ENV=production`: cookie `Secure; HttpOnly; SameSite=Strict`, HSTS/CSP/nosniff/X-Frame-Options, 500 sin detalles, rate limit de reservas públicas y de login activos, `X-Forwarded-For` no salta el límite sin `TRUST_PROXY` ni cambiando la IP falsa detrás de un proxy de confianza (mutación comprobada) |
 | `test/panel-e2e.test.ts` | Chromium contra la API que sirve el panel: ADMIN crea servicio (precio "30,00"), profesional con horario desde el editor, cita desde la agenda y la cancela con motivo, y lo ve en la auditoría; PROFESSIONAL en móvil: menú reducido, bloqueo propio, horario de solo lectura; recarga en una ruta del panel |
 | `apps/admin/test/pages.test.tsx` | cada pantalla del ADMIN: precio a céntimos y precio ilegible, editor de horario (24:00, local), ajustes sin slug, contraseña temporal mostrada una vez, clientes con búsqueda y paginación, locales/bloqueos/auditoría/cuenta |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
@@ -114,6 +114,14 @@ en ambos casos los tests fallan; restaurado, pasan.
 **Hallazgo de la Fase 14**: la sesión, el rol y la protección CSRF se comprobaban en `preHandler`, que
 en Fastify va *después* de validar el cuerpo: una petición anónima con cuerpo inválido recibía 400 en
 vez de 401 (revelando el esquema). Ahora se comprueban en `onRequest`.
+
+## Imágenes de producción (job `docker` de CI)
+
+Construye `runtime` y `migrate` y repite una instalación real contra PostgreSQL 16: migraciones con el
+propietario, alta de negocio con `reservas_app`, servidor con `NODE_ENV=production` hasta `healthy`,
+API pública, login con cookie `Secure`, panel, parada con `SIGTERM` (salida 0), y negativa a arrancar
+conectado como propietario. Lo mismo, más el importador y una copia `pg_dump`/`pg_restore` que conserva
+RLS, se probó a mano en la Fase 16.
 
 ## Matriz obligatoria (requisitos)
 

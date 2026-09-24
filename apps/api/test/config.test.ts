@@ -33,6 +33,17 @@ describe('loadConfig en producción', () => {
 
   it('valores por defecto del servidor y del worker de avisos', () => {
     expect(loadConfig(base)).toMatchObject({ PORT: 3000, HOST: '0.0.0.0', NOTIFICATIONS_TRANSPORT: 'log', NOTIFICATIONS_WORKER: true, TRUST_PROXY: false });
-    expect(loadConfig({ ...base, NOTIFICATIONS_WORKER: 'false', TRUST_PROXY: '1' })).toMatchObject({ NOTIFICATIONS_WORKER: false, TRUST_PROXY: true });
+    expect(loadConfig({ ...base, NOTIFICATIONS_WORKER: 'false' })).toMatchObject({ NOTIFICATIONS_WORKER: false });
+  });
+
+  it('TRUST_PROXY: lista de IPs/CIDR o alias; true está prohibido (permitiría falsear la IP)', () => {
+    expect(loadConfig({ ...base, TRUST_PROXY: 'false' }).TRUST_PROXY).toBe(false);
+    expect(loadConfig({ ...base, TRUST_PROXY: ' 10.0.0.0/8, 127.0.0.1 ,uniquelocal,::1,fd00::/8' }).TRUST_PROXY).toBe(
+      '10.0.0.0/8,127.0.0.1,uniquelocal,::1,fd00::/8',
+    );
+    for (const bad of ['true', '1', '10.0.0.0/33', 'proxy.local', '1.2.3.4/8/1', '::1/129']) {
+      expect(() => loadConfig({ ...base, TRUST_PROXY: bad }), bad).toThrow(/TRUST_PROXY/);
+    }
+    expect(() => loadConfig({ ...base, TRUST_PROXY: 'true' })).toThrow(/no true/);
   });
 });

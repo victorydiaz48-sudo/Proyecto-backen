@@ -240,6 +240,8 @@ cambio de cita ──(misma transacción)──► NotificationOutbox (PENDING, 
 
 ## 8. Despliegue (Fase 16, resumen)
 
-Una imagen Docker: `api` sirve `/api/*` y los estáticos de la SPA. `prisma migrate deploy` en el
-arranque del release. PostgreSQL gestionado con backups. Config por variables de entorno.
-Escalado horizontal requiere mover rate limit y (si aplica) worker a Redis/cola.
+Dos imágenes desde el mismo `Dockerfile`: `runtime` (JavaScript compilado, panel, solo dependencias de
+producción, usuario sin privilegios, `HEALTHCHECK`) y `migrate` (`prisma migrate deploy` con el
+propietario del esquema, antes de cada versión). PostgreSQL 16 gestionado con PITR. Configuración por
+variables de entorno. Escalar a varias instancias requiere mover el rate limit a Redis. Detalle en
+[DEPLOYMENT](DEPLOYMENT.md).

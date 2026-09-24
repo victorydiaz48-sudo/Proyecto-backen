@@ -52,7 +52,8 @@ export default tseslint.config(
     },
   },
   {
-    files: ['eslint.config.js'],
+    // JS plano fuera de los proyectos de TypeScript (configuración, scripts de la imagen Docker).
+    files: ['eslint.config.js', 'docker/**/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
   },
 );

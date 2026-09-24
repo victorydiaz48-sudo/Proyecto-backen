@@ -52,3 +52,56 @@ jobs:
           TZ: Pacific/Kiritimati
       - name: Migraciones desde cero (como en producción)
         run: npm run db:deploy -w apps/api
+
+  docker:
+    # Las imágenes de producción, probadas como en un despliegue: migrar, alta de negocio, servidor.
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: reservas
+          POSTGRES_PASSWORD: reservas
+          POSTGRES_DB: reservas
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U reservas" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      OWNER_URL: postgresql://reservas:reservas@127.0.0.1:5432/reservas
+      APP_URL: postgresql://reservas_app:reservas_app@127.0.0.1:5432/reservas
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build de las imágenes (servidor y migraciones)
+        run: |
+          docker build --target runtime -t reservas .
+          docker build --target migrate -t reservas-migrate .
+      - name: Rol de la aplicación (sujeto a RLS)
+        run: PGPASSWORD=reservas psql -h 127.0.0.1 -U reservas -d reservas -c "CREATE ROLE reservas_app LOGIN PASSWORD 'reservas_app'"
+      - name: Migraciones
+        run: docker run --rm --network host -e MIGRATION_DATABASE_URL="$OWNER_URL" reservas-migrate
+      - name: Alta de un negocio
+        run: |
+          docker run --rm --network host -e DATABASE_URL="$APP_URL" -e TENANT_ADMIN_PASSWORD=clave-humo-segura-1 reservas \
+            tenant-create --slug barberia-humo --name Humo --timezone America/Sao_Paulo --country 55 --currency BRL \
+            --locale pt-BR --admin-email dono@humo.test
+      - name: Servidor en producción
+        run: |
+          docker run -d --name api --network host -e DATABASE_URL="$APP_URL" reservas
+          for i in $(seq 1 40); do
+            [ "$(docker inspect -f '{{.State.Health.Status}}' api)" = healthy ] && break
+            sleep 1
+          done
+          docker inspect -f '{{.State.Health.Status}}' api | grep -qx healthy
+          curl -fsS localhost:3000/api/v1/public/barberia-humo | grep -q '"slug":"barberia-humo"'
+          curl -fsS -D - -o /dev/null -H 'content-type: application/json' \
+            -d '{"tenantSlug":"barberia-humo","email":"dono@humo.test","password":"clave-humo-segura-1"}' \
+            localhost:3000/api/v1/auth/login | grep -qi 'set-cookie: sid=.*Secure'
+          curl -fsS -H 'accept: text/html' localhost:3000/agenda | grep -q '<div id="root">'
+          docker stop api
+          test "$(docker inspect -f '{{.State.ExitCode}}' api)" = 0
+      - name: Se niega a arrancar conectado como propietario (sin RLS)
+        run: |
+          if docker run --rm --network host -e DATABASE_URL="$OWNER_URL" -e PORT=3001 reservas; then exit 1; fi
+      - name: Logs del servidor
+        if: failure()
+        run: docker logs api || true

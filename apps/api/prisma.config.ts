@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { defineConfig, env } from 'prisma/config';
+import { defineConfig } from 'prisma/config';
 
 export default defineConfig({
   schema: 'prisma/schema.prisma',
@@ -10,7 +10,8 @@ export default defineConfig({
   datasource: {
     // Las migraciones las aplica el propietario del esquema; la app usa DATABASE_URL (rol reservas_app,
     // sujeto a Row-Level Security). En local sin MIGRATION_DATABASE_URL se usa DATABASE_URL.
-    url: process.env.MIGRATION_DATABASE_URL ?? env('DATABASE_URL'),
+    // Vacía solo vale para `prisma generate` (build sin BD); migrar sin URL falla con un error claro.
+    url: process.env.MIGRATION_DATABASE_URL ?? process.env.DATABASE_URL ?? '',
     // Solo para 'prisma migrate diff' (detección de drift en CI); 'migrate dev' crea su propia BD sombra.
     shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,
   },

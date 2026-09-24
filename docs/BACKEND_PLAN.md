@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–15 completadas** (Fase 15: auditoría de seguridad y Row-Level Security). Siguiente: Fase 16 (despliegue).
+Estado: **Fases 0–16 completadas.** Guía de puesta en producción en [DEPLOYMENT](DEPLOYMENT.md).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -131,7 +131,7 @@ Nada en el repositorio contradice estas decisiones.
 - IDs UUID. Dinero en céntimos (`Int`).
 - Prisma 7.10 (estable; la etiqueta `latest` de npm apunta a una 8.0 RC que no se usa) y TypeScript 6.0
   (typescript-eslint aún no soporta TS 7). Se ejecuta TypeScript directamente con `tsx` en desarrollo;
-  la estrategia de build de producción se fija en la Fase 16.
+  en producción se compila a JavaScript con `tsc` (`rewriteRelativeImportExtensions`, `tsconfig.build.json`).
 - Monorepo con npm workspaces (`apps/api`, `apps/admin`, `packages/shared`); SPA con Vite.
 - Panel en portugués y español como el generador; idioma por defecto = `locale` del negocio.
 - Panel sin librería de componentes ni router externo (menos dependencias): router mínimo propio.
@@ -179,5 +179,5 @@ que el generador (que no se toca) sigue igual.
 | 12 | Notificaciones | Interfaz `NotificationChannel`, outbox + worker, WhatsApp como implementación. Opción C aprobada: transporte `log` + envío manual desde el panel; avisos a cliente y negocio. ✅ |
 | 13 | Integración con el generador | Campos `apiUrl`/`tenantSlug`, selector de horas reales, fallback a WhatsApp, importador del JSON v4. Páginas sin backend idénticas byte a byte (hashes congelados). ✅ |
 | 14 | Testing completo | Cobertura de la matriz de [TESTING](TESTING.md). Matriz de rutas automática, pruebas en navegador del panel, puntos de entrada, cobertura con umbrales, suite en UTC+14. ✅ |
-| 15 | Auditoría de seguridad | Checklist de [SECURITY](SECURITY.md), RLS si se aprueba. |
-| 16 | Despliegue | Dockerfile, `prisma migrate deploy`, health checks, backups, guía. |
+| 15 | Auditoría de seguridad | Checklist de [SECURITY](SECURITY.md) y Row-Level Security en todas las tablas de negocio. ✅ |
+| 16 | Despliegue | Imágenes `runtime` (sin la herramienta de Prisma) y `migrate`, TypeScript compilado, health checks, copia/restauración probadas, `TRUST_PROXY` seguro, prueba de humo en CI, [guía](DEPLOYMENT.md). ✅ |

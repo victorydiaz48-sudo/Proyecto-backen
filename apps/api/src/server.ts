@@ -5,7 +5,14 @@ import { createDb, rlsBypassReason } from './db.ts';
 import { LogTransport } from './modules/notifications/transport.ts';
 import { startNotificationWorker } from './modules/notifications/worker.ts';
 
-const config = loadConfig();
+let config: ReturnType<typeof loadConfig>;
+try {
+  config = loadConfig();
+} catch (err) {
+  // Error de configuración: solo el mensaje (sin traza), que dice qué variable corregir.
+  console.error((err as Error).message);
+  process.exit(1);
+}
 const db = createDb(config.DATABASE_URL);
 const app = await buildApp({ config, db });
 

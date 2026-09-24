@@ -11,10 +11,11 @@
     "test": "prisma generate && vitest run",
     "db:check-drift": "prisma migrate diff --from-migrations prisma/migrations --to-schema prisma/schema.prisma --exit-code",
     "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
+    "start": "node dist/server.js",
     "tenant:create": "tsx src/cli/tenant-create.ts",
     "import:generator": "tsx src/cli/import-generator.ts",
-    "test:coverage": "prisma generate && vitest run --coverage"
+    "test:coverage": "prisma generate && vitest run --coverage",
+    "build": "prisma generate && tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@fastify/cookie": "^11.1.2",
@@ -25,6 +26,7 @@
     "@node-rs/argon2": "^2.2.1",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
+    "dotenv": "^18.0.3",
     "fastify": "^5.12.5",
     "fastify-type-provider-zod": "^7.0.0",
     "libphonenumber-js": "^1.13.13",
@@ -37,7 +39,6 @@
     "@types/node": "^22.20.4",
     "@types/pg": "^8.23.1",
     "@vitest/coverage-v8": "^5.0.1",
-    "dotenv": "^18.0.3",
     "playwright-core": "^1.56.1",
     "prisma": "^7.10.0",
     "tsx": "^4.23.15",

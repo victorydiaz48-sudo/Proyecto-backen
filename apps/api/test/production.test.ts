@@ -73,4 +73,21 @@ describe('NODE_ENV=production', () => {
     for (let i = 0; i < 10; i++) await hit(`10.0.0.${i}`);
     expect((await hit('10.0.0.99')).statusCode).toBe(429);
   });
+
+  it('detrás de un proxy de confianza: la IP es la que añade el proxy, no la que escribe el cliente', async () => {
+    const behindProxy = await buildTestApp(db, undefined, { NODE_ENV: 'production', TRUST_PROXY: '127.0.0.1' });
+    // El balanceador (127.0.0.1) AÑADE la IP real al final de la cabecera que envió el cliente.
+    const hit = (spoofed: string, real: string) =>
+      behindProxy.inject({
+        method: 'POST',
+        url: '/api/v1/public/barberia-prod/bookings',
+        remoteAddress: '127.0.0.1',
+        headers: { 'x-forwarded-for': `${spoofed}, ${real}` },
+        payload: {},
+      });
+    for (let i = 0; i < 10; i++) expect((await hit(`10.9.9.${i}`, '203.0.113.60')).statusCode).toBe(400);
+    expect((await hit('10.9.9.99', '203.0.113.60')).statusCode).toBe(429);
+    expect((await hit('10.9.9.99', '203.0.113.61')).statusCode).toBe(400); // otro cliente real
+    await behindProxy.close();
+  });
 });

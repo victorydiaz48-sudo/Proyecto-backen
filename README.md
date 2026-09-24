@@ -29,6 +29,9 @@ npm run typecheck && npm run lint && npm test   # lo mismo que ejecuta CI
 npm run db:check-drift                          # schema.prisma coincide con las migraciones
 ```
 
+Producción: `docker build --target runtime` y `--target migrate`; guía completa en
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 La app se conecta con el rol `reservas_app` (sujeto a Row-Level Security) y las migraciones con el
 propietario (`MIGRATION_DATABASE_URL`). El PostgreSQL de Docker crea el rol al iniciarse por primera
 vez; con un PostgreSQL propio o un volumen de Docker anterior, créalo una vez como administrador:

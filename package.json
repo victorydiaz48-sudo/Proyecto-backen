@@ -16,7 +16,7 @@
     "db:migrate": "npm run db:migrate -w apps/api",
     "db:seed": "npm run db:seed -w apps/api",
     "db:check-drift": "npm run db:check-drift -w apps/api",
-    "build": "npm run build -w apps/admin",
+    "build": "npm run build -w apps/admin && npm run build -w apps/api",
     "dev:api": "npm run dev -w apps/api",
     "dev:admin": "npm run dev -w apps/admin",
     "test:coverage": "npm run test:coverage --workspaces --if-present"
