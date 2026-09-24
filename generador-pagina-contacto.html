@@ -857,6 +857,11 @@ function fitBox(ar,maxW,maxH,minH){
   return {w:w,h:h};
 }
 const LOGO_H=[236,132,42];   /* caja máxima del logo en la cabecera (ancho, alto, alto mínimo), en px CSS */
+/* Caja más grande de una foto de la galería (ancho, alto en px CSS) según cuántas fotos hay; sale del CSS de
+   .gal: la tarjeta deja como mucho 480 px de contenido. 1 foto ocupa todo el ancho con su proporción (alto 0),
+   2 y 3 van en columnas 4:5, y desde 4 es una cuadrícula de cuadrados (minmax 112px) que llegan a ~172 px
+   justo antes de pasar de 2 a 3 columnas. */
+const GAL_BOX={1:[480,0],2:[236,295],3:[155,194],4:[172,172]};
 /* Decisiones de diseño a partir de los datos. Todo es automático salvo lo que el usuario fije. */
 function designOf(d){
   const cp=CATP[d.cat]||CATP.general;
@@ -2398,7 +2403,7 @@ es:{
   sec_gallery:'Galería',sd_gallery:'Fotos del local, del trabajo o del ambiente. Aparecen solo si las añades.',
   h_gallery:'JPG, PNG o WEBP. Hasta 14 imágenes; cada una se optimiza automáticamente. Puedes añadir un texto alternativo breve para cada una (opcional, ayuda a la accesibilidad).',
   gal_add:'Añadir imágenes',gal_alt:'Descripción de la imagen',gal_altPh:'Descripción breve (opcional)',
-  t_gallery_ok:'{n} imagen(es) añadidas a la galería.',
+  t_gallery_ok:'{n} imagen(es) añadidas a la galería ({kb} KB).',
   i_galType:'Ninguno de los archivos elegidos es una imagen compatible (JPG, PNG o WEBP).',
   i_galFull:'Ya tienes 14 imágenes, el máximo de la galería. Quita alguna para añadir otra.',
   i_galSome:'Algunas imágenes no se pudieron añadir (formato no compatible o archivo demasiado pesado).',
@@ -2576,7 +2581,7 @@ pt:{
   sec_gallery:'Galeria',sd_gallery:'Fotos do local, do trabalho ou do ambiente. Só aparecem se você adicionar.',
   h_gallery:'JPG, PNG ou WEBP. Até 14 imagens; cada uma é otimizada automaticamente. Você pode adicionar um texto alternativo curto para cada uma (opcional, ajuda a acessibilidade).',
   gal_add:'Adicionar imagens',gal_alt:'Descrição da imagem',gal_altPh:'Descrição curta (opcional)',
-  t_gallery_ok:'{n} imagem(ns) adicionadas à galeria.',
+  t_gallery_ok:'{n} imagem(ns) adicionadas à galeria ({kb} KB).',
   i_galType:'Nenhum dos arquivos escolhidos é uma imagem compatível (JPG, PNG ou WEBP).',
   i_galFull:'Você já tem 14 imagens, o máximo da galeria. Remova alguma para adicionar outra.',
   i_galSome:'Algumas imagens não puderam ser adicionadas (formato incompatível ou arquivo pesado demais).',
@@ -3072,6 +3077,7 @@ function rasterize(img,max,upscale){
   const c=document.createElement('canvas');
   c.width=Math.max(1,Math.round(nw*k));c.height=Math.max(1,Math.round(nh*k));
   const x=c.getContext('2d');if(!x)throw new Error('ctx');
+  x.imageSmoothingQuality='high';   /* una foto de 4000 px reducida a unos cientos sale sin dientes de sierra */
   x.drawImage(img,0,0,c.width,c.height);
   return c;
 }
@@ -3181,11 +3187,21 @@ function fitLogo(src,alpha){
 /* Foto principal: 900 px de lado mayor (la tarjeta mide como mucho 520 px CSS, también en escritorio),
    bajando tamaño y calidad hasta caber en el tope de peso. */
 const photoEnc=(c,q)=>{const w=c.toDataURL('image/webp',q);return w.indexOf('data:image/webp')===0?w:c.toDataURL('image/jpeg',q);};
-function fitPhoto(img){
-  let size=900,q=.72,c=rasterize(img,size,false),url=photoEnc(c,q),g=0;
-  while(url.length>PHOTO_MAX&&g++<6){size=Math.round(size*.86);q=Math.max(.55,q-.03);c=rasterize(img,size,false);url=photoEnc(c,q);}
+function fitImg(img,size,q,max,minQ){
+  let c=rasterize(img,size,false),url=photoEnc(c,q),g=0;
+  while(url.length>max&&g++<6){size=Math.round(size*.86);q=Math.max(minQ,q-.03);c=rasterize(img,size,false);url=photoEnc(c,q);}
   return {c:c,url:url};
 }
+const fitPhoto=img=>fitImg(img,900,.72,PHOTO_MAX,.55);
+/* Galería: mismo criterio que el logo. Cada foto, al doble (retina) de la caja más grande donde se ve, que
+   depende de cuántas hay (GAL_BOX). La foto se muestra recortada para llenar su caja, así que basta con que
+   la cubra. Tope de peso por foto, bien por debajo de la foto principal. */
+const GAL_MAX=60000;
+function galSize(w,h,n){
+  const b=GAL_BOX[clamp(n,1,4)],k=b[1]?Math.max(2*b[0]/w,2*b[1]/h):2*b[0]/w;
+  return Math.round(Math.max(w,h)*Math.min(1,k));
+}
+const fitGal=(img,n)=>fitImg(img,galSize(img.naturalWidth||img.width,img.naturalHeight||img.height,n),.68,GAL_MAX,.5);
 function handleLogo(file){
   const myGen=++assetGen;
   logoErr='';logoNote='';
@@ -3259,14 +3275,13 @@ function addGalleryFiles(files){
   if(!list.length){galleryErr='galType';paintGallery();return;}
   const room=14-gallery.length;
   if(room<=0){galleryErr='galFull';paintGallery();return;}
-  const batch=list.slice(0,room);
+  const batch=list.slice(0,room),n=gallery.length+batch.length;
   Promise.all(batch.map(file=>{
     if(file.size>15*1024*1024)return Promise.resolve(null);
     const u=URL.createObjectURL(file);
     return loadImg(u).then(img=>{
-      let size=760,q=.68,c=rasterize(img,size,false),url=photoEnc(c,q),g=0;
-      while(url.length>85000&&g++<6){size=Math.round(size*.86);q=Math.max(.5,q-.03);c=rasterize(img,size,false);url=photoEnc(c,q);}
-      if(url.length>150000)throw new Error('big');
+      const fg=fitGal(img,n),c=fg.c,url=fg.url;
+      if(url.length>GAL_MAX)throw new Error('big');
       return {src:url,alt:'',w:c.width,h:c.height};
     }).catch(()=>null).then(r=>{try{URL.revokeObjectURL(u);}catch(e){}return r;});
   })).then(results=>{
@@ -3274,8 +3289,26 @@ function addGalleryFiles(files){
     const ok=results.filter(Boolean);
     gallery=gallery.concat(ok);
     galleryErr=ok.length<batch.length?'galSome':'';
-    paintGallery();update();
-    if(ok.length)toast(t('t_gallery_ok',{n:ok.length}));
+    paintGallery();update();refitGallery();
+    if(ok.length)toast(t('t_gallery_ok',{n:ok.length,kb:ok.reduce((a,g)=>a+kbOf(g.src),0)}));
+  });
+}
+/* Reajusta las fotos que pesan o miden más de lo que produciría hoy el optimizador para la galería actual:
+   las de un JSON o borrador antiguo al cargarlo, y las ya subidas cuando se añaden más (la caja de cada foto
+   se achica). Solo reduce: al quitar fotos las cajas crecen, pero no se puede recuperar el original. */
+function refitGallery(){
+  const myGen=assetGen,n=gallery.length;
+  gallery.forEach(g=>{
+    if(g.src.length<=GAL_MAX*1.1&&Math.max(g.w,g.h)<=galSize(g.w,g.h,n)*1.1)return;
+    const old=g.src;
+    loadImg(old).then(img=>{
+      if(myGen!==assetGen)return;   /* otro negocio, o se subió algo mientras tanto (esa subida vuelve a llamar aquí) */
+      const i=gallery.findIndex(x=>x.src===old);if(i<0)return;
+      const fg=fitGal(img,gallery.length);if(fg.url.length>=old.length)return;
+      gallery=gallery.slice();gallery[i]=Object.assign({},gallery[i],{src:fg.url,w:fg.c.width,h:fg.c.height});
+      const th=$('galGrid').querySelectorAll('.gth img')[i];if(th)th.src=fg.url;   /* sin repintar: no quita el foco de un texto alternativo a medio escribir */
+      schedule();
+    }).catch(()=>{});
   });
 }
 function removeGalleryImage(i){gallery=gallery.slice(0,i).concat(gallery.slice(i+1));paintGallery();update();}
@@ -3377,6 +3410,7 @@ function ensureMeta(){
     logoMeta=c.width+','+c.height+','+ls.p10.toFixed(3)+','+ls.p90.toFixed(3)+','+(ls.alpha?1:0);
     schedule();
   }).catch(()=>{});
+  refitGallery();
 }
 /* Favicon: un PNG de 64 px (unos pocos KB), sin duplicar el logo grande */
 function regenIcon(){
