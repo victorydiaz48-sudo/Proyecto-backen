@@ -93,27 +93,67 @@
 ## 8. Otros controles
 
 - SQL injection: solo Prisma con parámetros; el SQL crudo (`$queryRaw` con template tags) nunca
-  concatena strings.
-- Errores: handler global; en producción solo `code`, `message` genérico y `requestId`. Logs
-  estructurados (pino) con redacción de `password`, `cookie`, `authorization`, teléfonos parcialmente.
-- Cabeceras: `@fastify/helmet` global (CSP, HSTS, nosniff…). El panel (Fase 10) funciona con la CSP por
-  defecto (`script-src 'self'`, sin scripts en línea); un test lo comprueba.
-- Secretos por variables de entorno (`DATABASE_URL`, `SESSION_SECRET`, credenciales de WhatsApp),
-  validados al arrancar; `.env` en `.gitignore`, `.env.example` sin valores reales.
+  concatena strings; ESLint prohíbe `$queryRawUnsafe`/`$executeRawUnsafe`.
+- Errores: handler global igual en todos los entornos: solo `code`, `message` genérico y `requestId`;
+  el detalle va únicamente al log.
+- Logs (pino): la línea de cada petición registra método, URL, host e IP, **nunca cabeceras ni cuerpos**
+  (así no aparecen contraseñas, cookies, teléfonos ni nombres). El parámetro `search` de
+  `/admin/customers` se registra como `[REDACTED]` (`src/lib/log.ts`). Además se redactan
+  `cookie`/`authorization`/`set-cookie` por si algún log incluye cabeceras. El worker de avisos solo
+  registra el teléfono enmascarado. Los errores 500 sí se registran completos (pueden incluir valores de
+  la consulta): los logs de producción deben tratarse como datos personales.
+- Cabeceras: `@fastify/helmet` global (CSP `default-src 'self'`, HSTS, nosniff, `X-Frame-Options`,
+  sin `X-Powered-By`). El panel funciona con la CSP por defecto (sin scripts en línea).
+- Secretos: no hay secretos de aplicación (las sesiones son tokens aleatorios guardados como hash, no
+  firmados). Los únicos secretos son `DATABASE_URL` y, en el futuro, las credenciales del proveedor de
+  WhatsApp; se leen del entorno y se validan al arrancar sin imprimir su valor. `.env` en `.gitignore`;
+  solo se versiona `.env.example` con valores de desarrollo.
+- Seed de desarrollo (usuarios con contraseña conocida): se niega con `NODE_ENV=production` **y** si la
+  BD contiene algún negocio que no sea de los del seed.
 - Audit log de: login (éxito/fallo), cambios de usuarios/roles, servicios, precios, horarios,
   bloqueos, creación y cambios de estado de citas.
-- Dependencias: `npm audit` en CI, lockfile commiteado.
+- Dependencias: lockfile versionado y `npm audit --audit-level=high` en CI. `overrides` en el
+  `package.json` raíz fuerzan `mysql2` ≥ 3.24.4 y `deepmerge-ts` ≥ 8.0.2 (dependencias del CLI de
+  Prisma con avisos altos; no se usan en tiempo de ejecución). Revisar y quitar los `overrides` cuando
+  Prisma actualice sus dependencias.
 - Datos personales (teléfono, nombre): mínimos necesarios; política de retención a definir. El outbox
-  guarda teléfono y texto del aviso (necesarios para enviarlo); el log del worker solo registra el
-  teléfono enmascarado y la longitud del texto. Solo un ADMIN ve los avisos de su negocio.
+  guarda teléfono y texto del aviso (necesarios para enviarlo). Solo un ADMIN ve los avisos de su negocio.
 
-## 9. Checklist para la Fase 15
+## 9. Despliegue: requisitos de seguridad
+
+- HTTPS obligatorio (la cookie es `Secure`; HSTS activo).
+- `TRUST_PROXY`: `true` **solo** si hay un proxy/balanceador delante que sobrescribe
+  `X-Forwarded-For`. Con `false` detrás de un proxy, todos los clientes comparten la IP del proxy y el
+  rate limit los bloquearía a todos juntos; con `true` sin proxy, cualquiera podría falsear su IP y
+  saltarse el límite. Un test comprueba que, sin `TRUST_PROXY`, la cabecera se ignora.
+- Rate limit en memoria: con varias instancias, cada una cuenta por separado (mover a Redis).
+- El usuario de BD de la app no necesita ser propietario del esquema (las migraciones pueden usar otro).
+
+## 10. Auditoría de la Fase 15
+
+Hallazgos y correcciones:
+
+| Hallazgo | Riesgo | Corrección |
+|---|---|---|
+| `GET /admin/customers?search=…` dejaba nombres/teléfonos buscados en el log de peticiones | datos personales en logs | serializador de peticiones con `search` redactado; test con los logs reales (y mutación: sin el serializador falla) |
+| El seed de desarrollo solo se protegía por `NODE_ENV`: ejecutado contra la BD real sin esa variable, crearía ADMIN con contraseña conocida | toma de control de un negocio | segunda barrera por contenido de la BD; test de proceso real |
+| 4 avisos altos de `npm audit` (mysql2, deepmerge-ts vía el CLI de Prisma) | bajo (solo CLI, configuración estática) | `overrides`; comprobado validate/generate/drift/migraciones desde cero |
+| `npm audit` figuraba en esta documentación pero no se ejecutaba en CI | regresiones silenciosas | paso en CI |
+| La documentación citaba un `SESSION_SECRET` inexistente | confusión en el despliegue | corregido |
+
+Revisado sin hallazgos: esquemas de entrada de todas las rutas (test automático con lista justificada),
+autorización en `onRequest` en todas las rutas, errores 500, cabeceras, cookies, rate limits y CORS con
+`NODE_ENV=production`, idempotencia (la respuesta repetida exige el mismo cuerpo, así que no sirve para
+leer citas ajenas), inserción de HTML (el panel no usa `dangerouslySetInnerHTML`; la página generada usa
+`textContent`), SQL crudo y secretos en el repositorio.
+
+Checklist:
 
 - [x] Test de acceso cruzado para cada ruta (`route-matrix.test.ts`, lista tomada de la app).
-- [ ] Ningún esquema de entrada acepta `tenantId`, `price*`, `duration*`, `role`, `status` donde no corresponda.
-- [ ] Exclusion constraint presente tras `migrate deploy`.
-- [ ] Rate limits activos en producción.
+- [x] Ningún esquema de entrada acepta `tenantId`; los campos sensibles están justificados (`input-fields.test.ts`).
+- [x] Exclusion constraint presente tras `migrate deploy` (`db-constraints.test.ts`, sobre una BD migrada desde cero).
+- [x] Rate limits activos en producción (`production.test.ts`).
 - [x] Cookies `Secure` en producción (el arranque falla si se intenta desactivar); HTTPS obligatorio en el despliegue.
-- [ ] Errores 500 sin detalles internos.
-- [ ] `npm audit` sin vulnerabilidades altas.
-- [ ] Revisión de RLS (si se aprueba).
+- [x] Errores 500 sin detalles internos (también con `NODE_ENV=production`).
+- [x] `npm audit` sin vulnerabilidades altas (y en CI).
+- [ ] RLS: pendiente de decisión (ver §2.6).

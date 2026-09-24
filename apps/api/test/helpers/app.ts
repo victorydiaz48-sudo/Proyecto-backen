@@ -7,7 +7,12 @@ import { hashPassword } from '../../src/lib/password.ts';
 
 export const TEST_PASSWORD = 'clave-de-prueba-segura';
 
-export async function buildTestApp(db: Db, now?: () => Date, env: Record<string, string> = {}): Promise<FastifyInstance> {
+export async function buildTestApp(
+  db: Db,
+  now?: () => Date,
+  env: Record<string, string> = {},
+  logStream?: { write(line: string): void },
+): Promise<FastifyInstance> {
   const config = loadConfig({
     NODE_ENV: 'test',
     DATABASE_URL: process.env.TEST_DATABASE_URL,
@@ -16,7 +21,7 @@ export async function buildTestApp(db: Db, now?: () => Date, env: Record<string,
     ADMIN_DIST_DIR: '/nonexistent-admin-dist',
     ...env,
   });
-  return buildApp({ config, db, ...(now ? { now } : {}) });
+  return buildApp({ config, db, ...(now ? { now } : {}), ...(logStream ? { logStream } : {}) });
 }
 
 // Hash calculado una sola vez: Argon2 es lento a propósito y no aporta nada repetirlo en cada fixture.

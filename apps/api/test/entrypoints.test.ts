@@ -49,6 +49,24 @@ describe('servidor', () => {
 });
 
 describe('scripts del operador', () => {
+  it('seed de desarrollo: crea A y B, y se niega en producción o en una BD con negocios reales', async () => {
+    const prod = await tsx('prisma/seed.ts', [], { NODE_ENV: 'production', COOKIE_SECURE: 'true' });
+    expect(prod.code).toBe(1);
+    expect(await db.tenant.count()).toBe(0);
+
+    await db.tenant.create({ data: { slug: 'negocio-real', name: 'Real', timezone: 'Europe/Madrid', defaultCountryCode: '34', currency: 'EUR', locale: 'es-ES' } });
+    const foreign = await tsx('prisma/seed.ts', []);
+    expect(foreign.code).toBe(1);
+    expect(foreign.out).toContain('negocio(s) reales');
+    expect(await db.user.count()).toBe(0);
+
+    await truncateAll(db);
+    const ok = await tsx('prisma/seed.ts', []);
+    expect(ok.code).toBe(0);
+    expect(await db.tenant.count()).toBe(2);
+    expect((await tsx('prisma/seed.ts', [])).code).toBe(0); // idempotente
+  }, 60_000);
+
   it('tenant:create crea el negocio y rechaza datos inválidos con código de salida 1', async () => {
     const ok = await tsx('src/cli/tenant-create.ts', ['--slug', 'cli-negocio', '--name', 'CLI', '--timezone', 'America/Sao_Paulo', '--country', '55', '--currency', 'BRL', '--locale', 'pt-BR', '--admin-email', 'dono@cli.test'], { TENANT_ADMIN_PASSWORD: 'clave-cli-segura-1' });
     expect(ok.code).toBe(0);

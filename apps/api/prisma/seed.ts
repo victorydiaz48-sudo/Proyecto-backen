@@ -62,6 +62,10 @@ async function main(): Promise<void> {
   if (config.NODE_ENV === 'production') throw new Error('El seed de desarrollo no se ejecuta en producción.');
   const db = createDb(config.DATABASE_URL);
   try {
+    // Segunda barrera, por si se apunta a la BD real sin NODE_ENV=production: si ya hay negocios que no
+    // son los del seed, no se crean usuarios con una contraseña conocida.
+    const foreign = await db.tenant.count({ where: { slug: { notIn: SEED_TENANTS.map((t) => t.slug) } } });
+    if (foreign > 0) throw new Error(`La base de datos tiene ${foreign} negocio(s) reales: el seed de desarrollo no se ejecuta aquí.`);
     for (const t of SEED_TENANTS) await seedTenant(db, t);
   } finally {
     await db.$disconnect();

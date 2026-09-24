@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–14 completadas.** Siguiente: Fase 15 (auditoría de seguridad).
+Estado: **Fases 0–14 completadas; Fase 15 (auditoría de seguridad) completada salvo la decisión sobre RLS.** Siguiente: Fase 16 (despliegue).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)

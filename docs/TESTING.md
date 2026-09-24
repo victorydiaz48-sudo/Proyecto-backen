@@ -33,7 +33,7 @@ En CI se instala Chromium y se compila el panel antes de los tests.
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 14)
+## Estado actual (hasta la Fase 15)
 
 | Archivo | Cubre |
 |---|---|
@@ -63,7 +63,10 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `test/generator/e2e.test.ts` | **Chromium con la página abierta como `file://`** contra la API real: reserva con horas reales y aviso por WhatsApp; otra reserva se adelanta → aviso, alternativas y reserva con una de ellas; elección de servicio antes de que cargue la API se conserva; varios locales (filtra profesionales por local); API caída → flujo WhatsApp sin horas inventadas; página sin backend igual que antes; "Probar conexión" del generador. Se salta si no hay Chromium (en CI se instala) |
 | `test/importer.test.ts` | interpretación de servicios (categorías, precios, marcadores, sin precio), equipo (servicios por nombre, inexistentes), horarios (24 h, cruce de medianoche), locales, monedas y locales; importación completa y reserva posterior por la API pública; negocio existente con datos → se niega sin tocar nada; sin email de ADMIN → error |
 | `test/route-matrix.test.ts` | las 39 rutas `/admin` (lista tomada de la app): 401 sin sesión, 403 para PROFESSIONAL en rutas de ADMIN, 404 con ids de B y B intacto, sin `tenantId` en cuerpos, listados sin ids de B; sesión de A en la API pública de B; 20 reservas públicas simultáneas desde 20 IPs → 1 |
-| `test/entrypoints.test.ts` | `server.ts` real: arranca, `/healthz` y `/readyz`, SIGTERM → salida 0; `tenant:create` e `import:generator` como procesos (éxito, errores y código de salida) |
+| `test/entrypoints.test.ts` | `server.ts` real: arranca, `/healthz` y `/readyz`, SIGTERM → salida 0; `tenant:create` e `import:generator` como procesos (éxito, errores y código de salida); el seed de desarrollo se niega con `NODE_ENV=production` y en una BD con negocios reales |
+| `test/input-fields.test.ts` | **todas** las rutas (esquemas tomados de la app): ningún body/query acepta `tenantId`; cada campo sensible aceptado (precio, duración, rol, estado, contraseña, `professionalId`, `active`…) está en una lista justificada; la API pública solo acepta `professionalId` |
+| `test/logging.test.ts` | logs reales con `LOG_LEVEL=info`: sin contraseñas, cookie de sesión, teléfonos, nombres ni el texto de búsqueda de clientes (`search=[REDACTED]`) |
+| `test/production.test.ts` | app con `NODE_ENV=production`: cookie `Secure; HttpOnly; SameSite=Strict`, HSTS/CSP/nosniff/X-Frame-Options, 500 sin detalles, rate limit de reservas públicas y de login activos, `X-Forwarded-For` no salta el límite sin `TRUST_PROXY` |
 | `test/panel-e2e.test.ts` | Chromium contra la API que sirve el panel: ADMIN crea servicio (precio "30,00"), profesional con horario desde el editor, cita desde la agenda y la cancela con motivo, y lo ve en la auditoría; PROFESSIONAL en móvil: menú reducido, bloqueo propio, horario de solo lectura; recarga en una ruta del panel |
 | `apps/admin/test/pages.test.tsx` | cada pantalla del ADMIN: precio a céntimos y precio ilegible, editor de horario (24:00, local), ajustes sin slug, contraseña temporal mostrada una vez, clientes con búsqueda y paginación, locales/bloqueos/auditoría/cuenta |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |

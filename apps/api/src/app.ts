@@ -11,6 +11,7 @@ import { join, resolve } from 'node:path';
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
 import { FailureLimiter } from './lib/failure-limiter.ts';
+import { serializeRequest } from './lib/log.ts';
 import { authRoutes } from './modules/auth/routes.ts';
 import { AuthService } from './modules/auth/service.ts';
 import { availabilityAdminRoutes } from './modules/availability/routes.admin.ts';
@@ -30,8 +31,15 @@ import { registerErrorHandler } from './plugins/error-handler.ts';
 declare module 'fastify' {
   interface FastifyInstance {
     /** Todas las rutas registradas (método + URL). Lo usan los tests de permisos para no olvidar ninguna. */
-    routeList: { method: string; url: string }[];
+    routeList: RouteInfo[];
   }
+}
+
+/** Ruta registrada con sus esquemas de entrada (para los tests de matriz y de campos sensibles). */
+export interface RouteInfo {
+  method: string;
+  url: string;
+  schema?: { body?: unknown; querystring?: unknown; params?: unknown };
 }
 
 export interface AppDeps {
@@ -39,10 +47,12 @@ export interface AppDeps {
   db: Db;
   /** Reloj inyectable para los tests (sesiones, disponibilidad). */
   now?: () => Date;
+  /** Destino de los logs (los tests lo capturan); por defecto stdout. */
+  logStream?: { write(line: string): void };
 }
 
 /** Construye la aplicación sin escuchar en ningún puerto (los tests usan app.inject()). */
-export async function buildApp({ config, db, now = () => new Date() }: AppDeps): Promise<FastifyInstance> {
+export async function buildApp({ config, db, now = () => new Date(), logStream }: AppDeps): Promise<FastifyInstance> {
   const app = Fastify({
     trustProxy: config.TRUST_PROXY,
     bodyLimit: 16 * 1024,
@@ -53,13 +63,15 @@ export async function buildApp({ config, db, now = () => new Date() }: AppDeps):
         : {
             level: config.LOG_LEVEL,
             redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
+            serializers: { req: serializeRequest },
+            ...(logStream ? { stream: logStream } : {}),
           },
   }).withTypeProvider<ZodTypeProvider>();
 
-  const routeList: { method: string; url: string }[] = [];
+  const routeList: RouteInfo[] = [];
   app.decorate('routeList', routeList);
   app.addHook('onRoute', (r) => {
-    for (const method of Array.isArray(r.method) ? r.method : [r.method]) if (method !== 'HEAD') routeList.push({ method, url: r.url });
+    for (const method of Array.isArray(r.method) ? r.method : [r.method]) if (method !== 'HEAD') routeList.push({ method, url: r.url, schema: r.schema });
   });
 
   app.setValidatorCompiler(validatorCompiler);

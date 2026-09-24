@@ -33,6 +33,8 @@ jobs:
         run: |
           PGPASSWORD=reservas psql -h localhost -U reservas -d reservas_dev -c 'CREATE DATABASE reservas_test' -c 'CREATE DATABASE reservas_shadow'
       - run: npm ci
+      - name: Dependencias sin vulnerabilidades altas
+        run: npm audit --audit-level=high
       - name: Chromium para las pruebas de punta a punta de la página generada
         run: npx playwright-core install --with-deps chromium
       - run: npm run typecheck
