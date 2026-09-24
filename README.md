@@ -2,8 +2,10 @@
 
 Plataforma de reservas multi-tenant (empezando por barberías) y el generador de páginas de contacto.
 
-- `generador-pagina-contacto.html` — generador de páginas estáticas (reserva por WhatsApp). No se
-  modifica hasta la Fase 13 del plan.
+- `generador-pagina-contacto.html` — generador de páginas estáticas. Sin configurar nada, la reserva
+  es por WhatsApp como siempre; con "Reservas en línea" (dirección del sistema + identificador del
+  negocio) la página muestra horas reales y crea la cita en el backend. Ver
+  [docs/FRONTEND_INTEGRATION.md](docs/FRONTEND_INTEGRATION.md).
 - `apps/api` — backend (Node.js + TypeScript + Fastify + Prisma + PostgreSQL).
 - `apps/admin` — panel de administración y de profesional (React + Vite), servido por la API.
 - `docs/` — plan, arquitectura, base de datos, API, seguridad, testing e integración.
@@ -32,3 +34,7 @@ para `barberia-b`; contraseña `dev-password-123`. Solo para desarrollo.
 
 Alta de un negocio real (operador de la plataforma): `npm run tenant:create -w apps/api -- …`,
 ver el ejemplo completo en [docs/API.md](docs/API.md) §3.
+
+Importar un negocio desde el JSON que exporta el generador:
+`npm run import:generator -w apps/api -- --file datos.json --slug mi-negocio --admin-email yo@ejemplo.com --dry-run`
+(quita `--dry-run` para guardarlo).

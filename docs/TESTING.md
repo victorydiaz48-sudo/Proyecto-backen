@@ -27,7 +27,7 @@ npm run db:check-drift  # schema.prisma ≡ migraciones (requiere SHADOW_DATABAS
 
 CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de servicio.
 
-## Estado actual (hasta la Fase 12)
+## Estado actual (hasta la Fase 13)
 
 | Archivo | Cubre |
 |---|---|
@@ -53,6 +53,9 @@ CI (`.github/workflows/ci.yml`) ejecuta todo lo anterior con un PostgreSQL 16 de
 | `apps/admin/test/*.test.ts(x)` | importes y fechas en la zona del negocio (incluido cambio de hora), cliente de la API (errores, 401, sin red, sin tenantId), login y error traducido, navegación por rol (PROFESSIONAL solo su columna), idioma por defecto del negocio |
 | `apps/admin/test/professional.test.tsx` | panel del profesional: resumen del día sin canceladas y solo su columna; vista de 7 días (rango pedido, agrupación, sin canceladas); nueva cita limitada a sus servicios y a su agenda; aviso si no tiene ficha vinculada |
 | `test/notifications.test.ts` | reserva web → confirmación al cliente, aviso al negocio y recordatorio 24 h antes; panel → solo cliente; WhatsApp del local por defecto como respaldo y sin WhatsApp no hay aviso al negocio; PENDING → "recibida" y al confirmar "confirmada" + recordatorio; cancelar y mover anulan lo pendiente; sin recordatorio a < 24 h; reserva fallida no deja avisos (misma transacción); textos en español; worker: solo lo vencido, reintentos con espera y FAILED tras 5, la cita no se ve afectada, dos workers no duplican; endpoint del panel con `wa.me`, sin filas de B, solo ADMIN; plantillas pt/es |
+| `test/generator/generator.test.ts` | la librería del generador cargada en Node: **6 páginas sin backend idénticas byte a byte** a las del generador anterior (hashes congelados en `baseline-hashes.json`), JSON antiguo sin campos nuevos, configuración de la API (URL normalizada, slug en minúsculas), reserva sin WhatsApp ni servicios locales, multi-local con botón de reserva, validación de URL/slug (https, http solo localhost, sin query/credenciales), escape de la URL |
+| `test/generator/e2e.test.ts` | **Chromium con la página abierta como `file://`** contra la API real: reserva con horas reales y aviso por WhatsApp; otra reserva se adelanta → aviso, alternativas y reserva con una de ellas; elección de servicio antes de que cargue la API se conserva; varios locales (filtra profesionales por local); API caída → flujo WhatsApp sin horas inventadas; página sin backend igual que antes; "Probar conexión" del generador. Se salta si no hay Chromium (en CI se instala) |
+| `test/importer.test.ts` | interpretación de servicios (categorías, precios, marcadores, sin precio), equipo (servicios por nombre, inexistentes), horarios (24 h, cruce de medianoche), locales, monedas y locales; importación completa y reserva posterior por la API pública; negocio existente con datos → se niega sin tocar nada; sin email de ADMIN → error |
 | `test/lib.test.ts` | política de contraseñas, `FailureLimiter`, zonas horarias, slugs |
 
 ## Matriz obligatoria
@@ -116,8 +119,10 @@ se ejecutaron 5 veces seguidas sin fallos.
 - No hay drift entre `schema.prisma` y las migraciones.
 
 ### No romper el generador
-- Hasta la Fase 13, `generador-pagina-contacto.html` no cambia (`git diff --exit-code` sobre el archivo en CI).
-- Fase 13: tests con Playwright de la página generada con y sin `apiUrl` (sin él, el flujo WhatsApp es idéntico al actual).
+- Hasta la Fase 13 el archivo no cambió (CI lo comprobaba con `git diff`). Desde la Fase 13 la garantía
+  es más precisa: las páginas sin backend deben coincidir byte a byte con las del generador anterior
+  (`generator.test.ts`, hashes congelados antes de modificarlo).
+- Pruebas en Chromium de la página generada con y sin backend (`e2e.test.ts`), con `playwright-core`.
 
 ## Prueba manual en navegador (Fase 10)
 
@@ -139,3 +144,12 @@ Servidor real con el worker: una reserva por la API pública genera 3 avisos; en
 worker registra los 2 vencidos (log con teléfono enmascarado) y deja el recordatorio pendiente para su
 hora. La página Avisos del panel los muestra con "Abrir no WhatsApp". Se detectó y corrigió que las
 columnas de todas las tablas del panel estaban desalineadas.
+
+## Hallazgos de la Fase 13 (encontrados por las pruebas en navegador)
+
+- El atributo `hidden` no ocultaba campos ni botones del diálogo porque el CSS de la página les da
+  `display:flex`: se añadió `.bkf[hidden]`, `.bkba [hidden]` al CSS del modo conectado.
+- Carrera: si el cliente elegía servicio antes de que cargara la API, la elección se perdía. Se conserva.
+- Con temas de botón transparente, la hora elegida no se distinguía: ahora usa `--accent-text`
+  (contraste ≥ 4.5 garantizado) y un ✓.
+- `toE164` lanzaba una excepción con un código de país inexistente (p. ej. 999): ahora devuelve "no válido".

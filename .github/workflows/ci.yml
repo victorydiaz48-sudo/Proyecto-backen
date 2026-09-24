@@ -33,6 +33,8 @@ jobs:
         run: |
           PGPASSWORD=reservas psql -h localhost -U reservas -d reservas_dev -c 'CREATE DATABASE reservas_test' -c 'CREATE DATABASE reservas_shadow'
       - run: npm ci
+      - name: Chromium para las pruebas de punta a punta de la página generada
+        run: npx playwright-core install --with-deps chromium
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run db:check-drift
@@ -41,6 +43,3 @@ jobs:
         run: npm run build
       - name: Migraciones desde cero (como en producción)
         run: npm run db:deploy -w apps/api
-      - name: El generador HTML no cambia hasta la Fase 13
-        run: git diff --exit-code origin/main -- generador-pagina-contacto.html
-        if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'

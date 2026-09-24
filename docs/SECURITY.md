@@ -80,6 +80,14 @@
 - Tamaño máximo del body 16 KB.
 - (Futuro) CAPTCHA opcional por tenant si hay spam; estado `PENDING` como mitigación.
 
+## 7b. Página generada conectada (Fase 13)
+
+- La página solo envía IDs, fecha/hora local y datos de contacto; precio, duración, estado y profesional
+  asignado los decide el servidor. `Idempotency-Key` aleatoria por confirmación.
+- La URL de la API se valida en el generador (https; http solo `localhost`) y todo lo que se muestra
+  (nombres, horas, mensajes del servidor) se inserta con `textContent`, nunca como HTML.
+- "Probar conexión" solo hace `GET` públicos.
+
 ## 8. Otros controles
 
 - SQL injection: solo Prisma con parámetros; el SQL crudo (`$queryRaw` con template tags) nunca

@@ -100,6 +100,11 @@ describe('toE164', () => {
     expect(toE164('612 34 56 78', '34')).toBe('+34612345678');
   });
 
+  it('un código de país inexistente no rompe nada: el número simplemente no es válido', () => {
+    expect(toE164('41 99876-5432', '999')).toBeNull();
+    expect(toE164('+55 41 99876-5432', '999')).toBe('+5541998765432');
+  });
+
   it('rechaza números inválidos', () => {
     for (const raw of ['', '123', 'abc', '+55 41 9', '9'.repeat(41)]) expect(toE164(raw, '55'), raw).toBeNull();
   });

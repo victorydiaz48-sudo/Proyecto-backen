@@ -1,6 +1,6 @@
 # Plan del backend — Plataforma de reservas multi-tenant (barberías)
 
-Estado: **Fases 0–12 completadas.** Siguiente: Fase 13 (integración con el generador HTML).
+Estado: **Fases 0–13 completadas.** Siguiente: Fase 14 (testing completo).
 
 Documentos relacionados:
 [ARCHITECTURE](ARCHITECTURE.md) · [DATABASE](DATABASE.md) · [API](API.md) · [SECURITY](SECURITY.md) · [TESTING](TESTING.md) · [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md)
@@ -88,7 +88,8 @@ backend se construye desde cero, en carpetas nuevas, sin tocar el generador.
 - El runtime es ES5 y sin dependencias → la API pública debe ser consumible con `fetch`/XHR simple,
   JSON plano, sin cookies, sin preflight complejo si se puede evitar (ver [SECURITY](SECURITY.md) §CORS).
 - Las páginas pueden abrirse desde `file://` (Origin `null`) o cualquier dominio.
-- No se modifica `generador-pagina-contacto.html` hasta la Fase 13.
+- No se modifica `generador-pagina-contacto.html` hasta la Fase 13. Desde la Fase 13, cualquier cambio
+  debe mantener idénticas las páginas sin backend (test con hashes congelados).
 
 ### 1.8 Hallazgos que afectan al diseño
 
@@ -176,7 +177,7 @@ que el generador (que no se toca) sigue igual.
 | 10 | API admin + panel React | CRUD completo, agenda, auditoría. Usuarios y auditoría en la API; panel React (pt/es) servido por la API. ✅ |
 | 11 | Panel de profesional | Agenda propia, cambiar estado de sus citas, bloqueos propios. Vista de próximos 7 días, resumen del día, formulario limitado a sus servicios, navegación móvil. ✅ |
 | 12 | Notificaciones | Interfaz `NotificationChannel`, outbox + worker, WhatsApp como implementación. Opción C aprobada: transporte `log` + envío manual desde el panel; avisos a cliente y negocio. ✅ |
-| 13 | Integración con el generador | Campos `apiUrl`/`tenantSlug`, selector de horas reales, fallback a WhatsApp, importador del JSON v4. |
+| 13 | Integración con el generador | Campos `apiUrl`/`tenantSlug`, selector de horas reales, fallback a WhatsApp, importador del JSON v4. Páginas sin backend idénticas byte a byte (hashes congelados). ✅ |
 | 14 | Testing completo | Cobertura de la matriz de [TESTING](TESTING.md). |
 | 15 | Auditoría de seguridad | Checklist de [SECURITY](SECURITY.md), RLS si se aprueba. |
 | 16 | Despliegue | Dockerfile, `prisma migrate deploy`, health checks, backups, guía. |

@@ -9,7 +9,12 @@ export function toE164(raw: string, defaultCountryCode: string): string | null {
   const text = raw.trim();
   if (!text || text.length > 40) return null;
   const withPlus = text.startsWith('00') ? `+${text.slice(2)}` : text;
-  const parsed = parsePhoneNumberFromString(withPlus, { defaultCallingCode: defaultCountryCode });
-  if (!parsed || !parsed.isValid()) return null;
-  return parsed.number;
+  try {
+    const parsed = parsePhoneNumberFromString(withPlus, { defaultCallingCode: defaultCountryCode });
+    if (!parsed || !parsed.isValid()) return null;
+    return parsed.number;
+  } catch {
+    // libphonenumber lanza con un código de país que no existe (p. ej. 999): es un teléfono no válido.
+    return null;
+  }
 }
