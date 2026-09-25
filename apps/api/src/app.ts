@@ -1,0 +1,187 @@
+import cookie from '@fastify/cookie';
+import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import fastifyStatic from '@fastify/static';
+import Fastify, { type FastifyInstance } from 'fastify';
+import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fastify-type-provider-zod';
+import { randomUUID } from 'node:crypto';
+import { existsSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import type { Config } from './config.ts';
+import type { Db } from './db.ts';
+import { FailureLimiter } from './lib/failure-limiter.ts';
+import { serializeRequest } from './lib/log.ts';
+import { runInRequestContext } from './lib/tenant-context.ts';
+import { authRoutes } from './modules/auth/routes.ts';
+import { AuthService } from './modules/auth/service.ts';
+import { availabilityAdminRoutes } from './modules/availability/routes.admin.ts';
+import { bookingAdminRoutes } from './modules/bookings/routes.admin.ts';
+import { customerAdminRoutes } from './modules/customers/routes.admin.ts';
+import { locationAdminRoutes } from './modules/locations/routes.admin.ts';
+import { notificationAdminRoutes } from './modules/notifications/routes.admin.ts';
+import { professionalAdminRoutes } from './modules/professionals/routes.admin.ts';
+import { createTelegramBot, type TelegramBot } from './modules/notifications/telegram.ts';
+import { operatorRoutes } from './modules/ops/operator.ts';
+import { publicRoutes } from './modules/public/routes.ts';
+import { scheduleAdminRoutes } from './modules/schedule/routes.admin.ts';
+import { serviceAdminRoutes } from './modules/services/routes.admin.ts';
+import { tenantAdminRoutes } from './modules/tenants/routes.admin.ts';
+import { userAdminRoutes } from './modules/users/routes.admin.ts';
+import { registerAuth, requireAuth, sameOriginGuard } from './plugins/auth.ts';
+import { registerErrorHandler } from './plugins/error-handler.ts';
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    /** Todas las rutas registradas (método + URL). Lo usan los tests de permisos para no olvidar ninguna. */
+    routeList: RouteInfo[];
+  }
+}
+
+/** Ruta registrada con sus esquemas de entrada (para los tests de matriz y de campos sensibles). */
+export interface RouteInfo {
+  method: string;
+  url: string;
+  schema?: { body?: unknown; querystring?: unknown; params?: unknown };
+}
+
+export interface AppDeps {
+  config: Config;
+  db: Db;
+  /** Reloj inyectable para los tests (sesiones, disponibilidad). */
+  now?: () => Date;
+  /** Bot de Telegram compartido con el worker; por defecto se crea desde TELEGRAM_BOT_TOKEN. */
+  telegram?: TelegramBot | null;
+  /** Destino de los logs (los tests lo capturan); por defecto stdout. */
+  logStream?: { write(line: string): void };
+}
+
+/** Construye la aplicación sin escuchar en ningún puerto (los tests usan app.inject()). */
+export async function buildApp({ config, db, now = () => new Date(), logStream, telegram = createTelegramBot(config) }: AppDeps): Promise<FastifyInstance> {
+  const app = Fastify({
+    trustProxy: config.TRUST_PROXY,
+    bodyLimit: 16 * 1024,
+    genReqId: () => randomUUID(),
+    logger:
+      config.LOG_LEVEL === 'silent'
+        ? false
+        : {
+            level: config.LOG_LEVEL,
+            redact: ['req.headers.cookie', 'req.headers.authorization', 'res.headers["set-cookie"]'],
+            serializers: { req: serializeRequest },
+            ...(logStream ? { stream: logStream } : {}),
+          },
+  }).withTypeProvider<ZodTypeProvider>();
+
+  // Primer hook: cada petición tiene su propio contexto de negocio (RLS), vacío hasta resolver la sesión
+  // o el slug público.
+  app.addHook('onRequest', (_request, _reply, done) => runInRequestContext(done));
+
+  // Detrás de un proxy sin TRUST_PROXY, todos los visitantes comparten la IP del proxy (y los límites de
+  // intentos se agotan entre todos). Se avisa una vez, con la IP que habría que declarar.
+  if (!config.TRUST_PROXY) {
+    let warned = false;
+    app.addHook('onRequest', (request, _reply, done) => {
+      if (!warned && request.headers['x-forwarded-for']) {
+        warned = true;
+        request.log.warn(
+          { proxyAddress: request.ip },
+          'Las peticiones llegan a través de un proxy (X-Forwarded-For) con TRUST_PROXY=false: todos los visitantes comparten la IP del proxy. Configura TRUST_PROXY con la IP/rango de proxyAddress (docs/DEPLOYMENT.md §4, paso 5).',
+        );
+      }
+      done();
+    });
+  }
+
+  const routeList: RouteInfo[] = [];
+  app.decorate('routeList', routeList);
+  app.addHook('onRoute', (r) => {
+    for (const method of Array.isArray(r.method) ? r.method : [r.method]) if (method !== 'HEAD') routeList.push({ method, url: r.url, schema: r.schema });
+  });
+
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
+  // Solo JSON: text/plain es una petición "simple" que un sitio ajeno podría enviar sin preflight (CSRF).
+  app.removeContentTypeParser('text/plain');
+
+  const adminDist = resolve(config.ADMIN_DIST_DIR ?? join(import.meta.dirname, '../../admin/dist'));
+  const serveAdmin = existsSync(join(adminDist, 'index.html'));
+  registerErrorHandler(app, { spaFallback: serveAdmin });
+  await app.register(helmet, { global: true });
+  await app.register(cookie);
+  await app.register(rateLimit, { global: false });
+  registerAuth(app, { db, now });
+
+  if (serveAdmin) {
+    // Panel React en el mismo origen que la API (un solo despliegue). Los assets llevan hash en el
+    // nombre: caché larga; index.html nunca se cachea para que un despliegue nuevo se vea al instante.
+    await app.register(fastifyStatic, {
+      root: adminDist,
+      prefix: '/',
+      index: 'index.html',
+      wildcard: false,
+      setHeaders: (res, path) => {
+        res.header('cache-control', path.startsWith(join(adminDist, 'assets')) ? 'public, max-age=31536000, immutable' : 'no-cache');
+      },
+    });
+  }
+
+  app.get('/healthz', async () => ({ status: 'ok' }));
+  app.get('/readyz', async (_request, reply) => {
+    try {
+      await db.$queryRaw`SELECT 1`;
+      return { status: 'ok' };
+    } catch {
+      return reply.status(503).send({ status: 'unavailable' });
+    }
+  });
+
+  const auth = new AuthService(db, new FailureLimiter(5, 15 * 60 * 1000, () => now().getTime()), now);
+  await app.register(
+    async (scope) => {
+      // Rutas con cookie de sesión (panel): protección CSRF por origen. No se aplica a /public.
+      await scope.register(async (session) => {
+        session.addHook('onRequest', sameOriginGuard);
+        await session.register(authRoutes, { prefix: '/auth', auth, cookieSecure: config.COOKIE_SECURE });
+        await session.register(
+          async (admin) => {
+            admin.addHook('onRequest', requireAuth);
+            await admin.register(tenantAdminRoutes, { db, telegram, now });
+            await admin.register(serviceAdminRoutes, { db });
+            await admin.register(professionalAdminRoutes, { db, now });
+            await admin.register(locationAdminRoutes, { db, now });
+            await admin.register(scheduleAdminRoutes, { db, now });
+            await admin.register(customerAdminRoutes, { db });
+            await admin.register(bookingAdminRoutes, { db, now });
+            await admin.register(availabilityAdminRoutes, { db, now });
+            await admin.register(userAdminRoutes, { db });
+            await admin.register(notificationAdminRoutes, { db });
+          },
+          { prefix: '/admin' },
+        );
+      });
+      // API pública: las páginas generadas pueden abrirse desde cualquier dominio o desde file://
+      // (Origin: null). Sin cookies ni credenciales, así que '*' no expone ninguna sesión.
+      await scope.register(
+        async (pub) => {
+          await pub.register(cors, {
+            origin: '*',
+            methods: ['GET', 'POST', 'OPTIONS'],
+            allowedHeaders: ['Content-Type', 'Idempotency-Key'],
+            exposedHeaders: ['Idempotent-Replayed', 'Retry-After'],
+            credentials: false,
+            maxAge: 600,
+          });
+          await pub.register(publicRoutes, { db, now });
+        },
+        { prefix: '/public' },
+      );
+    },
+    { prefix: '/api/v1' },
+  );
+
+  // Alta de negocios desde el navegador, solo si el operador definió OPERATOR_TOKEN.
+  if (config.OPERATOR_TOKEN) await app.register(operatorRoutes, { db, token: config.OPERATOR_TOKEN });
+
+  return app;
+}

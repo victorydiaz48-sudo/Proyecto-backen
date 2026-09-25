@@ -1,0 +1,12 @@
+{
+  // Compilación de producción: src/ → dist/ en JavaScript (las importaciones .ts se reescriben a .js).
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "rewriteRelativeImportExtensions": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "sourceMap": true
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,376 @@
+// Esquema de la plataforma de reservas multi-tenant.
+// Convenciones (ver docs/DATABASE.md):
+// - Todo modelo de negocio lleva tenantId y @@unique([tenantId, id]) para que las relaciones usen
+//   claves foráneas compuestas: la BD impide mezclar filas de tenants distintos.
+// - Instantes en UTC (timestamptz). Horas del día en minutos desde medianoche, en la zona del tenant.
+// - Dinero en céntimos (Int).
+// - Lo que Prisma no sabe expresar (exclusion constraint, CHECKs, índices parciales) vive en SQL
+//   dentro de las migraciones; test/db-constraints.test.ts comprueba que sigue existiendo.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum Role {
+  ADMIN
+  PROFESSIONAL
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum BookingSource {
+  PUBLIC_WEB
+  ADMIN
+  PROFESSIONAL
+}
+
+enum AuditActorType {
+  USER
+  PUBLIC
+  SYSTEM
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  /// Ya no procede (p. ej. recordatorio de una cita cancelada o movida).
+  CANCELLED
+}
+
+enum NotificationAudience {
+  CUSTOMER
+  BUSINESS
+}
+
+model Tenant {
+  id                    String        @id @default(uuid()) @db.Uuid
+  slug                  String        @unique
+  name                  String
+  timezone              String
+  defaultCountryCode    String
+  currency              String        @db.Char(3)
+  locale                String
+  slotIntervalMinutes   Int           @default(15)
+  defaultBookingStatus  BookingStatus @default(CONFIRMED)
+  bookingLeadMinutes    Int           @default(60)
+  bookingHorizonDays    Int           @default(60)
+  status                TenantStatus  @default(ACTIVE)
+  /// Avisos del negocio por Telegram: chat conectado desde el panel (enlace de un solo uso).
+  telegramChatId        String?
+  telegramLinkedAt      DateTime?     @db.Timestamptz(3)
+  /// Hash del código del enlace de conexión (el código en claro solo va en el enlace) y su caducidad.
+  telegramLinkTokenHash String?       @unique
+  telegramLinkExpiresAt DateTime?     @db.Timestamptz(3)
+  createdAt             DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime      @updatedAt @db.Timestamptz(3)
+
+  locations            Location[]
+  users                User[]
+  professionals        Professional[]
+  services             Service[]
+  professionalServices ProfessionalService[]
+  workingHours         WorkingHour[]
+  timeBlocks           TimeBlock[]
+  customers            Customer[]
+  bookings             Booking[]
+  auditLogs            AuditLog[]
+  notifications        NotificationOutbox[]
+  idempotencyKeys      IdempotencyKey[]
+}
+
+model Location {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  address   String?
+  mapsUrl   String?
+  whatsapp  String?
+  isDefault Boolean  @default(false)
+  active    Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workingHours WorkingHour[]
+  timeBlocks   TimeBlock[]
+  bookings     Booking[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId])
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  tenantId     String    @db.Uuid
+  email        String
+  passwordHash String
+  role         Role
+  active       Boolean   @default(true)
+  lastLoginAt  DateTime? @db.Timestamptz(3)
+  createdAt    DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime  @updatedAt @db.Timestamptz(3)
+
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professional      Professional?
+  sessions          Session[]
+  createdTimeBlocks TimeBlock[]
+  createdBookings   Booking[]
+  auditLogs         AuditLog[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, email])
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  tokenHash  String   @unique
+  expiresAt  DateTime @db.Timestamptz(3)
+  lastSeenAt DateTime @default(now()) @db.Timestamptz(3)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+  ip         String?
+  userAgent  String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Professional {
+  id          String   @id @default(uuid()) @db.Uuid
+  tenantId    String   @db.Uuid
+  userId      String?  @unique @db.Uuid
+  displayName String
+  title       String?
+  bio         String?
+  photoUrl    String?
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user         User?                 @relation(fields: [tenantId, userId], references: [tenantId, id], onDelete: Restrict)
+  services     ProfessionalService[]
+  workingHours WorkingHour[]
+  timeBlocks   TimeBlock[]
+  bookings     Booking[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, userId])
+  @@index([tenantId])
+}
+
+model Service {
+  id                 String   @id @default(uuid()) @db.Uuid
+  tenantId           String   @db.Uuid
+  name               String
+  description        String?
+  category           String?
+  durationMinutes    Int
+  bufferAfterMinutes Int      @default(0)
+  priceCents         Int
+  active             Boolean  @default(true)
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant        Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professionals ProfessionalService[]
+  bookings      Booking[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId])
+}
+
+model ProfessionalService {
+  tenantId       String   @db.Uuid
+  professionalId String   @db.Uuid
+  serviceId      String   @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [tenantId, professionalId], references: [tenantId, id], onDelete: Cascade)
+  service      Service      @relation(fields: [tenantId, serviceId], references: [tenantId, id], onDelete: Cascade)
+
+  @@id([professionalId, serviceId])
+  @@index([tenantId, serviceId])
+}
+
+model WorkingHour {
+  id             String   @id @default(uuid()) @db.Uuid
+  tenantId       String   @db.Uuid
+  professionalId String   @db.Uuid
+  locationId     String   @db.Uuid
+  /// 0 = domingo … 6 = sábado (igual que Date.getDay() y el generador)
+  weekday        Int      @db.SmallInt
+  /// minutos desde medianoche en la zona del tenant, [startMinute, endMinute)
+  startMinute    Int      @db.SmallInt
+  endMinute      Int      @db.SmallInt
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant       Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professional Professional @relation(fields: [tenantId, professionalId], references: [tenantId, id], onDelete: Cascade)
+  location     Location     @relation(fields: [tenantId, locationId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, professionalId, weekday])
+}
+
+model TimeBlock {
+  id              String   @id @default(uuid()) @db.Uuid
+  tenantId        String   @db.Uuid
+  /// null = bloquea a todos los profesionales (del local indicado, o de todo el tenant)
+  professionalId  String?  @db.Uuid
+  locationId      String?  @db.Uuid
+  startAt         DateTime @db.Timestamptz(3)
+  endAt           DateTime @db.Timestamptz(3)
+  reason          String?
+  createdByUserId String?  @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  professional Professional? @relation(fields: [tenantId, professionalId], references: [tenantId, id], onDelete: Cascade)
+  location     Location?     @relation(fields: [tenantId, locationId], references: [tenantId, id], onDelete: Cascade)
+  createdBy    User?         @relation(fields: [tenantId, createdByUserId], references: [tenantId, id], onDelete: Restrict)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, professionalId, startAt])
+  @@index([tenantId, startAt])
+}
+
+model Customer {
+  id        String   @id @default(uuid()) @db.Uuid
+  tenantId  String   @db.Uuid
+  name      String
+  /// E.164, p. ej. +5541998765432
+  phoneE164 String
+  email     String?
+  notes     String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@unique([tenantId, id])
+  @@unique([tenantId, phoneE164])
+}
+
+model Booking {
+  id                      String        @id @default(uuid()) @db.Uuid
+  tenantId                String        @db.Uuid
+  locationId              String        @db.Uuid
+  professionalId          String        @db.Uuid
+  serviceId               String        @db.Uuid
+  customerId              String        @db.Uuid
+  startAt                 DateTime      @db.Timestamptz(3)
+  endAt                   DateTime      @db.Timestamptz(3)
+  status                  BookingStatus
+  serviceNameSnapshot     String
+  priceCentsSnapshot      Int
+  durationMinutesSnapshot Int
+  currencySnapshot        String        @db.Char(3)
+  customerNotes           String?
+  source                  BookingSource
+  createdByUserId         String?       @db.Uuid
+  cancelledAt             DateTime?     @db.Timestamptz(3)
+  cancelReason            String?
+  /// hash del token para que el cliente gestione su cita (endpoints en una fase posterior)
+  manageTokenHash         String?       @unique
+  createdAt               DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime      @updatedAt @db.Timestamptz(3)
+
+  tenant        Tenant               @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  location      Location             @relation(fields: [tenantId, locationId], references: [tenantId, id], onDelete: Restrict)
+  professional  Professional         @relation(fields: [tenantId, professionalId], references: [tenantId, id], onDelete: Restrict)
+  service       Service              @relation(fields: [tenantId, serviceId], references: [tenantId, id], onDelete: Restrict)
+  customer      Customer             @relation(fields: [tenantId, customerId], references: [tenantId, id], onDelete: Restrict)
+  createdBy     User?                @relation(fields: [tenantId, createdByUserId], references: [tenantId, id], onDelete: Restrict)
+  notifications NotificationOutbox[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, professionalId, startAt])
+  @@index([tenantId, startAt])
+  @@index([tenantId, customerId])
+}
+
+model AuditLog {
+  id          String         @id @default(uuid()) @db.Uuid
+  tenantId    String         @db.Uuid
+  actorType   AuditActorType
+  actorUserId String?        @db.Uuid
+  action      String
+  entityType  String
+  entityId    String?
+  before      Json?
+  after       Json?
+  ip          String?
+  requestId   String?
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor  User?  @relation(fields: [tenantId, actorUserId], references: [tenantId, id], onDelete: Restrict)
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([tenantId, entityType, entityId])
+}
+
+model NotificationOutbox {
+  id            String               @id @default(uuid()) @db.Uuid
+  tenantId      String               @db.Uuid
+  bookingId     String?              @db.Uuid
+  channel       String
+  audience      NotificationAudience
+  template      String
+  payload       Json
+  status        NotificationStatus   @default(PENDING)
+  attempts      Int                  @default(0)
+  nextAttemptAt DateTime             @default(now()) @db.Timestamptz(3)
+  lastError     String?
+  sentAt        DateTime?            @db.Timestamptz(3)
+  createdAt     DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime             @updatedAt @db.Timestamptz(3)
+
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  booking Booking? @relation(fields: [tenantId, bookingId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([tenantId, bookingId])
+  @@index([tenantId, createdAt(sort: Desc)])
+}
+
+model IdempotencyKey {
+  tenantId       String   @db.Uuid
+  key            String
+  requestHash    String
+  responseStatus Int
+  responseBody   Json
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([tenantId, key])
+  @@index([createdAt])
+}

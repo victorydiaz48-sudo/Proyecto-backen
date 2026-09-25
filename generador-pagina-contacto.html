@@ -250,6 +250,11 @@ const PAGE={
     bkName:'Nome',bkPhone:'Telefone',bkService:'Serviço',bkPro:'Profissional',bkProAny:'Sem preferência',bkDate:'Data',bkTime:'Horário',bkNotes:'Observações',bkNotesPh:'Alguma preferência ou observação (opcional)',
     bkPick:'Selecione',bkContinue:'Continuar',bkBack:'Voltar',bkWa:'Continuar no WhatsApp',
     bkReview:'Confira os dados antes de continuar',bkErrReq:'Preencha este campo.',bkErrPhone:'Telefone inválido.',bkErrDate:'Escolha uma data válida.',
+    akLoc:'Unidade',akAnyLoc:'Qualquer unidade',akSlot:'Horários disponíveis',akLoading:'Carregando horários…',akPickFirst:'Escolha o serviço e a data para ver os horários.',
+    akNoSlots:'Não há horários livres neste dia. Tente outra data.',akSlotsError:'Não foi possível carregar os horários. Tente de novo.',akErrSlot:'Escolha um horário.',
+    akConfirm:'Confirmar agendamento',akSending:'Confirmando…',akDoneT:'Agendamento confirmado!',akReceivedT:'Pedido recebido! O estabelecimento vai confirmar.',
+    akNotifyWa:'Avisar pelo WhatsApp (opcional)',akClose:'Fechar',akTaken:'Esse horário não está mais disponível. Escolha outro:',
+    akNetError:'Não foi possível confirmar agora: o agendamento NÃO foi feito. Tente de novo ou peça pelo WhatsApp.',akUnavailable:'O agendamento on-line não está disponível agora.',
     bkMsg1:'Olá! Gostaria de agendar um atendimento.',bkMsg2:'Aguardo confirmação. Obrigado!',
     bkLName:'Nome',bkLPhone:'Telefone',bkLService:'Serviço',bkLPro:'Profissional',bkLDate:'Data',bkLTime:'Horário',bkLNotes:'Observações',
     waMsg:'Olá! Vim pelo QR Code.',logoAlt:'Logotipo de ',metaDef:' — contato, WhatsApp, endereço e redes sociais.',
@@ -275,6 +280,11 @@ const PAGE={
     bkName:'Nombre',bkPhone:'Teléfono',bkService:'Servicio',bkPro:'Profesional',bkProAny:'Sin preferencia',bkDate:'Fecha',bkTime:'Hora',bkNotes:'Notas',bkNotesPh:'Alguna preferencia u observación (opcional)',
     bkPick:'Selecciona',bkContinue:'Continuar',bkBack:'Volver',bkWa:'Continuar por WhatsApp',
     bkReview:'Revisa los datos antes de continuar',bkErrReq:'Completa este campo.',bkErrPhone:'Teléfono no válido.',bkErrDate:'Elige una fecha válida.',
+    akLoc:'Local',akAnyLoc:'Cualquier local',akSlot:'Horas disponibles',akLoading:'Cargando horas…',akPickFirst:'Elige el servicio y la fecha para ver las horas.',
+    akNoSlots:'No hay horas libres este día. Prueba otra fecha.',akSlotsError:'No se pudieron cargar las horas. Inténtalo de nuevo.',akErrSlot:'Elige una hora.',
+    akConfirm:'Confirmar reserva',akSending:'Confirmando…',akDoneT:'¡Reserva confirmada!',akReceivedT:'¡Solicitud recibida! El negocio la confirmará.',
+    akNotifyWa:'Avisar por WhatsApp (opcional)',akClose:'Cerrar',akTaken:'Esa hora ya no está disponible. Elige otra:',
+    akNetError:'No se pudo confirmar ahora: la reserva NO se ha hecho. Inténtalo de nuevo o pídela por WhatsApp.',akUnavailable:'La reserva en línea no está disponible ahora.',
     bkMsg1:'¡Hola! Me gustaría reservar una cita.',bkMsg2:'Quedo atento/a a la confirmación. ¡Gracias!',
     bkLName:'Nombre',bkLPhone:'Teléfono',bkLService:'Servicio',bkLPro:'Profesional',bkLDate:'Fecha',bkLTime:'Hora',bkLNotes:'Notas',
     waMsg:'¡Hola! Vengo del código QR.',logoAlt:'Logotipo de ',metaDef:' — contacto, WhatsApp, dirección y redes sociales.',
@@ -360,8 +370,9 @@ const DEF={nombre:'',cat:'general',ciudad:'',desc:'',lang:'pt',
   dir:'',mapsUrl:'',tz:'America/Sao_Paulo',hd0:'',hd1:'',hd2:'',hd3:'',hd4:'',hd5:'',hd6:'',horario:'',
   color:'#0f766e',bg:'#ffffff',floatWa:true,
   canonical:'',ogImage:'',credito:'',
-  logo:'',logoBg:'light',logoDom:'',logoMeta:'',logoFrame:'auto',photo:'',photoDom:'',photoMeta:'',photoTiny:'',photoFit:'auto'};
-const MAX={nombre:80,ciudad:60,desc:200,ctaText:40,ctaUrl:1000,wa:40,waMsg:300,tel:40,email:120,ig:200,fb:400,tiktok:200,youtube:400,linkedin:400,web:400,l1t:40,l1u:1000,l2t:40,l2u:1000,review:1000,servicios:2400,zona:120,team:400,locName:40,locations:1400,dir:200,mapsUrl:1000,horario:300,canonical:300,ogImage:500,credito:120};
+  logo:'',logoBg:'light',logoDom:'',logoMeta:'',logoFrame:'auto',photo:'',photoDom:'',photoMeta:'',photoTiny:'',photoFit:'auto',
+  apiUrl:'',apiSlug:''};
+const MAX={nombre:80,ciudad:60,desc:200,ctaText:40,ctaUrl:1000,wa:40,waMsg:300,tel:40,email:120,ig:200,fb:400,tiktok:200,youtube:400,linkedin:400,web:400,l1t:40,l1u:1000,l2t:40,l2u:1000,review:1000,servicios:2400,zona:120,team:400,locName:40,locations:1400,dir:200,mapsUrl:1000,horario:300,canonical:300,ogImage:500,credito:120,apiUrl:300,apiSlug:60};
 
 const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 const enc=s=>{try{return encodeURIComponent(s);}catch(e){return '';}};
@@ -572,6 +583,18 @@ function parseUrl(raw){
   if(!/^https?:$/.test(u.protocol)||u.username||u.password)return {bad:1};
   if(!/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{1,62}$/i.test(u.hostname))return {bad:1};
   return {ok:true,href:s,host:u.hostname.replace(/^www\./i,'')};
+}
+/* Reservas en línea (opcional): URL del backend + identificador (slug) del negocio. https obligatorio,
+   salvo http://localhost para probar en local. Sin estos dos campos la página funciona como siempre. */
+const API_SLUG_RE=/^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$/;
+function parseApiUrl(raw){
+  const s=String(raw==null?'':raw).trim();
+  if(!s)return {empty:true};
+  let u;
+  try{u=new URL(s);}catch(e){return {bad:1};}
+  const local=/^(localhost|127\.0\.0\.1)$/.test(u.hostname);
+  if(u.username||u.password||u.search||u.hash||!(u.protocol==='https:'||(u.protocol==='http:'&&local)))return {bad:1};
+  return {ok:true,base:(u.origin+u.pathname).replace(/\/+$/,'')};
 }
 const IG_RES={p:1,reel:1,reels:1,stories:1,explore:1,tv:1,accounts:1,direct:1,about:1,web:1};
 function parseIg(raw){
@@ -1046,6 +1069,12 @@ function analyze(raw){
   if(rv.bad)add('review','warn');
   else if(rv.ok)rev={k:'rev',href:rv.href,t:T.rev,s:T.revSub,src:'review'};
 
+  const apiU=parseApiUrl(d.apiUrl),apiSlug=d.apiSlug.toLowerCase();
+  const api=(apiU.ok&&API_SLUG_RE.test(apiSlug))?{base:apiU.base,slug:apiSlug}:null;
+  if(d.apiUrl||d.apiSlug){
+    if(!apiU.ok)add('apiUrl','warn',apiU.bad?'apiUrl':'apiUrl_empty');
+    if(!API_SLUG_RE.test(apiSlug))add('apiSlug','warn',d.apiSlug?'apiSlug':'apiSlug_empty');
+  }
   const services=(()=>{let cat='';return d.servicios.split('\n').map(x=>x.trim()).filter(Boolean).slice(0,120).map(l=>{
     const cm=/^##\s*(.+)/.exec(l);
     if(cm){cat=clean(cm[1],40);return null;}
@@ -1090,7 +1119,7 @@ function analyze(raw){
     if(k==='maps')return place?{k:'map',href:place.href,t:o||T.map,src:'maps'}:null;
     if(k==='review')return rev?{k:'rev',href:rev.href,t:o||T.rev,src:'review'}:null;
     if(k==='l1')return LL[1]?{k:'link',href:LL[1].href,t:o||LL[1].label||(grp.l1?grp.l1[L]:T.ctaLink),src:'l1'}:null;
-    if(k==='book')return (R.wa&&services.length)?{k:'book',href:'',t:o||T.book,src:'book'}:null;
+    if(k==='book')return ((R.wa&&services.length)||api)?{k:'book',href:'',t:o||T.book,src:'book'}:null;
     if(k==='menu')return (R.wa&&services.length)?{k:'menu',href:'#hv',t:o||T.cart,src:'menu'}:null;
     if(k==='link'){const u=parseUrl(d.ctaUrl);return u.ok?{k:'link',href:u.href,t:o||T.ctaLink,src:'link'}:null;}
     return null;
@@ -1181,7 +1210,7 @@ function analyze(raw){
   return {
     d:d,T:T,name:name,shown:shown,des:des,th:des.tk,iss:iss,
     kind:[catLabel,city].filter(Boolean).join(' · '),
-    cta:cta,quick:quickFinal,sample:sampleHits(d),waHref:R.wa?R.wa.href:'',waNum:waNum,contact:contactFinal,socials:socials,place:place,extras:extras,services:services,featured:featured,menuCats:menuCats,cartOn:cartOn,orderModes:orderModes,team:team,gallery:d.gallery,zone:d.zona,hours:hours,locations:locations,order:cp.o,
+    cta:cta,api:api,quick:quickFinal,sample:sampleHits(d),waHref:R.wa?R.wa.href:'',waNum:waNum,contact:contactFinal,socials:socials,place:place,extras:extras,services:services,featured:featured,menuCats:menuCats,cartOn:cartOn,orderModes:orderModes,team:team,gallery:d.gallery,zone:d.zona,hours:hours,locations:locations,order:cp.o,
     canonical:cn.ok?cn.href:'',ogUrl:ogUrl,
     facts:{tel:telNum||(waNum?'+'+waNum:''),email:e.ok?e.addr:'',web:wb.ok?wb.href:'',same:same,map:mp.ok?mp.href:'',dir:dir,city:city},
     vcard:buildVcard({name:shown,wa:waNum,tel:telNum,email:e.ok?e.addr:'',web:wb.ok?wb.href:'',dir:dir,city:city}),
@@ -1546,6 +1575,261 @@ function cardRuntime(R,C){
   return function(){for(var i=0;i<timers.length;i++)clearInterval(timers[i]);for(var j=0;j<obs.length;j++)obs[j].disconnect();};
 }
 
+/* ============ Reserva conectada al backend (solo en páginas con URL de la API y slug) ============ */
+/* ES5 a propósito, como cardRuntime. Se añade a la página únicamente si el negocio configuró el backend.
+   No modifica cardRuntime: si la API no responde al abrir el formulario, la página sigue exactamente con
+   el flujo de WhatsApp de siempre. Con la API disponible, el backend es la fuente de verdad: servicios,
+   profesionales, locales y horas reales; la cita se crea en el servidor (precio y duración los decide él)
+   y WhatsApp queda como aviso opcional al final. Nunca se ofrecen horas inventadas. */
+function bookingApiRuntime(R,C){
+  var cfg=C.book,A=cfg&&cfg.api;
+  if(!A||C.preview)return;
+  function q(s){return R.querySelector(s);}
+  var bk=q('#bkDlg'),form=q('#bkForm');
+  if(!bk||!form)return;
+  var L=A.l,base=A.base+'/api/v1/public/'+encodeURIComponent(A.slug);
+  var review=q('#bkReview'),sum=q('#bkSum'),go=q('#bkGo'),confirmBtn=q('#bkConfirm'),done=q('#bkDone'),msg=q('#bkMsg');
+  var slotWrap=q('.bkf[data-f="slot"]'),slotsEl=q('#bkSlots'),locWrap=q('.bkf[data-f="loc"]'),locEl=q('#bkLoc');
+  var timeWrap=q('.bkf[data-f="time"]'),dateEl=q('#bkDate'),svcEl=q('#bkService'),proEl=q('#bkPro');
+  var st={mode:'idle',tenant:null,services:[],pros:[],locPros:null,slot:null,key:'',seq:0,busy:false};
+
+  function ajax(method,path,body,headers,cb){
+    var x,fired=false;
+    function fin(s,j){if(!fired){fired=true;cb(s,j);}}
+    try{
+      x=new XMLHttpRequest();
+      x.open(method,base+path,true);
+      x.timeout=10000;
+      if(body)x.setRequestHeader('Content-Type','application/json');
+      for(var h in headers)if(Object.prototype.hasOwnProperty.call(headers,h))x.setRequestHeader(h,headers[h]);
+      x.onload=function(){var j=null;try{j=JSON.parse(x.responseText);}catch(e){}fin(x.status,j);};
+      x.onerror=function(){fin(0,null);};
+      x.ontimeout=function(){fin(0,null);};
+      x.send(body?JSON.stringify(body):null);
+    }catch(e){fin(0,null);}
+  }
+  function setMsg(t,err){if(!msg)return;msg.textContent=t||'';msg.hidden=!t;msg.className='bkmsg'+(err?' err':'');}
+  function opt(v,l,dis){var o=document.createElement('option');o.value=v;o.textContent=l;if(dis){o.disabled=true;o.selected=true;}return o;}
+  function note(t){var p=document.createElement('p');p.className='bknote';p.textContent=t;return p;}
+  function fresh(el){var c=el.cloneNode(false);el.parentNode.replaceChild(c,el);return c;}
+  function money(c,cur){try{return new Intl.NumberFormat(A.locale,{style:'currency',currency:cur}).format(c/100);}catch(e){return (c/100).toFixed(2)+' '+cur;}}
+  function dmy(d){var p=d.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:d;}
+  function addDays(d,n){var p=d.split('-'),t=new Date(Date.UTC(+p[0],+p[1]-1,+p[2]+n));return t.getUTCFullYear()+'-'+('0'+(t.getUTCMonth()+1)).slice(-2)+'-'+('0'+t.getUTCDate()).slice(-2);}
+  function newKey(){var s='web-',c='abcdefghijklmnopqrstuvwxyz0123456789';for(var i=0;i<24;i++)s+=c.charAt(Math.floor(Math.random()*c.length));return s;}
+  function setErr(id,t){
+    var f=R.querySelector('.bkf[data-f="'+id+'"]'),e=q('#bk'+id.charAt(0).toUpperCase()+id.slice(1)+'-e');
+    if(f)f.classList.toggle('err',!!t);
+    if(e){e.textContent=t||'';e.hidden=!t;}
+  }
+  function openDlg(){try{typeof bk.showModal==='function'?bk.showModal():bk.setAttribute('open','');}catch(e){bk.setAttribute('open','');}}
+  function closeDlg(){try{typeof bk.close==='function'?bk.close():bk.removeAttribute('open');}catch(e){bk.removeAttribute('open');}}
+
+  /* Carga inicial (al abrir el formulario la primera vez): negocio, servicios y profesionales. */
+  function load(){
+    st.mode='loading';setMsg(L.loading);
+    var got=0,fail=false,res={};
+    function part(k,path){
+      ajax('GET',path,null,{},function(s,j){
+        if(s!==200||!j)fail=true;
+        res[k]=j;
+        if(++got===3)ready(fail,res);
+      });
+    }
+    part('t','');part('s','/services');part('p','/professionals');
+  }
+  function ready(fail,res){
+    if(fail){
+      /* Sin backend: si hay WhatsApp, el formulario sigue como siempre (nada que hacer); si no, se avisa. */
+      st.mode='off';
+      if(cfg.wa)setMsg('');
+      else{setMsg(L.unavailable,true);var sb=form.querySelector('button[type="submit"]');if(sb)sb.disabled=true;}
+      return;
+    }
+    st.mode='on';setMsg('');
+    st.tenant=res.t;st.pros=res.p.items||[];
+    st.services=[];
+    for(var i=0;i<(res.s.items||[]).length;i++)if(res.s.items[i].bookable)st.services.push(res.s.items[i]);
+    /* Los selects se sustituyen por copias limpias: así no quedan los manejadores del modo WhatsApp. */
+    /* Si el cliente ya eligió un servicio en la lista de la página mientras cargaba, se mantiene (por nombre). */
+    var prevSvc=(svcEl.value||'').toLowerCase();
+    svcEl=fresh(svcEl);svcEl.appendChild(opt('',L.pick,true));
+    for(var k=0;k<st.services.length;k++){
+      var sv=st.services[k];
+      svcEl.appendChild(opt(sv.id,sv.name+' — '+money(sv.priceCents,sv.currency)+' · '+sv.durationMinutes+' min'));
+      if(prevSvc&&sv.name.toLowerCase()===prevSvc)svcEl.value=sv.id;
+    }
+    if(proEl){proEl=fresh(proEl);fillPros();}
+    var locs=st.tenant.locations||[];
+    if(locEl&&locWrap&&locs.length>1){
+      locEl.appendChild(opt('',L.anyLoc));
+      for(var l=0;l<locs.length;l++)locEl.appendChild(opt(locs[l].id,locs[l].name));
+      locWrap.hidden=false;
+      locEl.addEventListener('change',function(){
+        /* Solo los profesionales que trabajan en ese local (lo sabe el backend por su horario). */
+        st.locPros=null;
+        if(!locEl.value){fillPros();refreshSlots();return;}
+        var chosen=locEl.value;
+        ajax('GET','/professionals?locationId='+encodeURIComponent(chosen),null,{},function(s,j){
+          if(locEl.value!==chosen)return;
+          st.locPros=[];
+          if(s===200&&j&&j.items)for(var i=0;i<j.items.length;i++)st.locPros.push(j.items[i].id);
+          fillPros();refreshSlots();
+        });
+      });
+    }
+    if(dateEl){
+      dateEl.min=st.tenant.today;dateEl.max=addDays(st.tenant.today,st.tenant.bookingHorizonDays||60);
+      if(!dateEl.value||dateEl.value<dateEl.min)dateEl.value=st.tenant.today;
+      dateEl.addEventListener('change',refreshSlots);
+    }
+    if(timeWrap)timeWrap.hidden=true;
+    if(slotWrap)slotWrap.hidden=false;
+    svcEl.addEventListener('change',function(){fillPros();refreshSlots();});
+    if(proEl)proEl.addEventListener('change',refreshSlots);
+    refreshSlots();
+  }
+  function fillPros(){
+    if(!proEl)return;
+    var keep=proEl.value,sv=svcEl.value;
+    proEl.innerHTML='';proEl.appendChild(opt('',cfg.l.proAny));
+    for(var i=0;i<st.pros.length;i++){
+      var p=st.pros[i];
+      if(sv&&p.serviceIds.indexOf(sv)<0)continue;
+      if(st.locPros&&st.locPros.indexOf(p.id)<0)continue;
+      proEl.appendChild(opt(p.id,p.title?p.displayName+' — '+p.title:p.displayName));
+      if(p.id===keep)proEl.value=keep;
+    }
+  }
+  function renderSlots(list,withDate){
+    for(var i=0;i<list.length;i++)(function(s){
+      var b=document.createElement('button');
+      b.type='button';b.className='bkslot';b.setAttribute('aria-pressed','false');
+      b.textContent=(withDate&&s.localDate!==dateEl.value?dmy(s.localDate)+' ':'')+s.localTime;
+      b.addEventListener('click',function(){
+        st.slot=s;
+        if(s.localDate&&s.localDate!==dateEl.value)dateEl.value=s.localDate;
+        var all=slotsEl.querySelectorAll('.bkslot');
+        for(var k=0;k<all.length;k++)all[k].setAttribute('aria-pressed','false');
+        b.setAttribute('aria-pressed','true');
+        setErr('slot','');
+      });
+      slotsEl.appendChild(b);
+    })(list[i]);
+  }
+  function refreshSlots(){
+    st.slot=null;slotsEl.innerHTML='';setErr('slot','');
+    var sv=svcEl.value,dt=dateEl.value;
+    if(!sv||!dt){slotsEl.appendChild(note(L.pickFirst));return;}
+    var my=++st.seq;
+    slotsEl.appendChild(note(L.loading));
+    var path='/availability?serviceId='+encodeURIComponent(sv)+'&professionalId='+encodeURIComponent(proEl&&proEl.value?proEl.value:'any')+'&date='+encodeURIComponent(dt)+(locEl&&locEl.value?'&locationId='+encodeURIComponent(locEl.value):'');
+    ajax('GET',path,null,{},function(s,j){
+      if(my!==st.seq)return;
+      slotsEl.innerHTML='';
+      if(s!==200||!j){slotsEl.appendChild(note(L.slotsError));return;}
+      var raw=(j.days&&j.days[0]&&j.days[0].slots)||[],list=[];
+      for(var i=0;i<raw.length;i++)list.push({localDate:dt,localTime:raw[i].localTime,locationId:raw[i].locationId});
+      if(!list.length){slotsEl.appendChild(note(L.noSlots));return;}
+      renderSlots(list,false);
+    });
+  }
+  function selText(el){return el&&el.selectedOptions&&el.selectedOptions[0]?el.selectedOptions[0].textContent:'';}
+  function waLines(){
+    var name=q('#bkName').value.trim(),phone=q('#bkPhone').value.trim(),notes=q('#bkNotes').value.trim(),pro=proEl&&proEl.value?selText(proEl):'';
+    var lines=[cfg.msg1,'','*'+cfg.name+'*','',cfg.l.name+': '+name,cfg.l.phone+': '+phone,cfg.l.service+': '+selText(svcEl)];
+    if(pro)lines.push(cfg.l.pro+': '+pro);
+    lines.push(cfg.l.date+': '+dmy(dateEl.value));lines.push(cfg.l.time+': '+(st.slot?st.slot.localTime:''));
+    if(notes)lines.push(cfg.l.notes+': '+notes);
+    lines.push('');lines.push(cfg.msg2);
+    return lines.join('\n');
+  }
+  function fillSum(el,rows){
+    el.innerHTML='';
+    for(var i=0;i<rows.length;i++){
+      var dt=document.createElement('dt');dt.textContent=rows[i][0];
+      var dd=document.createElement('dd');dd.textContent=rows[i][1];
+      el.appendChild(dt);el.appendChild(dd);
+    }
+  }
+
+  /* Enviar el formulario en modo conectado: se intercepta ANTES que el manejador del modo WhatsApp. */
+  R.addEventListener('submit',function(ev){
+    if(ev.target!==form||st.mode!=='on')return;
+    ev.preventDefault();ev.stopImmediatePropagation();
+    var name=q('#bkName').value.trim(),phone=q('#bkPhone').value.trim(),ok=true;
+    setErr('name',name?'':cfg.e.req);if(!name)ok=false;
+    if(!phone){setErr('phone',cfg.e.req);ok=false;}else if(phone.replace(/\D/g,'').length<8){setErr('phone',cfg.e.phone);ok=false;}else setErr('phone','');
+    setErr('service',svcEl.value?'':cfg.e.req);if(!svcEl.value)ok=false;
+    setErr('date',dateEl.value?'':cfg.e.req);if(!dateEl.value)ok=false;
+    setErr('slot',st.slot?'':L.errSlot);if(!st.slot)ok=false;
+    if(!ok){var bad=R.querySelector('.bkf.err input,.bkf.err select,.bkf.err .bkslot');if(bad)bad.focus();return;}
+    var rows=[[cfg.l.service,selText(svcEl)]];
+    if(proEl&&proEl.value)rows.push([cfg.l.pro,selText(proEl)]);
+    if(locEl&&locEl.value)rows.push([L.loc,selText(locEl)]);
+    rows.push([cfg.l.date,dmy(dateEl.value)]);rows.push([cfg.l.time,st.slot.localTime]);
+    fillSum(sum,rows);
+    st.key=newKey();setMsg('');
+    go.hidden=true;confirmBtn.hidden=false;confirmBtn.disabled=false;
+    form.hidden=true;review.hidden=false;
+    confirmBtn.focus();
+  },true);
+
+  confirmBtn.addEventListener('click',function(){
+    if(st.busy||!st.slot)return;
+    st.busy=true;confirmBtn.disabled=true;setMsg(L.sending);
+    var body={serviceId:svcEl.value,professionalId:proEl&&proEl.value?proEl.value:'any',date:dateEl.value,time:st.slot.localTime,
+      customer:{name:q('#bkName').value.trim(),phone:q('#bkPhone').value.trim()}};
+    if(st.slot.locationId)body.locationId=st.slot.locationId;
+    var notes=q('#bkNotes').value.trim();if(notes)body.notes=notes;
+    ajax('POST','/bookings',body,{'Idempotency-Key':st.key},function(s,j){
+      st.busy=false;confirmBtn.disabled=false;
+      var err=j&&j.error;
+      if(s===201&&j&&j.booking){showDone(j);return;}
+      if((s===409||s===422)&&err&&err.details&&err.details.reason){
+        /* La hora ya no vale: se vuelve al formulario con horas reales cercanas. Nunca se mueve sola. */
+        review.hidden=true;form.hidden=false;
+        setMsg(L.taken,true);
+        st.slot=null;slotsEl.innerHTML='';
+        var alts=err.details.alternatives||[];
+        if(alts.length)renderSlots(alts,true);else slotsEl.appendChild(note(L.noSlots));
+        return;
+      }
+      if(s===400||s===429){setMsg(err&&err.message?err.message:L.netError,true);return;}
+      /* Sin conexión o error del servidor: la cita NO está hecha. WhatsApp como alternativa explícita. */
+      setMsg(L.netError,true);
+      if(cfg.wa){go.href='https://wa.me/'+cfg.wa+'?text='+encodeURIComponent(waLines());go.hidden=false;}
+    });
+  });
+
+  function showDone(j){
+    var b=j.booking;
+    form.hidden=true;review.hidden=true;setMsg('');
+    q('#bkDoneT').textContent=b.status==='PENDING'?L.receivedT:L.doneT;
+    var rows=[[cfg.l.service,b.service.name+' — '+money(b.service.priceCents,b.service.currency)],[cfg.l.pro,b.professional.displayName]];
+    if(st.tenant&&st.tenant.locations&&st.tenant.locations.length>1)rows.push([L.loc,b.location.name]);
+    rows.push([cfg.l.date,dmy(b.localDate)]);rows.push([cfg.l.time,b.localTime]);
+    fillSum(q('#bkDoneSum'),rows);
+    var wa=q('#bkDoneWa');
+    if(j.whatsappUrl){wa.href=j.whatsappUrl;wa.hidden=false;}else wa.hidden=true;
+    done.hidden=false;
+    var x=q('#bkDoneX');if(x)x.focus();
+  }
+  var doneX=q('#bkDoneX');
+  if(doneX)doneX.addEventListener('click',function(){
+    closeDlg();
+    /* Una reserva nueva empieza de cero. */
+    done.hidden=true;form.hidden=false;review.hidden=true;form.reset();
+    if(st.mode==='on'){dateEl.value=st.tenant.today;fillPros();refreshSlots();}
+  });
+
+  var openers=R.querySelectorAll('[data-bkopen]');
+  for(var oi=0;oi<openers.length;oi++)openers[oi].addEventListener('click',function(){
+    if(!done.hidden){done.hidden=true;form.hidden=false;}
+    if(st.mode==='idle')load();
+    if(!bk.hasAttribute('open'))openDlg();
+  });
+}
+
 /* ============ Variables de diseño (cada personalidad ajusta variables, no reescribe estilos) ============ */
 const POS={auto:'50% 32%',top:'50% 8%',center:'50% 50%',bottom:'50% 92%'};
 const MONO={band:104,minimal:88,luxury:88,gradient:80,full:60,editorial:60};
@@ -1854,7 +2138,22 @@ ${P.prem?'.ph{filter:saturate(.94) contrast(1.03)}.kind{letter-spacing:.14em}.de
 ${P.sheen?'.cta{position:relative;overflow:hidden}.cta::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 38%,rgba(255,255,255,.28) 50%,transparent 62%);transform:translateX(-130%);transition:transform .9s ease;pointer-events:none}@media(hover:hover){.cta:hover::after{transform:translateX(130%)}}':''}
 @media(prefers-reduced-motion:reduce){.rv{animation:none}.pg *,.pg *::after{transition:none!important}}
 ${pv?(desk?deskCss(m,true)+'.pv .fab,.pv .topbar{display:none}':'.pv .fab{position:sticky;right:auto;bottom:16px;margin:-72px 16px 16px auto}.pv .topbar{position:sticky;top:0;margin-bottom:-56px;padding-top:0;height:56px}'):`@media(min-width:600px){${deskCss(m,false)}}`}`;
-  return css.replace(/\n\s*/g,'');
+  return (css+(m.api?apiCss():'')).replace(/\n\s*/g,'');
+}
+
+function apiCss(){
+  return `
+.bkf[hidden],.bkmsg[hidden],.bkba [hidden]{display:none}
+.bkmsg{margin:12px var(--pr) 0 var(--pl);padding:10px 14px;border-radius:12px;background:var(--surface-2);font-size:.875rem;line-height:1.4}
+.bkmsg.err{color:var(--off);border:1px solid var(--off)}
+.bkslots{display:flex;flex-wrap:wrap;gap:8px}
+.bkslot{min-height:44px;min-width:76px;padding:8px 12px;border-radius:calc(var(--c-r)*.5 + 4px);border:1.5px solid var(--border);background:var(--surface-2);color:var(--text);font:600 15px/1 var(--fb);cursor:pointer;touch-action:manipulation}
+.bkslot[aria-pressed="true"]{border-color:var(--accent-text);box-shadow:inset 0 0 0 1.5px var(--accent-text);color:var(--accent-text)}
+.bkslot[aria-pressed="true"]::before{content:"✓ "}
+.bkslot:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.bknote{margin:0;font-size:.875rem;color:var(--text-muted)}
+.bkok{margin:0;font:700 1.125rem/1.3 var(--fh)}
+.lbl2{font-size:.8125rem;font-weight:650;color:var(--text-muted)}`;
 }
 
 /* ============ Marcado ============ */
@@ -1886,7 +2185,7 @@ function pgHtml(m,opt){
   else if(h==='gradient')hero='<div class="grimg"'+fit+'><span class="rt"></span>'+photo+'</div><header '+A('id hero')+'>'+logo+name+kind+orn+desc+'</header>';
   else hero='<header '+A('id hero')+'><div class="flimg"'+fit+'><span class="rt"></span>'+photo+'<div class="fltxt">'+logo+kind+name+desc+'</div></div></header>';
   /* barra compacta con logo pequeño: aparece al pasar el hero */
-  const isBook=!m.locations&&m.cta&&m.cta.k==='book';
+  const isBook=!!(m.cta&&m.cta.k==='book'&&(!m.locations||m.api));
   const isMenuCta=!m.locations&&m.cta&&m.cta.k==='menu';
   const tbc=(!m.locations&&m.cta)?(isBook?'<button type="button" class="tbc" data-bkopen aria-label="'+esc(m.cta.t)+'">'+ICONS.book+'</button>':isMenuCta?'<button type="button" class="tbc" data-menuopen aria-label="'+esc(m.cta.t)+'">'+ICONS.menu+'</button>':'<a class="tbc" href="'+esc(m.cta.href)+'" rel="noopener" aria-label="'+esc(m.cta.t)+'">'+ICONS[m.cta.k]+'</a>'):'';
   const topbar='<div class="topbar"><div class="tb">'+logoEl('x',false)+'<span class="tbn">'+esc(m.shown)+'</span>'+tbc+'</div></div>';
@@ -1935,6 +2234,7 @@ function pgHtml(m,opt){
      principal se convierte en un selector: un botón de WhatsApp por local en vez de uno solo. */
   let acts='';
   if(m.locations){
+    if(isBook)acts+='<button type="button" class="cta" data-bkopen>'+ICONS.book+'<span>'+esc(m.cta.t)+'</span></button>';
     acts+='<div class="locs">'+m.locations.map(loc=>{
       const msg=enc((d.waMsg||T.waMsg)+T.locSuffix.replace('{name}',loc.name));
       return '<a class="cta" href="https://wa.me/'+loc.waNum+'?text='+msg+'" rel="noopener">'+ICONS.wa+'<span>'+esc(T.locBook+' · '+loc.name)+'</span></a>';
@@ -2030,25 +2330,29 @@ function bookingDialog(m){
   const T=m.T,svc=m.services,team=m.team;
   const opt=(v,l)=>'<option value="'+esc(v)+'">'+esc(l)+'</option>';
   const svcOpts='<option value="" disabled selected>'+esc(T.bkPick)+'</option>'+svc.map(s=>opt(s.n,s.p?s.n+' — '+s.p:s.n)).join('');
-  const proField=team.length?'<div class="bkf" data-f="pro"><label for="bkPro">'+esc(T.bkPro)+'</label><select id="bkPro"><option value="">'+esc(T.bkProAny)+'</option>'+team.map(x=>opt(x.n,x.r?x.n+' — '+x.r:x.n)).join('')+'</select></div>':'';
+  const proField=(team.length||m.api)?'<div class="bkf" data-f="pro"><label for="bkPro">'+esc(T.bkPro)+'</label><select id="bkPro"><option value="">'+esc(T.bkProAny)+'</option>'+team.map(x=>opt(x.n,x.r?x.n+' — '+x.r:x.n)).join('')+'</select></div>':'';
   return '<dialog class="bkdlg" id="bkDlg" aria-labelledby="bkTitle">'+
     '<div class="bkpanel">'+
       '<div class="bkhead"><h2 id="bkTitle">'+esc(T.bookTitle)+'</h2><button type="button" class="bkx" data-bkclose aria-label="'+esc(T.bookClose)+'">'+ICONS.x+'</button></div>'+
+      (m.api?'<p class="bkmsg" id="bkMsg" role="status" aria-live="polite" hidden></p>':'')+
       '<form class="bkf1" id="bkForm" novalidate>'+
         '<div class="bkf" data-f="name"><label for="bkName">'+esc(T.bkName)+'</label><input id="bkName" name="name" type="text" autocomplete="name" maxlength="80" required><p class="bke" id="bkName-e" hidden></p></div>'+
         '<div class="bkf" data-f="phone"><label for="bkPhone">'+esc(T.bkPhone)+'</label><input id="bkPhone" name="phone" type="tel" inputmode="tel" autocomplete="tel" maxlength="40" required><p class="bke" id="bkPhone-e" hidden></p></div>'+
         '<div class="bkf" data-f="service"><label for="bkService">'+esc(T.bkService)+'</label><select id="bkService" required>'+svcOpts+'</select><p class="bke" id="bkService-e" hidden></p></div>'+
         proField+
+        (m.api?'<div class="bkf" data-f="loc" hidden><label for="bkLoc">'+esc(T.akLoc)+'</label><select id="bkLoc"></select></div>':'')+
         '<div class="bkrow"><div class="bkf" data-f="date"><label for="bkDate">'+esc(T.bkDate)+'</label><input id="bkDate" type="date" required><p class="bke" id="bkDate-e" hidden></p></div>'+
         '<div class="bkf" data-f="time"><label for="bkTime">'+esc(T.bkTime)+'</label><input id="bkTime" type="time" required><p class="bke" id="bkTime-e" hidden></p></div></div>'+
+        (m.api?'<div class="bkf" data-f="slot" hidden><span class="lbl2" id="bkSlotL">'+esc(T.akSlot)+'</span><div class="bkslots" id="bkSlots" role="group" aria-labelledby="bkSlotL"></div><p class="bke" id="bkSlot-e" hidden></p></div>':'')+
         '<div class="bkf" data-f="notes"><label for="bkNotes">'+esc(T.bkNotes)+'</label><textarea id="bkNotes" rows="2" maxlength="300" placeholder="'+esc(T.bkNotesPh)+'"></textarea></div>'+
         '<button type="submit" class="cta">'+ICONS.go+'<span>'+esc(T.bkContinue)+'</span></button>'+
       '</form>'+
       '<div class="bkf2" id="bkReview" hidden>'+
         '<p class="bkrh">'+esc(T.bkReview)+'</p>'+
         '<dl class="bksum" id="bkSum"></dl>'+
-        '<div class="bkba"><button type="button" class="qb" data-bkback>'+esc(T.bkBack)+'</button><a class="cta" id="bkGo" href="#" rel="noopener">'+ICONS.wa+'<span>'+esc(T.bkWa)+'</span></a></div>'+
+        '<div class="bkba"><button type="button" class="qb" data-bkback>'+esc(T.bkBack)+'</button>'+(m.api?'<button type="button" class="cta" id="bkConfirm" hidden>'+ICONS.book+'<span>'+esc(T.akConfirm)+'</span></button>':'')+'<a class="cta" id="bkGo" href="#" rel="noopener">'+ICONS.wa+'<span>'+esc(T.bkWa)+'</span></a></div>'+
       '</div>'+
+      (m.api?'<div class="bkf2" id="bkDone" hidden><p class="bkok" id="bkDoneT"></p><dl class="bksum" id="bkDoneSum"></dl><div class="bkba"><a class="cta" id="bkDoneWa" href="#" rel="noopener" hidden>'+ICONS.wa+'<span>'+esc(T.akNotifyWa)+'</span></a><button type="button" class="qb" id="bkDoneX">'+esc(T.akClose)+'</button></div></div>':'')+
     '</div>'+
   '</dialog>';
 }
@@ -2084,10 +2388,13 @@ function buildParts(raw,opt){
     cfg:{vcf:m.vcard,file:m.file+'.vcf',save:T.save,saved:T.saved,h:m.hours.cfg,preview:pv,
       locs:m.locations?m.locations.map((loc,i)=>loc.hd.some(Boolean)?{tz:m.d.tz,d:loc.hd.map(r=>r?[r[0],r[1]]:null),on:T.openNow,off:T.closedNow}:null):null,
       cart:m.cartOn?{wa:m.waNum,name:m.shown,items:m.services.map(s=>({n:s.n,p:s.p,desc:s.desc,photo:s.photo,sizes:s.sizes,opts:s.opts})),msg1:T.ctMsg1,msg2:T.ctMsg2,l:{mode:T.ctLMode,notes:T.ctLNotes,total:T.ctLTotal,address:T.ctLAddress,payment:T.ctLPayment,change:T.ctLChange,qty:T.ctQty,table:T.ctLTable},e:{address:T.ctErrAddress,table:T.ctErrTable},icoMinus:ICONS.minus,icoPlus:ICONS.plus}:null,
-      book:(!m.locations&&m.cta&&m.cta.k==='book')?{wa:m.waNum,name:m.shown,msg1:T.bkMsg1,msg2:T.bkMsg2,
+      book:(m.cta&&m.cta.k==='book'&&(!m.locations||m.api))?{wa:m.waNum,name:m.shown,msg1:T.bkMsg1,msg2:T.bkMsg2,
         pros:m.team.map(x=>({n:x.n,label:x.r?x.n+' — '+x.r:x.n,svc:x.svc})),
         l:{name:T.bkLName,phone:T.bkLPhone,service:T.bkLService,pro:T.bkLPro,proAny:T.bkProAny,date:T.bkLDate,time:T.bkLTime,notes:T.bkLNotes},
-        e:{req:T.bkErrReq,phone:T.bkErrPhone,date:T.bkErrDate}}:null}};
+        e:{req:T.bkErrReq,phone:T.bkErrPhone,date:T.bkErrDate},
+        ...(m.api?{api:{base:m.api.base,slug:m.api.slug,locale:T.htmlLang,l:{pick:T.bkPick,loc:T.akLoc,anyLoc:T.akAnyLoc,loading:T.akLoading,pickFirst:T.akPickFirst,
+          noSlots:T.akNoSlots,slotsError:T.akSlotsError,errSlot:T.akErrSlot,sending:T.akSending,doneT:T.akDoneT,receivedT:T.akReceivedT,taken:T.akTaken,
+          netError:T.akNetError,unavailable:T.akUnavailable}}}:{})}:null}};
 }
 function faviconOf(m,icon){
   if(icon)return icon;
@@ -2112,7 +2419,7 @@ function buildPage(raw,opt){
     '<link rel="icon" href="'+esc(faviconOf(m,opt.icon))+'">'].concat(fonts,[
     '<style>'+P.css+'</style>','<noscript><style>.save{display:none}</style></noscript>',
     ld?'<script type="application/ld+json">'+jsonScript(ld)+'<\/script>':'']).filter(Boolean).join('\n');
-  return '<!doctype html>\n<html lang="'+T.htmlLang+'">\n<head>\n'+head+'\n</head>\n<body>\n'+P.pg+'\n<script>(function(){var run='+cardRuntime.toString()+';run(document,'+jsonScript(P.cfg)+');})();<\/script>\n</body>\n</html>\n';
+  return '<!doctype html>\n<html lang="'+T.htmlLang+'">\n<head>\n'+head+'\n</head>\n<body>\n'+P.pg+'\n<script>(function(){var run='+cardRuntime.toString()+';'+(m.api&&P.cfg.book?'var cfg='+jsonScript(P.cfg)+';run(document,cfg);var api='+bookingApiRuntime.toString()+';api(document,cfg);':'run(document,'+jsonScript(P.cfg)+');')+'})();<\/script>\n</body>\n</html>\n';
 }
 /*ENDLIB*/
 
@@ -2197,6 +2504,13 @@ es:{
   aw_text:'texto',aw_muted:'texto secundario',aw_button:'botón principal',aw_icons:'iconos',
   i_cta_wa:'Elegiste WhatsApp como acción principal, pero falta un número válido. Se usará otra acción.',
   i_cta_call:'Elegiste “Llamar” como acción principal, pero falta un teléfono válido. Se usará otra acción.',
+  sec_api:'Reservas en línea (opcional)',
+  sd_api:'Si tu negocio usa el sistema de reservas, la página mostrará horas libres reales y guardará la cita al instante. Si lo dejas vacío, la reserva sigue siendo por WhatsApp como hasta ahora.',
+  l_apiUrl:'Dirección del sistema de reservas',h_apiUrl:'La que te dio el sistema de reservas, empieza por https://',
+  l_apiSlug:'Identificador del negocio',h_apiSlug:'El identificador de tu negocio en el sistema de reservas (minúsculas, números y guiones).',
+  i_apiUrl:'Revisa la dirección del sistema de reservas: tiene que empezar por https://',i_apiUrl_empty:'Falta la dirección del sistema de reservas (o borra el identificador).',
+  i_apiSlug:'El identificador solo admite minúsculas, números y guiones (3 a 50).',i_apiSlug_empty:'Falta el identificador del negocio (o borra la dirección).',
+  api_test:'Probar conexión',api_testing:'Probando…',api_ok:'Conectado: {name} · {n} servicios reservables.',api_fail:'No se pudo conectar. Revisa la dirección y el identificador.',api_incomplete:'Completa la dirección y el identificador.',
   i_ctaUrl:'Revisa el enlace del botón principal. Pega la dirección completa.',
   i_ctaUrl_empty:'Escribe el enlace del botón principal o cambia el tipo de acción.',
   i_tiktok:'Revisa el usuario o enlace de TikTok. Ejemplo: @tunegocio.',
@@ -2369,6 +2683,13 @@ pt:{
   aw_text:'texto',aw_muted:'texto secundário',aw_button:'botão principal',aw_icons:'ícones',
   i_cta_wa:'Você escolheu o WhatsApp como ação principal, mas falta um número válido. Será usada outra ação.',
   i_cta_call:'Você escolheu “Ligar” como ação principal, mas falta um telefone válido. Será usada outra ação.',
+  sec_api:'Agendamento on-line (opcional)',
+  sd_api:'Se o seu negócio usa o sistema de agendamentos, a página mostrará horários livres reais e salvará o agendamento na hora. Se deixar vazio, o agendamento continua pelo WhatsApp como hoje.',
+  l_apiUrl:'Endereço do sistema de agendamentos',h_apiUrl:'O que o sistema de agendamentos te passou, começa com https://',
+  l_apiSlug:'Identificador do negócio',h_apiSlug:'O identificador do seu negócio no sistema de agendamentos (minúsculas, números e hífens).',
+  i_apiUrl:'Confira o endereço do sistema de agendamentos: precisa começar com https://',i_apiUrl_empty:'Falta o endereço do sistema de agendamentos (ou apague o identificador).',
+  i_apiSlug:'O identificador aceita só minúsculas, números e hífens (3 a 50).',i_apiSlug_empty:'Falta o identificador do negócio (ou apague o endereço).',
+  api_test:'Testar conexão',api_testing:'Testando…',api_ok:'Conectado: {name} · {n} serviços agendáveis.',api_fail:'Não foi possível conectar. Confira o endereço e o identificador.',api_incomplete:'Preencha o endereço e o identificador.',
   i_ctaUrl:'Confira o link do botão principal. Cole o endereço completo.',
   i_ctaUrl_empty:'Escreva o link do botão principal ou mude o tipo de ação.',
   i_tiktok:'Confira o usuário ou link do TikTok. Exemplo: @seunegocio.',
@@ -2467,9 +2788,9 @@ pt:{
 'use strict';
 const $=id=>document.getElementById(id);
 const LS_DRAFT='gpc-draft',LS_UI='gpc-ui';
-const FIELDS=['nombre','cat','ciudad','desc','lang','persona','pal','hero','btn','photoPos','photoFit','logoFrame','cta','ctaText','ctaUrl','cc','wa','waMsg','tel','email','ig','fb','tiktok','youtube','linkedin','web','l1t','l1u','l2t','l2u','review','servicios','team','zona','dir','mapsUrl','locName','locations','tz','horario','color','bg','canonical','ogImage','credito'];
+const FIELDS=['nombre','cat','ciudad','desc','lang','persona','pal','hero','btn','photoPos','photoFit','logoFrame','cta','ctaText','ctaUrl','apiUrl','apiSlug','cc','wa','waMsg','tel','email','ig','fb','tiktok','youtube','linkedin','web','l1t','l1u','l2t','l2u','review','servicios','team','zona','dir','mapsUrl','locName','locations','tz','horario','color','bg','canonical','ogImage','credito'];
 const CHK=['premium','floatWa','webFonts','modeDelivery','modePickup','modeDine'];
-const MSG_FIELDS=['nombre','cta','ctaUrl','cc','wa','tel','email','ig','fb','tiktok','youtube','linkedin','web','l1u','l2u','review','mapsUrl','color','canonical','ogImage'];
+const MSG_FIELDS=['nombre','cta','ctaUrl','apiUrl','apiSlug','cc','wa','tel','email','ig','fb','tiktok','youtube','linkedin','web','l1u','l2u','review','mapsUrl','color','canonical','ogImage'];
 const MI={
   error:'<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7 7l6 6M13 7l-6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
   warn:'<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 2.5l8 14H2z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 8v3.5M10 14v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>',
@@ -2555,6 +2876,10 @@ function buildForm(){
     sel('cta',opts('cta',CTA_TYPES),{hint:1})+
     '<div class="f" data-f="cta"><p class="msg" id="m-cta" hidden></p></div>'+
     fld('ctaText',{max:40,hint:1,cap:'sentences'})+fld('ctaUrl',{max:1000,im:'url',hint:1})+
+    '<details class="fine" id="apiBox"><summary data-t="sec_api"></summary><div style="height:14px"></div><p class="hint" data-t="sd_api"></p>'+
+      fld('apiUrl',{max:300,im:'url',hint:1})+fld('apiSlug',{max:60,hint:1})+
+      '<div class="f"><button type="button" class="btn ghost" id="apiTest" data-t="api_test"></button><p class="msg" id="apiTestMsg" role="status" hidden></p></div>'+
+    '</details>'+
   '</section>'+
   '<section class="card" aria-labelledby="s4"><h2 id="s4" data-t="sec_contact"></h2><p class="sec-sub" data-t="sd_contact"></p>'+
     '<div class="row2"><div class="f" data-f="cc"><label for="cc" data-t="l_cc"></label><input type="text" id="cc" name="cc" maxlength="6" inputmode="numeric" autocomplete="off" aria-describedby="m-cc h-cc"></div>'+
@@ -2633,7 +2958,8 @@ function applyPh(){
     ig:x.ig,fb:x.fb,tiktok:'@barbearia',youtube:'@barbearia',linkedin:'linkedin.com/company/negocio',web:x.web,l1t:l1[$('lang').value==='es'?0:1],l1u:'www.negocio.com.br/agenda',l2t:'',l2u:'',review:'https://g.page/r/…',
     servicios:x.svc,team:x.team,zona:x.zone,dir:x.dir,mapsUrl:'https://maps.app.goo.gl/…',locName:'Centro',
     locations:'Batel | Rua Comendador Araújo, 500 - Batel | 09:00-20:00,09:00-20:00,09:00-20:00,09:00-20:00,09:00-20:00,09:00-18:00, | https://maps.app.goo.gl/… | 41 98888-7777',
-    horario:x.note,canonical:'https://negocio.com.br/tarjeta.html',ogImage:'https://negocio.com.br/og.png',credito:x.credit};
+    horario:x.note,canonical:'https://negocio.com.br/tarjeta.html',ogImage:'https://negocio.com.br/og.png',credito:x.credit,
+    apiUrl:'https://reservas.seunegocio.com',apiSlug:'barbearia-central'};
   Object.keys(ph).forEach(k=>{const e=$(k);if(e)e.placeholder=ph[k];});
 }
 
@@ -2663,13 +2989,14 @@ function write(raw,fresh){
     $('ho'+i).checked=!!r;$('hs'+i).value=r?s['hd'+i].slice(0,5):'09:00';$('he'+i).value=r?s['hd'+i].slice(6):'18:00';
   }
   syncHours();syncCta();
+  if(s.apiUrl||s.apiSlug)$('apiBox').open=true;
   assetGen++;
   logo=s.logo;logoBg=s.logoBg;logoDom=s.logoDom;logoMeta=s.logoMeta;logoNote='';photo=s.photo;photoDom=s.photoDom;photoMeta=s.photoMeta;photoTiny=s.photoTiny;logoErr='';photoErr='';
   gallery=s.gallery;galleryErr='';teamPhotos=s.teamPhotos;menuPhotos=s.menuPhotos;
   regenIcon();ensureMeta();paintGallery();paintTeamPhotos();paintMenuPhotos();
   return s;
 }
-function hasContent(s){return ['nombre','ciudad','desc','wa','waMsg','tel','email','dir','mapsUrl','horario','ig','fb','tiktok','youtube','linkedin','web','review','l1u','ctaUrl','credito','canonical','servicios','team','zona','locName','locations'].some(k=>s[k])||!!s.logo||!!s.photo||s.gallery.length>0||Object.keys(s.teamPhotos).length>0||Object.keys(s.menuPhotos).length>0||[0,1,2,3,4,5,6].some(i=>s['hd'+i]);}
+function hasContent(s){return ['nombre','ciudad','desc','wa','waMsg','tel','email','dir','mapsUrl','horario','ig','fb','tiktok','youtube','linkedin','web','review','l1u','ctaUrl','credito','canonical','servicios','team','zona','locName','locations','apiUrl','apiSlug'].some(k=>s[k])||!!s.logo||!!s.photo||s.gallery.length>0||Object.keys(s.teamPhotos).length>0||Object.keys(s.menuPhotos).length>0||[0,1,2,3,4,5,6].some(i=>s['hd'+i]);}
 function markFilled(s){Object.keys(s).forEach(k=>{if(s[k])touched[k]=true;});}
 
 /* ---------- Avisos y estado ---------- */
@@ -3429,6 +3756,16 @@ document.addEventListener('click',e=>{
 });
 $('demo').addEventListener('click',doDemo);
 document.querySelectorAll('[data-pm]').forEach(b=>b.addEventListener('click',()=>{pvMode=b.getAttribute('data-pm');try{localStorage.setItem('gpc-pv',pvMode);}catch(e){}update();}));
+$('apiTest').addEventListener('click',()=>{
+  const out=$('apiTestMsg'),u=parseApiUrl($('apiUrl').value),slugV=$('apiSlug').value.trim().toLowerCase();
+  const show=(txt,ok)=>{out.textContent=txt;out.hidden=false;out.className='msg'+(ok?' info':'');};
+  if(!u.ok||!API_SLUG_RE.test(slugV)){show(t('api_incomplete'),false);return;}
+  show(t('api_testing'),true);
+  const base=u.base+'/api/v1/public/'+encodeURIComponent(slugV);
+  Promise.all([fetch(base).then(r=>r.ok?r.json():Promise.reject(r.status)),fetch(base+'/services').then(r=>r.ok?r.json():Promise.reject(r.status))])
+    .then(([info,svc])=>show(t('api_ok',{name:info.name,n:(svc.items||[]).filter(x=>x.bookable).length}),true))
+    .catch(()=>show(t('api_fail'),false));
+});
 $('logoTrim').addEventListener('change',()=>{try{localStorage.setItem('gpc-trim',$('logoTrim').checked?'1':'0');}catch(e){}});
 function pvOpen(){const p=$('preview');p.classList.add('open');p.setAttribute('role','dialog');p.setAttribute('aria-modal','true');document.body.classList.add('lock');$('pvClose').focus();update();}
 function pvClose(){const p=$('preview');p.classList.remove('open');p.removeAttribute('role');p.removeAttribute('aria-modal');document.body.classList.remove('lock');$('pvOpen').focus();}
