@@ -45,6 +45,16 @@ describe('logs sin datos personales', () => {
     }
   });
 
+  it('avisa una vez si llegan peticiones por un proxy con TRUST_PROXY=false, con la IP del proxy', async () => {
+    const before = lines.length;
+    for (let i = 0; i < 3; i++) {
+      await app.inject({ method: 'GET', url: '/healthz', remoteAddress: '100.64.3.7', headers: { 'x-forwarded-for': '203.0.113.9' } });
+    }
+    const warnings = lines.slice(before).filter((l) => l.includes('TRUST_PROXY=false'));
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('"proxyAddress":"100.64.3.7"');
+  });
+
   it('redactUrl solo toca los parámetros con datos personales', () => {
     expect(redactUrl('/api/v1/admin/customers')).toBe('/api/v1/admin/customers');
     expect(redactUrl('/x?date=2026-10-01&professionalId=any')).toBe('/x?date=2026-10-01&professionalId=any');

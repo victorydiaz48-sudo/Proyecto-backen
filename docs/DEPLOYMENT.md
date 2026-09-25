@@ -87,9 +87,9 @@ Para crear el negocio a partir del JSON exportado por el generador:
 (`-v "$PWD/datos.json:/datos.json:ro"`; `--dry-run` para ver el plan; ver
 [FRONTEND_INTEGRATION](FRONTEND_INTEGRATION.md) §4).
 
-**5. `TRUST_PROXY`.** Con `TRUST_PROXY=false`, abre `https://tu-dominio/readyz` y busca en los logs la
-línea `incoming request` de esa petición: su `"remoteAddress"` es la IP del proxy de la plataforma (no la
-tuya). Si es privada (10.x, 172.16–31.x, 192.168.x, fd…/fc…) usa `uniquelocal`; si es 100.64–100.127.x,
+**5. `TRUST_PROXY`.** Con `TRUST_PROXY=false`, el servidor escribe **una vez** en los logs un aviso
+"Las peticiones llegan a través de un proxy…" con `"proxyAddress"`: esa es la IP del proxy de la
+plataforma (no la tuya). También sale como `"remoteAddress"` en las líneas `incoming request`. Si es privada (10.x, 172.16–31.x, 192.168.x, fd…/fc…) usa `uniquelocal`; si es 100.64–100.127.x,
 `100.64.0.0/10`; si no, esa IP o su rango. Con `false` todo funciona, pero todos los visitantes cuentan
 como una sola IP para los rate limits.
 

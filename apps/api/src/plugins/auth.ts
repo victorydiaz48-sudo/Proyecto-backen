@@ -102,8 +102,14 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  */
 export async function sameOriginGuard(request: FastifyRequest, _reply: FastifyReply): Promise<void> {
   if (SAFE_METHODS.has(request.method)) return;
+  // Sec-Fetch-Site lo pone el navegador y una página no puede falsearlo: si viene, decide él. Así no se
+  // depende de la cabecera Host, que un proxy (p. ej. el de Railway) puede reescribir.
   const site = request.headers['sec-fetch-site'];
-  if (site && site !== 'same-origin' && site !== 'none') throw csrfError();
+  if (site) {
+    if (site !== 'same-origin' && site !== 'none') throw csrfError();
+    return;
+  }
+  // Navegadores sin Sec-Fetch-Site: Origin debe coincidir con el host.
   const origin = request.headers.origin;
   if (origin) {
     let host: string;

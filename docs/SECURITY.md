@@ -120,8 +120,9 @@ con RLS.
   y desde `file://` (Origin `null`). Como no hay cookies ni credenciales en estas rutas, `*` no
   expone datos de sesión. Las respuestas públicas nunca incluyen datos personales de otros clientes.
 - **Rutas admin/auth**: sin cabeceras CORS (solo mismo origen). Cookie `SameSite=Strict` +
-  `sameOriginGuard` (rechaza con `403 CSRF_REJECTED` si `Sec-Fetch-Site` no es `same-origin`/`none`
-  u `Origin` no coincide con el host) + solo `application/json` (el parser `text/plain` de Fastify
+  `sameOriginGuard` (rechaza con `403 CSRF_REJECTED` si `Sec-Fetch-Site` no es `same-origin`/`none`;
+  si el navegador no envía `Sec-Fetch-Site`, si `Origin` no coincide con el host. `Sec-Fetch-Site` manda
+  porque una página no puede falsearlo y no depende de la cabecera `Host`, que un proxy puede reescribir) + solo `application/json` (el parser `text/plain` de Fastify
   está desactivado, así un formulario o `fetch` "simple" de otro sitio recibe `415`).
 
 ## 7. Abuso de la API pública

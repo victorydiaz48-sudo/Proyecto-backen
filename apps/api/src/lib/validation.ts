@@ -21,6 +21,20 @@ export const zSlug = z
   .regex(SLUG_RE, 'Solo minúsculas, números y guiones (3–50 caracteres).')
   .refine((s) => !RESERVED_SLUGS.has(s), 'Ese identificador está reservado.');
 
+/**
+ * Lo que alguien escribe en "negocio" al entrar → identificador: minúsculas, sin acentos, espacios y
+ * signos convertidos en guiones. "Barbearia Alpha Clube" → "barbearia-alpha-clube" (el slug que se
+ * genera a partir del nombre), así escribir el nombre en lugar del identificador también funciona.
+ */
+export function toSlugInput(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 export const zTimeZone = z.string().trim().refine(isValidTimeZone, 'Zona horaria desconocida.');
 export const zCountryCode = z.string().trim().regex(/^[1-9]\d{0,2}$/, 'Código de país sin +, p. ej. 55.');
 export const zCurrency = z.string().trim().toUpperCase().regex(/^[A-Z]{3}$/, 'Código ISO 4217, p. ej. BRL.');

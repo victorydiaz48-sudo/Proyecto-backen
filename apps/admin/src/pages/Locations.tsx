@@ -74,7 +74,7 @@ function LocationForm({ location, onClose, onDone }: { location: Location | null
       <form className="form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <Field label={t.name}><input value={name} onChange={(e) => setName(e.target.value)} maxLength={40} required /></Field>
         <Field label={`${t.address} (${t.optional})`}><input value={address} onChange={(e) => setAddress(e.target.value)} maxLength={200} /></Field>
-        <Field label={`${t.mapsUrl} (${t.optional})`}><input type="url" value={mapsUrl} onChange={(e) => setMapsUrl(e.target.value)} placeholder="https://" /></Field>
+        <Field label={`${t.mapsUrl} (${t.optional})`}><input type="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={mapsUrl} onChange={(e) => setMapsUrl(e.target.value)} placeholder="https://" /></Field>
         <Field label={`${t.whatsapp} (${t.optional})`}><input type="tel" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} maxLength={40} /></Field>
         <ErrorBox error={action.error} />
         <div className="form-actions">

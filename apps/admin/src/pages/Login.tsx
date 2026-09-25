@@ -30,7 +30,15 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
       }
       onLoggedIn();
     } catch (err) {
-      setError(err instanceof ApiError && err.code === 'INVALID_CREDENTIALS' ? new Error(t.invalidCredentials) : err);
+      // Mensajes en el idioma del panel para los errores que puede ver cualquiera al entrar.
+      const known: Record<string, string> = {
+        INVALID_CREDENTIALS: t.invalidCredentials,
+        RATE_LIMITED: t.tooManyAttempts,
+        CSRF_REJECTED: t.originRejected,
+        NETWORK: t.networkError,
+      };
+      const message = err instanceof ApiError ? known[err.code] : undefined;
+      setError(message ? new Error(message) : err);
     } finally {
       setBusy(false);
     }
@@ -40,11 +48,13 @@ export function LoginPage({ onLoggedIn }: { onLoggedIn: () => void }) {
     <main className="login">
       <form onSubmit={(e) => void submit(e)} className="card">
         <h1>{t.loginTitle}</h1>
-        <Field label={t.business}>
-          <input value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} autoComplete="organization" required />
+        <Field label={t.business} hint={t.businessHint}>
+          <input value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} autoComplete="organization"
+            autoCapitalize="none" autoCorrect="off" spellCheck={false} required />
         </Field>
         <Field label={t.email}>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" required />
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username"
+            autoCapitalize="none" autoCorrect="off" spellCheck={false} required />
         </Field>
         <Field label={t.password}>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />

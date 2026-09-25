@@ -3,11 +3,11 @@
 //     --timezone America/Sao_Paulo --country 55 --currency BRL --locale pt-BR --admin-email dono@exemplo.com
 // La contraseña del primer ADMIN se toma de TENANT_ADMIN_PASSWORD o se genera y se muestra una vez.
 import 'dotenv/config';
-import { randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
 import { loadConfig } from '../config.ts';
 import { createDb } from '../db.ts';
 import { AppError } from '../lib/errors.ts';
+import { generateTemporaryPassword } from '../lib/password.ts';
 import { provisionTenant } from '../modules/tenants/provision.ts';
 
 const { values } = parseArgs({
@@ -24,7 +24,7 @@ const { values } = parseArgs({
 });
 
 const generated = !process.env.TENANT_ADMIN_PASSWORD;
-const adminPassword = process.env.TENANT_ADMIN_PASSWORD ?? randomBytes(15).toString('base64url');
+const adminPassword = process.env.TENANT_ADMIN_PASSWORD ?? generateTemporaryPassword();
 const db = createDb(loadConfig().DATABASE_URL);
 
 try {

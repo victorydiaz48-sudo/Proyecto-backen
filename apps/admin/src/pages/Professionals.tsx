@@ -101,7 +101,7 @@ function ProfessionalForm({ professional, services, onClose, onDone }: {
         <Field label={t.displayName}><input value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={80} required /></Field>
         <Field label={`${t.title} (${t.optional})`}><input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} /></Field>
         <Field label={`${t.bio} (${t.optional})`}><textarea value={bio} onChange={(e) => setBio(e.target.value)} maxLength={400} rows={2} /></Field>
-        <Field label={`${t.photoUrl} (${t.optional})`}><input type="url" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://" /></Field>
+        <Field label={`${t.photoUrl} (${t.optional})`}><input type="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} placeholder="https://" /></Field>
         <Field label={t.order}><input type="number" min={0} value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} /></Field>
         <fieldset>
           <legend>{t.servicesOffered}</legend>

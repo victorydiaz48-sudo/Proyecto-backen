@@ -50,7 +50,7 @@ describe('usuarios', () => {
     expect(res.statusCode).toBe(201);
     const { user, temporaryPassword } = res.json();
     expect(user).toMatchObject({ email: 'andre@a.test', role: 'PROFESSIONAL', professionalId: pro.id });
-    expect(temporaryPassword).toMatch(/^[A-Za-z0-9_-]{20}$/);
+    expect(temporaryPassword).toMatch(/^[a-z2-9]{4}(-[a-z2-9]{4}){3}$/);
     expect((await login(app, 'barberia-a', 'andre@a.test', temporaryPassword)).res.statusCode).toBe(200);
     const log = await db.auditLog.findFirstOrThrow({ where: { action: 'user.created' } });
     expect(JSON.stringify(log)).not.toContain(temporaryPassword);

@@ -1,4 +1,5 @@
 import { hash, verify } from '@node-rs/argon2';
+import { randomInt } from 'node:crypto';
 
 // Parámetros mínimos recomendados por OWASP para Argon2id (19 MiB, 2 iteraciones, 1 hilo).
 // `algorithm: 2` = Algorithm.Argon2id (const enum ambiental, no importable con verbatimModuleSyntax).
@@ -21,6 +22,18 @@ export function passwordProblem(password: string, email?: string): string | null
   const local = email?.split('@')[0]?.toLowerCase();
   if (local && local.length >= 4 && lower.includes(local)) return 'No puede contener tu email.';
   return null;
+}
+
+// Sin caracteres que se confunden al leerlos o teclearlos en el móvil (l/1/i, o/0) ni mayúsculas.
+const TEMP_ALPHABET = 'abcdefghjkmnpqrstuvwxyz23456789';
+
+/**
+ * Contraseña inicial/temporal fácil de copiar a mano: 4 grupos de 4 ("xk7m-p3ra-9wfe-h2tc"),
+ * 31^16 combinaciones (≈ 79 bits). Se cambia al entrar.
+ */
+export function generateTemporaryPassword(): string {
+  const group = () => Array.from({ length: 4 }, () => TEMP_ALPHABET[randomInt(TEMP_ALPHABET.length)]).join('');
+  return [group(), group(), group(), group()].join('-');
 }
 
 export const hashPassword = (password: string): Promise<string> => hash(password, OPTIONS);

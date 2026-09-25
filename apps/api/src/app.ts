@@ -77,6 +77,22 @@ export async function buildApp({ config, db, now = () => new Date(), logStream, 
   // o el slug público.
   app.addHook('onRequest', (_request, _reply, done) => runInRequestContext(done));
 
+  // Detrás de un proxy sin TRUST_PROXY, todos los visitantes comparten la IP del proxy (y los límites de
+  // intentos se agotan entre todos). Se avisa una vez, con la IP que habría que declarar.
+  if (!config.TRUST_PROXY) {
+    let warned = false;
+    app.addHook('onRequest', (request, _reply, done) => {
+      if (!warned && request.headers['x-forwarded-for']) {
+        warned = true;
+        request.log.warn(
+          { proxyAddress: request.ip },
+          'Las peticiones llegan a través de un proxy (X-Forwarded-For) con TRUST_PROXY=false: todos los visitantes comparten la IP del proxy. Configura TRUST_PROXY con la IP/rango de proxyAddress (docs/DEPLOYMENT.md §4, paso 5).',
+        );
+      }
+      done();
+    });
+  }
+
   const routeList: RouteInfo[] = [];
   app.decorate('routeList', routeList);
   app.addHook('onRoute', (r) => {

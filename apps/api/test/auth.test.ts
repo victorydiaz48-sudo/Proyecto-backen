@@ -196,6 +196,54 @@ describe('CSRF', () => {
   });
 });
 
+describe('login en el mundo real (errores reportados en producción)', () => {
+  it('acepta el nombre del negocio (con acentos, mayúsculas y espacios) en lugar del identificador', async () => {
+    const creds = { email: 'admin@a.test', password: TEST_PASSWORD };
+    for (const tenantSlug of ['Barberia A', '  barbería-a ', 'BARBERIA_A', 'barberia a.']) {
+      const res = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { tenantSlug, ...creds } });
+      expect(res.statusCode, tenantSlug).toBe(200);
+    }
+    const wrong = await app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { tenantSlug: 'Barberia B', ...creds } });
+    expect(wrong.statusCode).toBe(401);
+  });
+
+  it('detrás de un proxy que reescribe Host, un navegador del mismo origen no es rechazado por CSRF', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      headers: { origin: 'https://mi-app.up.railway.app', host: 'backend.railway.internal:8080', 'sec-fetch-site': 'same-origin' },
+      payload: { tenantSlug: 'barberia-a', email: 'admin@a.test', password: TEST_PASSWORD },
+    });
+    expect(res.statusCode).toBe(200);
+    // Otro sitio (también otra app del mismo dominio de la plataforma) sigue rechazado.
+    for (const site of ['cross-site', 'same-site']) {
+      const bad = await app.inject({
+        method: 'POST',
+        url: '/api/v1/auth/login',
+        headers: { 'sec-fetch-site': site },
+        payload: { tenantSlug: 'barberia-a', email: 'admin@a.test', password: TEST_PASSWORD },
+      });
+      expect(bad.statusCode, site).toBe(403);
+    }
+  });
+
+  it('con la IP compartida de un proxy, los intentos en otro negocio no bloquean este login', async () => {
+    const ip = '100.64.0.5';
+    for (let i = 0; i < 20; i++) {
+      await app.inject({ method: 'POST', url: '/api/v1/auth/login', remoteAddress: ip, payload: { tenantSlug: 'otro-negocio', email: `u${i}@x.test`, password: 'x' } });
+    }
+    const other = await app.inject({ method: 'POST', url: '/api/v1/auth/login', remoteAddress: ip, payload: { tenantSlug: 'otro-negocio', email: 'z@x.test', password: 'x' } });
+    expect(other.statusCode).toBe(429);
+    const mine = await app.inject({
+      method: 'POST',
+      url: '/api/v1/auth/login',
+      remoteAddress: ip,
+      payload: { tenantSlug: 'barberia-a', email: 'admin@a.test', password: TEST_PASSWORD },
+    });
+    expect(mine.statusCode).toBe(200);
+  });
+});
+
 describe('errores', () => {
   it('ruta inexistente → 404 con el formato uniforme y requestId', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/v1/nada' });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { FailureLimiter } from '../src/lib/failure-limiter.ts';
-import { passwordProblem } from '../src/lib/password.ts';
-import { isValidTimeZone, zSlug } from '../src/lib/validation.ts';
+import { generateTemporaryPassword, passwordProblem } from '../src/lib/password.ts';
+import { isValidTimeZone, toSlugInput, zSlug } from '../src/lib/validation.ts';
 
 describe('passwordProblem', () => {
   it('aplica longitud, lista de comunes y email', () => {
@@ -57,5 +57,26 @@ describe('FailureLimiter con muchas claves', () => {
     l.fail('nueva'); // dispara la limpieza
     expect(l.isBlocked('k1')).toBe(false);
     expect((l as unknown as { failures: Map<string, number[]> }).failures.size).toBeLessThan(10);
+  });
+});
+
+describe('entradas escritas a mano', () => {
+  it('toSlugInput: nombre del negocio → identificador', () => {
+    expect(toSlugInput('Barbearia Alpha Clube')).toBe('barbearia-alpha-clube');
+    expect(toSlugInput('  Barbería  São João! ')).toBe('barberia-sao-joao');
+    expect(toSlugInput('barbearia-alpha-clube')).toBe('barbearia-alpha-clube');
+    expect(toSlugInput('***')).toBe('');
+  });
+
+  it('contraseñas temporales: 4 grupos de 4 sin caracteres confusos, válidas y distintas', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const p = generateTemporaryPassword();
+      expect(p).toMatch(/^[a-hj-km-np-z2-9]{4}(-[a-hj-km-np-z2-9]{4}){3}$/);
+      expect(p).not.toMatch(/[il1o0]/);
+      expect(passwordProblem(p)).toBeNull();
+      seen.add(p);
+    }
+    expect(seen.size).toBe(200);
   });
 });

@@ -38,7 +38,7 @@ describe('panel', () => {
     });
     renderApp();
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText('Negócio (identificador)'), 'barberia-a');
+    await user.type(await screen.findByLabelText(/^Negócio/), 'barberia-a');
     await user.type(screen.getByLabelText('E-mail'), 'admin@a.test');
     await user.type(screen.getByLabelText('Senha'), 'clave-segura-123');
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
@@ -56,11 +56,29 @@ describe('panel', () => {
     });
     renderApp();
     const user = userEvent.setup();
-    await user.type(await screen.findByLabelText('Negócio (identificador)'), 'barberia-a');
+    await user.type(await screen.findByLabelText(/^Negócio/), 'barberia-a');
     await user.type(screen.getByLabelText('E-mail'), 'a@a.test');
     await user.type(screen.getByLabelText('Senha'), 'mala');
     await user.click(screen.getByRole('button', { name: 'Entrar' }));
     expect((await screen.findByRole('alert')).textContent).toBe('E-mail, senha ou negócio incorretos.');
+  });
+
+  it('demasiados intentos y origen rechazado → mensajes propios traducidos (no "datos incorrectos")', async () => {
+    let code = 'RATE_LIMITED';
+    mockFetch({
+      'GET /api/v1/auth/me': () => ({ status: 401, json: { error: { code: 'UNAUTHENTICATED', message: 'x' } } }),
+      'POST /api/v1/auth/login': () => ({ status: code === 'RATE_LIMITED' ? 429 : 403, json: { error: { code, message: 'Mensaje del servidor' } } }),
+    });
+    renderApp();
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText(/^Negócio/), 'Barbearia A');
+    await user.type(screen.getByLabelText('E-mail'), 'a@a.test');
+    await user.type(screen.getByLabelText('Senha'), 'clave-larga-1');
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+    expect((await screen.findByRole('alert')).textContent).toBe('Muitas tentativas. Espere alguns minutos e tente de novo.');
+    code = 'CSRF_REJECTED';
+    await user.click(screen.getByRole('button', { name: 'Entrar' }));
+    await screen.findByText(/bloqueou o envio por segurança/);
   });
 
   it('un PROFESSIONAL solo ve su agenda, bloqueos, horario, clientes y cuenta', async () => {

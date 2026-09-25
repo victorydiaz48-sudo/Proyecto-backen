@@ -1,7 +1,8 @@
+import type { FastifyRequest } from 'fastify';
 import type { FastifyPluginAsyncZod } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { PASSWORD_MAX } from '../../lib/password.ts';
-import { zEmail } from '../../lib/validation.ts';
+import { toSlugInput, zEmail } from '../../lib/validation.ts';
 import { requireAuth, requireAuthContext, SESSION_ABSOLUTE_MS, SESSION_COOKIE, type AuthContext } from '../../plugins/auth.ts';
 import type { AuthService, RequestMeta } from './service.ts';
 
@@ -23,11 +24,20 @@ export const authRoutes: FastifyPluginAsyncZod<AuthRoutesOptions> = async (app, 
   app.post(
     '/login',
     {
-      config: { rateLimit: { max: 20, timeWindow: '15 minutes' } },
+      config: {
+        // Por IP y negocio, después de validar el cuerpo: detrás de un proxy mal configurado todos los
+        // visitantes comparten IP, y así los intentos de un negocio no bloquean el login de los demás.
+        rateLimit: {
+          max: 20,
+          timeWindow: '15 minutes',
+          hook: 'preHandler',
+          keyGenerator: (req: FastifyRequest) => `${req.ip}|${(req.body as { tenantSlug?: string } | undefined)?.tenantSlug ?? ''}`,
+        },
+      },
       schema: {
         body: z
           .object({
-            tenantSlug: z.string().trim().toLowerCase().min(1).max(50),
+            tenantSlug: z.string().max(100).transform(toSlugInput).pipe(z.string().min(1).max(50)),
             email: zEmail,
             password: z.string().min(1).max(PASSWORD_MAX),
           })

@@ -113,7 +113,7 @@ function UserForm({ professionals, onClose, onDone }: {
   return (
     <Modal title={t.new} onClose={onClose}>
       <form className="form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
-        <Field label={t.email}><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
+        <Field label={t.email}><input type="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} required /></Field>
         <Field label={t.role}>
           <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
             <option value="PROFESSIONAL">{t.role_PROFESSIONAL}</option>

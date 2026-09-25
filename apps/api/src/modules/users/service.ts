@@ -1,8 +1,7 @@
-import { randomBytes } from 'node:crypto';
 import { PgErrorCode, pgErrorCode, type Db, type Tx } from '../../db.ts';
 import type { Role } from '../../generated/prisma/enums.ts';
 import { AppError, conflict, notFound, validationError } from '../../lib/errors.ts';
-import { hashPassword, passwordProblem } from '../../lib/password.ts';
+import { generateTemporaryPassword, hashPassword, passwordProblem } from '../../lib/password.ts';
 import { writeAudit, type Actor } from '../audit/audit.ts';
 
 const USER_SELECT = {
@@ -20,7 +19,7 @@ const toDto = (u: Row) => ({ ...u, professionalId: u.professional?.id ?? null })
 export type UserDto = ReturnType<typeof toDto>;
 
 /** Contraseña temporal legible (20 caracteres, ~120 bits). */
-const temporaryPassword = (): string => randomBytes(15).toString('base64url');
+const temporaryPassword = generateTemporaryPassword;
 
 /**
  * Usuarios del panel de un tenant. Reglas: siempre queda al menos un ADMIN activo; desactivar o bajar

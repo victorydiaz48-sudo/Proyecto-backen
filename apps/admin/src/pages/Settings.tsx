@@ -49,7 +49,7 @@ export function SettingsPage() {
           </select>
         </Field>
         <div className="grid2">
-          <Field label={t.countryCode}><input value={form.defaultCountryCode} onChange={(e) => set('defaultCountryCode', e.target.value)} pattern="[1-9]\d{0,2}" required /></Field>
+          <Field label={t.countryCode}><input inputMode="numeric" value={form.defaultCountryCode} onChange={(e) => set('defaultCountryCode', e.target.value)} pattern="[1-9]\d{0,2}" required /></Field>
           <Field label={t.currency}><input value={form.currency} onChange={(e) => set('currency', e.target.value.toUpperCase())} pattern="[A-Za-z]{3}" required /></Field>
           <Field label={t.locale}>
             <select value={form.locale} onChange={(e) => set('locale', e.target.value)}>

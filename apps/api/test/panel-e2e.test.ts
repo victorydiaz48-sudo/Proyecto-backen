@@ -31,7 +31,7 @@ async function loginAs(email: string, viewport = { width: 1280, height: 900 }): 
     throw e;
   });
   await page.goto(base);
-  await page.getByLabel('Negócio (identificador)').fill('barberia-a');
+  await page.getByLabel('Negócio').fill('barberia-a');
   await page.getByLabel('E-mail').fill(email);
   await page.getByLabel('Senha').fill(TEST_PASSWORD);
   await page.getByRole('button', { name: 'Entrar' }).click();

@@ -81,7 +81,7 @@ function CustomerForm({ customer, onClose, onDone }: { customer: Customer | null
       <form className="form" onSubmit={(e) => { e.preventDefault(); void save(); }}>
         <Field label={t.name}><input value={name} onChange={(e) => setName(e.target.value)} maxLength={80} required /></Field>
         <Field label={t.phone}><input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} required /></Field>
-        <Field label={`${t.email} (${t.optional})`}><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
+        <Field label={`${t.email} (${t.optional})`}><input type="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} /></Field>
         <Field label={`${t.notes} (${t.optional})`}><textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={500} rows={3} /></Field>
         <ErrorBox error={action.error} />
         <div className="form-actions">

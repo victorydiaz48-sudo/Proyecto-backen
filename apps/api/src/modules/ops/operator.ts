@@ -1,8 +1,9 @@
 import type { FastifyPluginAsync, FastifyReply } from 'fastify';
-import { randomBytes, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
 import type { Db } from '../../db.ts';
 import { sha256 } from '../../lib/crypto.ts';
 import { AppError } from '../../lib/errors.ts';
+import { generateTemporaryPassword } from '../../lib/password.ts';
 import { provisionTenant } from '../tenants/provision.ts';
 
 /*
@@ -84,8 +85,12 @@ function page(title: string, body: string): string {
 
 function formPage(values: Fields, errors: Partial<Record<keyof Fields | 'token' | 'general', string>> = {}): string {
   const err = (k: keyof Fields | 'token') => (errors[k] ? `<p class="err">${escapeHtml(errors[k])}</p>` : '');
+  // Campos técnicos: sin mayúsculas automáticas ni autocorrector del móvil (cambian "barbearia-x" o el email).
+  const TEXT_FIELDS: (keyof Fields)[] = ['name', 'location'];
   const input = (k: keyof Fields, label: string, hint = '', type = 'text') =>
-    `<label for="${k}">${label}</label><input id="${k}" name="${k}" type="${type}" value="${escapeHtml(values[k])}" autocomplete="off" required>${
+    `<label for="${k}">${label}</label><input id="${k}" name="${k}" type="${type}" value="${escapeHtml(values[k])}" autocomplete="off"${
+      TEXT_FIELDS.includes(k) ? '' : ' autocapitalize="none" autocorrect="off" spellcheck="false"'
+    } required>${
       hint ? `<p class="hint">${hint}</p>` : ''
     }${err(k)}`;
   return page(
@@ -93,7 +98,7 @@ function formPage(values: Fields, errors: Partial<Record<keyof Fields | 'token' 
     `<h1>Crear negocio</h1>
 ${errors.general ? `<div class="box bad">${escapeHtml(errors.general)}</div>` : ''}
 <form method="post" action="/operator/tenants">
-<label for="token">Token de operador</label><input id="token" name="token" type="password" autocomplete="off" required>${err('token')}
+<label for="token">Token de operador</label><input id="token" name="token" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" required>${err('token')}
 ${input('name', 'Nombre del negocio')}
 ${input('slug', 'Identificador (slug)', 'Minúsculas, números y guiones. Va en la dirección de la página y en el login.')}
 ${input('adminEmail', 'Email del primer ADMIN', '', 'email')}
@@ -141,7 +146,7 @@ export const operatorRoutes: FastifyPluginAsync<{ db: Db; token: string }> = asy
         return noStore(reply).status(403).send(formPage(values, { token: 'Token incorrecto.' }));
       }
 
-      const adminPassword = randomBytes(15).toString('base64url');
+      const adminPassword = generateTemporaryPassword();
       try {
         const r = await provisionTenant(db, {
           slug: values.slug.trim().toLowerCase(),

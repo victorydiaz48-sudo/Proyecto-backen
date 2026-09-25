@@ -3,8 +3,8 @@
 //     --admin-email dono@exemplo.com [--duration 30] [--currency BRL] [--dry-run]
 // Sin --dry-run crea el negocio (si no existe) con sus locales, servicios, profesionales y horarios.
 import 'dotenv/config';
-import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { generateTemporaryPassword } from '../lib/password.ts';
 import { parseArgs } from 'node:util';
 import { loadConfig } from '../config.ts';
 import { createDb } from '../db.ts';
@@ -48,7 +48,7 @@ try {
   const r = await applyImport(db, plan, {
     slug: values.slug,
     adminEmail: values['admin-email'],
-    adminPassword: process.env.TENANT_ADMIN_PASSWORD ?? randomBytes(15).toString('base64url'),
+    adminPassword: process.env.TENANT_ADMIN_PASSWORD ?? generateTemporaryPassword(),
     now: () => new Date(),
   });
   console.log(`Importado en "${values.slug}"${r.created ? ' (negocio nuevo)' : ''}: ${JSON.stringify(r.counts)}`);
