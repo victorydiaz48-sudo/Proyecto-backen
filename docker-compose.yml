@@ -1,0 +1,11 @@
+# Local / self-hosted run of the Phase 0 bot. Postgres, Redis and object
+# storage are added in Phases 1-2.
+services:
+  telegram:
+    build:
+      context: .
+      dockerfile: apps/telegram/Dockerfile
+    env_file: .env
+    ports:
+      - "3000:3000"
+    restart: unless-stopped

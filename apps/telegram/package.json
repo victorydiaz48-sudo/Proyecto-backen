@@ -1,0 +1,19 @@
+{
+  "name": "@autocontent/telegram",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.cjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@autocontent/config": "workspace:*",
+    "@autocontent/content-engine": "workspace:*",
+    "@autocontent/providers": "workspace:*",
+    "@autocontent/shared": "workspace:*",
+    "grammy": "^1.38.0"
+  }
+}
