@@ -83,7 +83,11 @@ con RLS.
   rechazo de contraseñas comunes/repetitivas y de las que contienen el email (`src/lib/password.ts`).
 - Login (`src/modules/auth/service.ts`): mensaje genérico `INVALID_CREDENTIALS`; si el usuario no
   existe se verifica contra un hash ficticio para igualar el tiempo; `FailureLimiter` bloquea 15 min
-  tras 5 fallos por negocio+email; `@fastify/rate-limit` limita a 20 intentos/15 min por IP.
+  tras 5 fallos por negocio+email; `@fastify/rate-limit` limita a 20 intentos/15 min por IP
+  **y negocio** (detrás de un proxy mal configurado, los intentos en un negocio no bloquean el login de
+  los demás). En "negocio" se acepta el identificador o el nombre (se normaliza: minúsculas, sin acentos,
+  espacios → guiones). Las contraseñas temporales son 4 grupos de 4 caracteres sin letras confusas
+  (≈ 79 bits).
   Los fallos se auditan (sin la contraseña).
 - Sesión (`src/plugins/auth.ts`): token aleatorio de 32 bytes en cookie `sid`
   `HttpOnly; SameSite=Strict; Path=/` y `Secure` (obligatorio en producción: `COOKIE_SECURE` no puede
