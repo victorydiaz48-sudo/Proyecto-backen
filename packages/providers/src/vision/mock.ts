@@ -1,7 +1,6 @@
 import { createHash } from 'node:crypto';
 import {
-  computeMissingInformation,
-  vehicleAnalysisSchema,
+  ProviderResponseError,
   type BodyType,
   type Locale,
   type Segment,
@@ -9,7 +8,9 @@ import {
   type VehicleAnalysis,
 } from '@autocontent/shared';
 import type { ProviderStatus } from '../status.js';
-import type { VisionInput, VisionProvider } from './types.js';
+import { abortableDelay, throwIfAborted, type ProviderCallOptions, type ProviderResult } from '../types.js';
+import { normalizeVisionOutput } from './normalize.js';
+import type { VisionCapabilities, VisionInput, VisionProvider } from './types.js';
 
 type L10n = Record<Locale, string>;
 
@@ -99,32 +100,55 @@ const SAMPLES: MockSample[] = [
 
 export class MockVisionProvider implements VisionProvider {
   readonly name = 'mock-vision';
+  readonly kind = 'VISION' as const;
 
   constructor(private readonly opts: { latencyMs?: number } = {}) {}
 
-  async analyze(input: VisionInput): Promise<VehicleAnalysis> {
-    if (this.opts.latencyMs) await new Promise((r) => setTimeout(r, this.opts.latencyMs));
-    const digest = createHash('sha256').update(input.image).digest();
+  capabilities(): VisionCapabilities {
+    return {
+      supportedMimes: ['image/jpeg', 'image/png', 'image/webp'],
+      maxImageBytes: 20 * 1024 * 1024,
+      maxImageDimension: 10_000,
+      maxImagesPerCall: 4,
+      localizedFreeText: true,
+    };
+  }
+
+  async analyze(input: VisionInput, opts: ProviderCallOptions): Promise<ProviderResult<VehicleAnalysis>> {
+    const started = Date.now();
+    throwIfAborted(opts.signal);
+    if (this.opts.latencyMs) await abortableDelay(this.opts.latencyMs, opts.signal);
+    const first = input.images[0];
+    if (!first) throw new ProviderResponseError(this.name, 'No image given');
+
+    const digest = createHash('sha256').update(first.bytes).digest();
     const sample = SAMPLES[digest.readUInt32BE(0) % SAMPLES.length]!;
     const loc = input.locale;
-    const base = {
-      make: sample.make,
-      model: sample.model,
-      version: sample.version,
-      year: sample.year,
-      color:
-        sample.color.value === null
-          ? { value: null, source: 'unknown' as const }
-          : { ...sample.color, value: sample.color.value[loc] },
-      body_type: sample.body_type,
-      estimated_segment: sample.estimated_segment,
-      visual_features: sample.features.map((f) => ({ value: f.value[loc], source: f.source })),
-      visible_details: sample.details.map((d) => d[loc]),
-      confidence: sample.confidence,
-      provider: this.name,
+    // Same path as a real adapter: map to the candidate shape, then normalize.
+    const data = normalizeVisionOutput(
+      {
+        subject: 'vehicle',
+        image_quality: [],
+        make: sample.make,
+        model: sample.model,
+        version: sample.version,
+        year: sample.year,
+        color: sample.color.value === null ? unknown : { ...sample.color, value: sample.color.value[loc] },
+        body_type: sample.body_type,
+        estimated_segment: sample.estimated_segment,
+        visual_features: sample.features.map((f) => ({ value: f.value[loc], source: f.source })),
+        visible_details: sample.details.map((d) => d[loc]),
+        confidence: sample.confidence,
+      },
+      this.name,
+    );
+    return {
+      data,
+      usage: [{ unitType: 'image', units: input.images.length }],
+      model: 'mock-vision-v1',
+      latencyMs: Date.now() - started,
+      rawSummary: { sample: `${sample.make.value} ${sample.model.value ?? ''}`.trim() },
     };
-    // Validate against the same contract a real provider must meet.
-    return vehicleAnalysisSchema.parse({ ...base, missing_information: computeMissingInformation(base) });
   }
 
   async testConnection(): Promise<ProviderStatus> {

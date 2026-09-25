@@ -2,15 +2,30 @@ import type { AppConfig } from '@autocontent/config';
 import { ProviderNotConfiguredError } from '@autocontent/shared';
 import type { ProviderStatus } from './status.js';
 import { MockVisionProvider } from './vision/mock.js';
-import type { VisionProvider } from './vision/types.js';
+import type { VisionCapabilities, VisionProvider } from './vision/types.js';
 
 /**
  * Placeholder used when no real provider is configured: the app keeps running,
- * the status page shows NOT_CONFIGURED, and jobs fail with a clear, non-retryable
- * error instead of crashing.
+ * the status page shows NOT_CONFIGURED, and jobs fail fast with a clear,
+ * non-retryable error instead of crashing.
  */
 export class UnconfiguredVisionProvider implements VisionProvider {
-  constructor(readonly name: string, private readonly reason: string) {}
+  readonly kind = 'VISION' as const;
+
+  constructor(
+    readonly name: string,
+    private readonly reason: string,
+  ) {}
+
+  capabilities(): VisionCapabilities {
+    return {
+      supportedMimes: ['image/jpeg', 'image/png', 'image/webp'],
+      maxImageBytes: 0,
+      maxImageDimension: 0,
+      maxImagesPerCall: 1,
+      localizedFreeText: false,
+    };
+  }
 
   async analyze(): Promise<never> {
     throw new ProviderNotConfiguredError(this.name);
@@ -23,7 +38,8 @@ export class UnconfiguredVisionProvider implements VisionProvider {
 
 /**
  * The only place that decides which vision implementation is used.
- * Business logic depends on the VisionProvider interface, never on a class.
+ * Phase 2 moves this behind a database-backed registry that resolves
+ * per-dealership overrides (APIProvider rows); callers don't change.
  */
 export function createVisionProvider(config: AppConfig): VisionProvider {
   if (config.MOCK_MODE) {

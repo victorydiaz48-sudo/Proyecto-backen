@@ -1,7 +1,8 @@
 import { createServer } from 'node:http';
 import { loadConfig, ConfigError } from '@autocontent/config';
 import { createVisionProvider } from '@autocontent/providers';
-import { createLogger, InMemoryJobQueue, redactSecrets, type ImageLimits } from '@autocontent/shared';
+import { InMemoryQueue } from '@autocontent/queue';
+import { createLogger, redactSecrets, type ImageLimits } from '@autocontent/shared';
 import { Api } from 'grammy';
 import { createBot } from './bot.js';
 import { createAnalyzePhotoHandler, failureMessage, type AnalyzePhotoPayload } from './pipeline.js';
@@ -54,7 +55,11 @@ async function main() {
   const api = new Api(token);
   const notifier = createNotifier(api);
 
-  const queue = new InMemoryJobQueue<AnalyzePhotoPayload>(
+  const queue = new InMemoryQueue<AnalyzePhotoPayload>({
+    logger,
+    retry: { maxRetries: config.JOB_MAX_RETRIES, baseDelayMs: 2000 },
+  });
+  queue.process(
     createAnalyzePhotoHandler({
       vision,
       notifier,
@@ -63,7 +68,7 @@ async function main() {
       mockMode: config.MOCK_MODE,
     }),
     {
-      logger,
+      concurrency: 4,
       onFinalFailure: async (p, err) => {
         await notifier.sendText(p.chatId, failureMessage(err, p.locale, limits));
       },

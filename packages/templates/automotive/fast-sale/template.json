@@ -1,0 +1,108 @@
+{
+  "slug": "fast-sale",
+  "version": "1.0.0",
+  "locales": [
+    "es",
+    "pt",
+    "en"
+  ],
+  "name": "Fast Sale",
+  "description": "Direct, conversion-focused content to move inventory quickly.",
+  "tone": {
+    "voice": "direct, upbeat, action-oriented",
+    "adjectives": [
+      "available now",
+      "ready to drive",
+      "great opportunity"
+    ],
+    "avoid": [
+      "fake scarcity",
+      "prices or discounts not provided",
+      "'last unit' claims"
+    ]
+  },
+  "prompt": {
+    "copyGuidance": "Get to the point fast: what it is, why it's worth a look, how to act now. Use the user-provided price and offer only if present.",
+    "imageGuidance": "Bright, clean backgrounds; the car large in frame; room for a price overlay when a price was provided."
+  },
+  "copyStrategy": {
+    "hookStyle": "direct offer",
+    "structure": [
+      "identity",
+      "offer if provided",
+      "2-3 visible highlights",
+      "CTA"
+    ],
+    "emojiPolicy": "rich",
+    "hashtags": {
+      "min": 3,
+      "max": 5
+    }
+  },
+  "sceneStructure": [
+    {
+      "id": "hook",
+      "setting": "bright studio",
+      "shot": "quick push to front",
+      "purpose": "attention"
+    },
+    {
+      "id": "highlights",
+      "setting": "bright studio",
+      "shot": "fast detail cuts",
+      "purpose": "reasons"
+    },
+    {
+      "id": "offer",
+      "setting": "bright studio",
+      "shot": "hero with overlay space",
+      "purpose": "offer if provided"
+    },
+    {
+      "id": "closing",
+      "setting": "bright studio",
+      "shot": "hero shot",
+      "purpose": "CTA"
+    }
+  ],
+  "ctaStrategy": {
+    "primary": "whatsapp",
+    "urgency": "high",
+    "examples": {
+      "es": [
+        "¡Escríbenos hoy por WhatsApp!",
+        "Reserva tu visita hoy."
+      ],
+      "pt": [
+        "Chama no WhatsApp hoje!",
+        "Agende sua visita hoje."
+      ],
+      "en": [
+        "Message us on WhatsApp today!",
+        "Book your visit today."
+      ]
+    }
+  },
+  "formats": [
+    "instagram_caption",
+    "reel_caption",
+    "reel_video",
+    "story_text",
+    "story_image",
+    "whatsapp_message",
+    "whatsapp_status",
+    "facebook_post",
+    "marketplace_listing",
+    "headline",
+    "cta_variants"
+  ],
+  "videoStyles": [
+    "fast-sales",
+    "premium-dealership",
+    "urban"
+  ],
+  "imageScenes": [
+    "premium-studio",
+    "showroom"
+  ]
+}

@@ -18,6 +18,9 @@ export interface Messages {
   imageTooBigDimensions: (maxPx: number) => string;
   imageInvalid: string;
   visionNotConfigured: string;
+  notAVehicle: string;
+  multipleVehicles: string;
+  unclearPhoto: string;
   jobFailed: string;
   mockNotice: string;
   captionIntro: string;
@@ -54,6 +57,9 @@ const es: Messages = {
   imageTooBigDimensions: (px) => `⚠️ La imagen tiene dimensiones demasiado grandes. Máximo ${px}px por lado.`,
   imageInvalid: '⚠️ No pude leer la imagen. Prueba a enviarla de nuevo.',
   visionNotConfigured: '⚠️ El análisis de imágenes no está configurado todavía. Avisa al administrador.',
+  notAVehicle: '🤔 No veo ningún vehículo en esta foto. Envía una foto del coche, por favor.',
+  multipleVehicles: '🚗🚗 Veo varios vehículos. Envía una foto con un solo coche, por favor.',
+  unclearPhoto: '📷 No puedo ver bien el vehículo. Prueba con una foto más clara, con buena luz y el coche completo.',
   jobFailed: '❌ No pude procesar la foto. Inténtalo de nuevo en unos minutos.',
   mockNotice: '🧪 <i>Modo demo: análisis simulado, no es una identificación real.</i>',
   captionIntro: '✍️ Texto para publicar:',
@@ -120,6 +126,9 @@ const pt: Messages = {
   imageTooBigDimensions: (px) => `⚠️ As dimensões da imagem são grandes demais. Máximo ${px}px por lado.`,
   imageInvalid: '⚠️ Não consegui ler a imagem. Tente enviar de novo.',
   visionNotConfigured: '⚠️ A análise de imagens ainda não está configurada. Avise o administrador.',
+  notAVehicle: '🤔 Não vejo nenhum veículo nesta foto. Envie uma foto do carro, por favor.',
+  multipleVehicles: '🚗🚗 Vejo vários veículos. Envie uma foto com um só carro, por favor.',
+  unclearPhoto: '📷 Não consigo ver bem o veículo. Tente uma foto mais nítida, com boa luz e o carro inteiro.',
   jobFailed: '❌ Não consegui processar a foto. Tente novamente em alguns minutos.',
   mockNotice: '🧪 <i>Modo demo: análise simulada, não é uma identificação real.</i>',
   captionIntro: '✍️ Texto para publicar:',
@@ -186,6 +195,9 @@ const en: Messages = {
   imageTooBigDimensions: (px) => `⚠️ The image dimensions are too large. Maximum ${px}px per side.`,
   imageInvalid: '⚠️ I could not read the image. Please send it again.',
   visionNotConfigured: '⚠️ Image analysis is not configured yet. Please tell your administrator.',
+  notAVehicle: '🤔 I can’t see a vehicle in this photo. Please send a photo of the car.',
+  multipleVehicles: '🚗🚗 I can see several vehicles. Please send a photo with just one car.',
+  unclearPhoto: '📷 I can’t see the vehicle clearly. Try a sharper photo, with good light and the whole car in view.',
   jobFailed: '❌ I could not process the photo. Please try again in a few minutes.',
   mockNotice: '🧪 <i>Demo mode: simulated analysis, not a real identification.</i>',
   captionIntro: '✍️ Ready-to-post copy:',

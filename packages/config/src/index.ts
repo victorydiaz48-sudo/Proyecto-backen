@@ -42,6 +42,24 @@ const configSchema = z
     /** Vision provider credentials (real provider arrives in Phase 4). */
     AI_API_KEY: z.string().min(1).optional(),
 
+    /** PostgreSQL. Optional until Phase 2 wires the bot to the database. */
+    DATABASE_URL: z
+      .string()
+      .regex(/^postgres(ql)?:\/\/.+/, 'must be a postgres:// or postgresql:// URL')
+      .optional(),
+    /** Redis for the BullMQ queue (Phase 2). Without it, the in-memory queue is used. */
+    REDIS_URL: z
+      .string()
+      .regex(/^rediss?:\/\/.+/, 'must be a redis:// or rediss:// URL')
+      .optional(),
+    /** "version:base64key" pairs (32-byte keys), comma separated. Encrypts stored API keys. */
+    ENCRYPTION_KEYS: z
+      .string()
+      .regex(/^\d+:[A-Za-z0-9+/]{43}=(,\s*\d+:[A-Za-z0-9+/]{43}=)*$/, 'must look like "1:<44-char base64 key>"')
+      .optional(),
+    /** Retries after the first attempt (spec: MAX_RETRIES = 3 → up to 4 attempts). */
+    JOB_MAX_RETRIES: z.coerce.number().int().min(0).max(10).default(3),
+
     MAX_IMAGE_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024),
     MIN_IMAGE_DIMENSION: z.coerce.number().int().positive().default(320),
     MAX_IMAGE_DIMENSION: z.coerce.number().int().positive().default(10_000),

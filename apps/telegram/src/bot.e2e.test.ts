@@ -1,5 +1,6 @@
-import { MockVisionProvider, type VisionProvider } from '@autocontent/providers';
-import { ImageValidationError, InMemoryJobQueue, silentLogger } from '@autocontent/shared';
+import { MockVisionProvider, normalizeVisionOutput, type VisionProvider } from '@autocontent/providers';
+import { InMemoryQueue } from '@autocontent/queue';
+import { ImageValidationError, silentLogger } from '@autocontent/shared';
 import { makePng } from '@autocontent/shared/testing';
 import { Api, type RawApi, type Transformer } from 'grammy';
 import type { Update, UserFromGetMe } from 'grammy/types';
@@ -37,12 +38,10 @@ function harness(opts: { files?: TelegramFileFetcher; vision?: VisionProvider } 
   const notifier = createNotifier(api);
   const files: TelegramFileFetcher = opts.files ?? { download: async () => makePng(1080, 1080, 3) };
 
-  const queue = new InMemoryJobQueue<AnalyzePhotoPayload>(
+  const queue = new InMemoryQueue<AnalyzePhotoPayload>({ retry: { maxRetries: 3, baseDelayMs: 1 } });
+  queue.process(
     createAnalyzePhotoHandler({ vision: opts.vision ?? new MockVisionProvider(), notifier, files, limits, mockMode: true }),
-    {
-      retry: { maxAttempts: 3, baseDelayMs: 1 },
-      onFinalFailure: async (p, err) => notifier.sendText(p.chatId, failureMessage(err, p.locale, limits)),
-    },
+    { onFinalFailure: async (p, err) => notifier.sendText(p.chatId, failureMessage(err, p.locale, limits)) },
   );
 
   const bot = createBot({
@@ -92,6 +91,18 @@ function harness(opts: { files?: TelegramFileFetcher; vision?: VisionProvider } 
     );
 
   return { sent, queue, message, photo };
+}
+
+/** A VisionProvider whose analyze() is supplied by the test. */
+function stubVision(analyze: VisionProvider['analyze']): VisionProvider {
+  const mock = new MockVisionProvider();
+  return {
+    name: 'stub',
+    kind: 'VISION',
+    capabilities: () => mock.capabilities(),
+    testConnection: () => mock.testConnection(),
+    analyze,
+  };
 }
 
 describe('walking skeleton: Telegram photo → mock analysis → caption', () => {
@@ -169,14 +180,10 @@ describe('walking skeleton: Telegram photo → mock analysis → caption', () =>
   it('retries a flaky vision provider and still delivers exactly once', async () => {
     let calls = 0;
     const mock = new MockVisionProvider();
-    const flaky: VisionProvider = {
-      name: 'flaky',
-      testConnection: () => mock.testConnection(),
-      analyze: async (input) => {
-        if (++calls === 1) throw new Error('timeout');
-        return mock.analyze(input);
-      },
-    };
+    const flaky = stubVision(async (input, opts) => {
+      if (++calls === 1) throw new Error('timeout');
+      return mock.analyze(input, opts);
+    });
     const h = harness({ vision: flaky });
     await h.photo();
     await h.queue.onIdle();
@@ -186,13 +193,9 @@ describe('walking skeleton: Telegram photo → mock analysis → caption', () =>
 
   it('sends one friendly failure message when all attempts fail', async () => {
     const h = harness({
-      vision: {
-        name: 'down',
-        testConnection: async () => ({ provider: 'down', state: 'ERROR' }),
-        analyze: async () => {
-          throw new Error('503');
-        },
-      },
+      vision: stubVision(async () => {
+        throw new Error('503');
+      }),
     });
     await h.photo();
     await h.queue.onIdle();
@@ -200,6 +203,25 @@ describe('walking skeleton: Telegram photo → mock analysis → caption', () =>
       '🚗 Analizando tu vehículo…',
       '❌ No pude procesar la foto. Inténtalo de nuevo en unos minutos.',
     ]);
+  });
+
+  it.each([
+    ['not_vehicle', 'No veo ningún vehículo'],
+    ['multiple_vehicles', 'Veo varios vehículos'],
+    ['unclear', 'No puedo ver bien el vehículo'],
+  ])('stops politely when the photo subject is %s, without generating copy', async (subject, expected) => {
+    const h = harness({
+      vision: stubVision(async () => ({
+        data: normalizeVisionOutput({ subject }, 'stub'),
+        usage: [{ unitType: 'image', units: 1 }],
+        model: 'stub',
+        latencyMs: 0,
+      })),
+    });
+    await h.photo();
+    await h.queue.onIdle();
+    expect(h.sent).toHaveLength(2);
+    expect(h.sent[1]!.text).toContain(expected);
   });
 
   it('answers text messages and /start', async () => {

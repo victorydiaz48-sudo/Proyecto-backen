@@ -1,18 +1,30 @@
+import { createHash } from 'node:crypto';
 import { loadConfig } from '@autocontent/config';
-import { ProviderNotConfiguredError, vehicleAnalysisSchema } from '@autocontent/shared';
+import { ProviderNotConfiguredError, silentLogger, type Locale } from '@autocontent/shared';
 import { makePng } from '@autocontent/shared/testing';
 import { describe, expect, it } from 'vitest';
 import { createVisionProvider } from '../registry.js';
+import { describeVisionProviderContract } from '../testing.js';
 import { MockVisionProvider } from './mock.js';
+import type { VisionInput } from './types.js';
+
+describeVisionProviderContract('mock-vision', () => new MockVisionProvider());
+
+const opts = { jobId: 'j', dealershipId: 'd', idempotencyKey: 'k', signal: new AbortController().signal, logger: silentLogger };
+const input = (seed: number, locale: Locale = 'es'): VisionInput => {
+  const bytes = makePng(400, 400, seed);
+  return {
+    images: [{ bytes, mime: 'image/png', width: 400, height: 400, sha256: createHash('sha256').update(bytes).digest('hex') }],
+    locale,
+  };
+};
 
 describe('MockVisionProvider', () => {
   const vision = new MockVisionProvider();
 
-  it('returns output that satisfies the real provider contract', async () => {
+  it('keeps missing_information consistent with unknown fields across samples', async () => {
     for (let seed = 0; seed < 20; seed++) {
-      const a = await vision.analyze({ image: makePng(400, 400, seed), mime: 'image/png', locale: 'es', jobId: 'j' });
-      expect(vehicleAnalysisSchema.safeParse(a).success).toBe(true);
-      expect(a.missing_information).toEqual(expect.arrayContaining(['price', 'mileage', 'location', 'contact']));
+      const { data: a } = await vision.analyze(input(seed), opts);
       for (const k of ['make', 'model', 'version', 'year', 'color'] as const) {
         expect(a.missing_information.includes(k)).toBe(a[k].source === 'unknown');
       }
@@ -20,13 +32,25 @@ describe('MockVisionProvider', () => {
   });
 
   it('is deterministic for the same image and localises free text', async () => {
-    const img = makePng(400, 400, 7);
-    const es = await vision.analyze({ image: img, mime: 'image/png', locale: 'es', jobId: 'j' });
-    const again = await vision.analyze({ image: img, mime: 'image/png', locale: 'es', jobId: 'j' });
-    const pt = await vision.analyze({ image: img, mime: 'image/png', locale: 'pt', jobId: 'j' });
+    const es = (await vision.analyze(input(7), opts)).data;
+    const again = (await vision.analyze(input(7), opts)).data;
+    const pt = (await vision.analyze(input(7, 'pt'), opts)).data;
     expect(again).toEqual(es);
     expect(pt.make).toEqual(es.make);
     expect(pt.color.value).not.toBe(es.color.value);
+  });
+
+  it('reports usage per image, not money', async () => {
+    const res = await vision.analyze(input(1), opts);
+    expect(res.usage).toEqual([{ unitType: 'image', units: 1 }]);
+  });
+
+  it('aborts a slow call when the signal fires', async () => {
+    const slow = new MockVisionProvider({ latencyMs: 5_000 });
+    const ac = new AbortController();
+    const p = slow.analyze(input(1), { ...opts, signal: ac.signal });
+    ac.abort(new Error('deadline'));
+    await expect(p).rejects.toThrow('deadline');
   });
 });
 
@@ -38,8 +62,6 @@ describe('createVisionProvider', () => {
   it('reports NOT_CONFIGURED without crashing when no real provider is available', async () => {
     const v = createVisionProvider(loadConfig({ MOCK_MODE: 'false' }));
     expect((await v.testConnection()).state).toBe('NOT_CONFIGURED');
-    await expect(v.analyze({ image: new Uint8Array(), mime: 'image/png', locale: 'es', jobId: 'j' })).rejects.toBeInstanceOf(
-      ProviderNotConfiguredError,
-    );
+    await expect(v.analyze(input(1), opts)).rejects.toBeInstanceOf(ProviderNotConfiguredError);
   });
 });

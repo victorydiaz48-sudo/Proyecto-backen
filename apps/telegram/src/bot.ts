@@ -1,4 +1,5 @@
-import type { ImageLimits, JobQueue, Locale, Logger } from '@autocontent/shared';
+import type { JobQueue } from '@autocontent/queue';
+import type { ImageLimits, Locale, Logger } from '@autocontent/shared';
 import { messages, deterministicJobId } from '@autocontent/shared';
 import { Bot, type Context } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';

@@ -29,6 +29,14 @@ export type Segment = (typeof SEGMENTS)[number];
 export const USER_ONLY_FIELDS = ['price', 'mileage', 'location', 'contact', 'financing'] as const;
 export type UserOnlyField = (typeof USER_ONLY_FIELDS)[number];
 
+/** What the photo actually shows. Anything but `vehicle` stops the job before any further spend. */
+export const PHOTO_SUBJECTS = ['vehicle', 'not_vehicle', 'multiple_vehicles', 'unclear'] as const;
+export type PhotoSubject = (typeof PHOTO_SUBJECTS)[number];
+
+/** Problems with the photo itself, so the bot can ask for a better one. */
+export const IMAGE_QUALITY_ISSUES = ['blurry', 'dark', 'overexposed', 'partial', 'obstructed', 'low_resolution'] as const;
+export type ImageQualityIssue = (typeof IMAGE_QUALITY_ISSUES)[number];
+
 export const ANALYSIS_FIELDS = ['make', 'model', 'version', 'year', 'color', 'body_type', 'estimated_segment'] as const;
 export type AnalysisField = (typeof ANALYSIS_FIELDS)[number];
 
@@ -59,6 +67,8 @@ export type Tagged<T> = {
 };
 
 export const vehicleAnalysisSchema = z.object({
+  subject: z.enum(PHOTO_SUBJECTS),
+  image_quality: z.array(z.enum(IMAGE_QUALITY_ISSUES)),
   make: taggedSchema(z.string().min(1)),
   model: taggedSchema(z.string().min(1)),
   version: taggedSchema(z.string().min(1)),

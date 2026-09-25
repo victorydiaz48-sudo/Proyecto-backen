@@ -3,9 +3,13 @@
 Everything below is done from a phone or any browser: the Telegram app,
 GitHub's website and Railway's dashboard. You never need to run a command.
 
-**Current phase: 0 (walking skeleton, MOCK_MODE).** The bot receives a photo,
-runs a **simulated** vehicle analysis and replies with a generated caption.
-No paid API is used.
+**Current phase: 1 (foundations).** The bot still runs the Phase 0 flow: it
+receives a photo, runs a **simulated** vehicle analysis and replies with a
+generated caption. No paid API is used.
+
+**Updating from Phase 0 needs no changes on Railway** — no new variables, no
+database yet. Phase 2 adds PostgreSQL (and optionally Redis); this file will
+list those steps before you deploy it.
 
 ---
 

@@ -1,6 +1,8 @@
 import { generateCaption } from '@autocontent/content-engine';
 import type { VisionProvider } from '@autocontent/providers';
-import type { ImageLimits, JobContext, Locale } from '@autocontent/shared';
+import { createHash } from 'node:crypto';
+import type { JobContext } from '@autocontent/queue';
+import type { ImageLimits, Locale } from '@autocontent/shared';
 import {
   ImageValidationError,
   LogEvent,
@@ -28,7 +30,15 @@ export interface PipelineDeps {
   files: TelegramFileFetcher;
   limits: ImageLimits;
   mockMode: boolean;
+  /** Hard deadline for the vision call. */
+  visionTimeoutMs?: number;
 }
+
+/**
+ * Until Phase 2 attaches Telegram users to dealerships, provider calls carry
+ * this placeholder tenant id (used only for logging/idempotency keys).
+ */
+export const UNSCOPED_DEALERSHIP_ID = 'unscoped';
 
 /**
  * Walking-skeleton pipeline: download → validate → analyse → caption → reply.
@@ -58,20 +68,57 @@ export function createAnalyzePhotoHandler(deps: PipelineDeps) {
     });
 
     const t0 = Date.now();
-    const analysis = await deps.vision.analyze({ image: bytes, mime: image.mime, locale: p.locale, jobId: p.jobId });
+    const result = await deps.vision.analyze(
+      {
+        images: [
+          {
+            bytes,
+            mime: image.mime as 'image/jpeg' | 'image/png' | 'image/webp',
+            width: image.width,
+            height: image.height,
+            sha256: createHash('sha256').update(bytes).digest('hex'),
+          },
+        ],
+        locale: p.locale,
+      },
+      {
+        jobId: p.jobId,
+        dealershipId: UNSCOPED_DEALERSHIP_ID,
+        idempotencyKey: `${p.jobId}:vision:${ctx.attempt}`,
+        signal: AbortSignal.timeout(deps.visionTimeoutMs ?? 60_000),
+        logger: log,
+      },
+    );
+    const analysis = result.data;
     log.info('image analyzed', {
       event: LogEvent.IMAGE_ANALYZED,
       provider: deps.vision.name,
+      model: result.model,
       durationMs: Date.now() - t0,
+      usage: result.usage,
+      subject: analysis.subject,
       confidence: analysis.confidence,
       make: analysis.make.value,
-      model: analysis.model.value,
+      model_name: analysis.model.value,
     });
+
+    const m = messages(p.locale);
+    // Not a usable vehicle photo: say so and stop before generating anything.
+    if (analysis.subject !== 'vehicle') {
+      const text =
+        analysis.subject === 'not_vehicle'
+          ? m.notAVehicle
+          : analysis.subject === 'multiple_vehicles'
+            ? m.multipleVehicles
+            : m.unclearPhoto;
+      await sendOnce(`${p.jobId}:subject`, () => deps.notifier.sendText(p.chatId, text));
+      sent.delete(`${p.jobId}:subject`);
+      return;
+    }
 
     const caption = generateCaption(analysis, p.locale);
     log.info('copy generated', { event: LogEvent.COPY_GENERATED, usedFields: caption.usedFields });
 
-    const m = messages(p.locale);
     await sendOnce(`${p.jobId}:analysis`, () =>
       deps.notifier.sendHtml(p.chatId, formatAnalysis(analysis, p.locale, { mock: deps.mockMode })),
     );

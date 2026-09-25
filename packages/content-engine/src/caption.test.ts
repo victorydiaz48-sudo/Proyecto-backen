@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { generateCaption } from './caption.js';
 
 const base: VehicleAnalysis = {
+  subject: 'vehicle',
+  image_quality: [],
   make: { value: 'Toyota', source: 'detected', confidence: 0.95 },
   model: { value: 'Corolla', source: 'detected', confidence: 0.9 },
   version: { value: 'XEI', source: 'inferred', confidence: 0.55 },

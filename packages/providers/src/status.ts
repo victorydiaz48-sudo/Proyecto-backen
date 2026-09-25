@@ -1,5 +1,15 @@
-/** Shape used by the admin status page (Phase 9) and by startup logs. */
+/** Shape used by the admin status page and startup logs. */
 export type ProviderState = 'CONNECTED' | 'NOT_CONFIGURED' | 'ERROR';
+
+export type ProviderKind =
+  | 'TELEGRAM'
+  | 'VISION'
+  | 'TEXT_GENERATION'
+  | 'IMAGE_GENERATION'
+  | 'VIDEO_GENERATION'
+  | 'STORAGE'
+  | 'SOCIAL_PUBLISHING'
+  | 'ANALYTICS';
 
 export interface ProviderStatus {
   provider: string;
@@ -9,8 +19,11 @@ export interface ProviderStatus {
   latencyMs?: number;
 }
 
-/** Every provider adapter exposes a cheap connectivity check. */
+/** Every provider adapter exposes an identity and a cheap connectivity check. */
 export interface TestableProvider {
+  /** Adapter id; matches APIProvider.adapter in the database. */
   readonly name: string;
-  testConnection(): Promise<ProviderStatus>;
+  readonly kind: ProviderKind;
+  /** Must not spend generation credit. */
+  testConnection(opts?: { signal?: AbortSignal }): Promise<ProviderStatus>;
 }

@@ -42,4 +42,15 @@ describe('loadConfig', () => {
       expect((e as Error).message).not.toContain(bad);
     }
   });
+
+  it('validates infrastructure URLs and encryption keys without echoing them', () => {
+    expect(loadConfig({ DATABASE_URL: 'postgresql://u:p@h:5432/db' }).DATABASE_URL).toContain('postgresql://');
+    expect(() => loadConfig({ DATABASE_URL: 'mysql://u:SECRETPW@h/db' })).toThrow(/DATABASE_URL/);
+    expect(() => loadConfig({ DATABASE_URL: 'mysql://u:SECRETPW@h/db' })).not.toThrow(/SECRETPW/);
+    expect(() => loadConfig({ REDIS_URL: 'http://x' })).toThrow(/REDIS_URL/);
+    const key = Buffer.alloc(32, 7).toString('base64');
+    expect(loadConfig({ ENCRYPTION_KEYS: `1:${key}` }).ENCRYPTION_KEYS).toBe(`1:${key}`);
+    expect(() => loadConfig({ ENCRYPTION_KEYS: 'short' })).toThrow(/ENCRYPTION_KEYS/);
+    expect(loadConfig({}).JOB_MAX_RETRIES).toBe(3);
+  });
 });

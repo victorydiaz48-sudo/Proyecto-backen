@@ -1,0 +1,107 @@
+{
+  "slug": "cinematic-luxury",
+  "version": "1.0.0",
+  "locales": [
+    "es",
+    "pt",
+    "en"
+  ],
+  "name": "Cinematic Luxury",
+  "description": "Slow, elegant storytelling for premium and luxury vehicles.",
+  "tone": {
+    "voice": "sophisticated, calm, confident",
+    "adjectives": [
+      "elegant",
+      "refined",
+      "exclusive"
+    ],
+    "avoid": [
+      "urgency pressure",
+      "discount language",
+      "exclamation marks in excess"
+    ]
+  },
+  "prompt": {
+    "copyGuidance": "Evoke craftsmanship and presence through what is visible in the photo. Short sentences, sensory language, no hard selling.",
+    "imageGuidance": "Premium studio or cinematic road at golden hour; soft reflections; the car is the hero and fully in frame."
+  },
+  "copyStrategy": {
+    "hookStyle": "evocative statement",
+    "structure": [
+      "hook",
+      "visible design details",
+      "invitation"
+    ],
+    "emojiPolicy": "light",
+    "hashtags": {
+      "min": 3,
+      "max": 6
+    }
+  },
+  "sceneStructure": [
+    {
+      "id": "reveal",
+      "setting": "premium studio",
+      "shot": "slow front three-quarter reveal",
+      "purpose": "first impression"
+    },
+    {
+      "id": "details",
+      "setting": "premium studio",
+      "shot": "close-ups of headlights and wheels",
+      "purpose": "craftsmanship"
+    },
+    {
+      "id": "road",
+      "setting": "cinematic road at golden hour",
+      "shot": "side tracking shot",
+      "purpose": "freedom"
+    },
+    {
+      "id": "closing",
+      "setting": "premium studio",
+      "shot": "front hero shot",
+      "purpose": "CTA"
+    }
+  ],
+  "ctaStrategy": {
+    "primary": "message",
+    "urgency": "low",
+    "examples": {
+      "es": [
+        "Agenda una visita privada.",
+        "Escríbenos para conocerlo en persona."
+      ],
+      "pt": [
+        "Agende uma visita exclusiva.",
+        "Fale com a gente para conhecê-lo pessoalmente."
+      ],
+      "en": [
+        "Book a private viewing.",
+        "Message us to see it in person."
+      ]
+    }
+  },
+  "formats": [
+    "instagram_caption",
+    "instagram_carousel",
+    "reel_caption",
+    "reel_video",
+    "story_text",
+    "story_image",
+    "facebook_post",
+    "website_description",
+    "headline",
+    "cta_variants"
+  ],
+  "videoStyles": [
+    "cinematic-luxury",
+    "night-luxury",
+    "minimalist"
+  ],
+  "imageScenes": [
+    "premium-studio",
+    "cinematic-road",
+    "showroom"
+  ]
+}

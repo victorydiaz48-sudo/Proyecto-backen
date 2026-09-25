@@ -10,6 +10,11 @@
   },
   "dependencies": {
     "@autocontent/config": "workspace:*",
-    "@autocontent/shared": "workspace:*"
+    "@autocontent/shared": "workspace:*",
+    "zod": "^4.1.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
   }
 }

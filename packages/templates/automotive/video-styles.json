@@ -1,0 +1,108 @@
+{
+  "$comment": "Selectable reel styles for the cinematic reel engine (Phase 7).",
+  "styles": [
+    {
+      "id": "cinematic-luxury",
+      "name": "Cinematic Luxury",
+      "pacing": "slow",
+      "cameraMovements": [
+        "slow dolly in",
+        "orbit",
+        "crane down"
+      ],
+      "transitions": [
+        "fade",
+        "light leak"
+      ],
+      "music": "orchestral ambient, restrained",
+      "colorGrade": "warm, high contrast"
+    },
+    {
+      "id": "aggressive-sport",
+      "name": "Aggressive Sport",
+      "pacing": "fast",
+      "cameraMovements": [
+        "whip pan",
+        "low tracking",
+        "rack focus"
+      ],
+      "transitions": [
+        "hard cut",
+        "speed ramp"
+      ],
+      "music": "driving electronic, heavy bass",
+      "colorGrade": "cool, punchy"
+    },
+    {
+      "id": "premium-dealership",
+      "name": "Premium Dealership",
+      "pacing": "medium",
+      "cameraMovements": [
+        "steady glide",
+        "slow pan"
+      ],
+      "transitions": [
+        "cross dissolve"
+      ],
+      "music": "modern corporate, upbeat",
+      "colorGrade": "clean, neutral"
+    },
+    {
+      "id": "minimalist",
+      "name": "Minimalist",
+      "pacing": "slow",
+      "cameraMovements": [
+        "static",
+        "slow push"
+      ],
+      "transitions": [
+        "cut to white"
+      ],
+      "music": "sparse piano",
+      "colorGrade": "soft, low saturation"
+    },
+    {
+      "id": "urban",
+      "name": "Urban",
+      "pacing": "medium",
+      "cameraMovements": [
+        "handheld follow",
+        "street-level tracking"
+      ],
+      "transitions": [
+        "glitch cut",
+        "match cut"
+      ],
+      "music": "hip-hop instrumental",
+      "colorGrade": "teal and orange"
+    },
+    {
+      "id": "fast-sales",
+      "name": "Fast Sales",
+      "pacing": "very fast",
+      "cameraMovements": [
+        "quick push",
+        "snap zoom"
+      ],
+      "transitions": [
+        "hard cut"
+      ],
+      "music": "energetic pop",
+      "colorGrade": "bright, saturated"
+    },
+    {
+      "id": "night-luxury",
+      "name": "Night Luxury",
+      "pacing": "slow",
+      "cameraMovements": [
+        "slow orbit",
+        "reflections tracking"
+      ],
+      "transitions": [
+        "fade through black"
+      ],
+      "music": "deep ambient synth",
+      "colorGrade": "dark, neon accents"
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "slug": "minimalist",
+  "version": "1.0.0",
+  "locales": [
+    "es",
+    "pt",
+    "en"
+  ],
+  "name": "Minimalist",
+  "description": "Understated, clean content that lets the vehicle speak.",
+  "tone": {
+    "voice": "understated, precise",
+    "adjectives": [
+      "clean",
+      "simple",
+      "essential"
+    ],
+    "avoid": [
+      "filler",
+      "emoji overload",
+      "superlatives"
+    ]
+  },
+  "prompt": {
+    "copyGuidance": "Few words, each earning its place. Identity, one or two visible details, one CTA.",
+    "imageGuidance": "Seamless white or grey studio; soft shadows; generous negative space."
+  },
+  "copyStrategy": {
+    "hookStyle": "single noun phrase",
+    "structure": [
+      "identity",
+      "one visible detail",
+      "CTA"
+    ],
+    "emojiPolicy": "none",
+    "hashtags": {
+      "min": 1,
+      "max": 3
+    }
+  },
+  "sceneStructure": [
+    {
+      "id": "still",
+      "setting": "minimal studio",
+      "shot": "static front three-quarter",
+      "purpose": "identity"
+    },
+    {
+      "id": "line",
+      "setting": "minimal studio",
+      "shot": "slow push along side profile",
+      "purpose": "design line"
+    },
+    {
+      "id": "closing",
+      "setting": "minimal studio",
+      "shot": "static rear three-quarter",
+      "purpose": "CTA"
+    }
+  ],
+  "ctaStrategy": {
+    "primary": "message",
+    "urgency": "low",
+    "examples": {
+      "es": [
+        "Más información por mensaje."
+      ],
+      "pt": [
+        "Mais informações por mensagem."
+      ],
+      "en": [
+        "Details by message."
+      ]
+    }
+  },
+  "formats": [
+    "instagram_caption",
+    "instagram_post_image",
+    "reel_caption",
+    "reel_video",
+    "story_text",
+    "story_image",
+    "website_description",
+    "headline",
+    "cta_variants"
+  ],
+  "videoStyles": [
+    "minimalist",
+    "premium-dealership"
+  ],
+  "imageScenes": [
+    "premium-studio"
+  ]
+}

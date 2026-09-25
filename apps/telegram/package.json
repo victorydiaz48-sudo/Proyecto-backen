@@ -13,6 +13,7 @@
     "@autocontent/config": "workspace:*",
     "@autocontent/content-engine": "workspace:*",
     "@autocontent/providers": "workspace:*",
+    "@autocontent/queue": "workspace:*",
     "@autocontent/shared": "workspace:*",
     "grammy": "^1.38.0"
   }
