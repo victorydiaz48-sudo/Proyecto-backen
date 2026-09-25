@@ -23,6 +23,9 @@ const configSchema = z
     MOCK_LATENCY_MS: z.coerce.number().int().min(0).max(60_000).default(800),
 
     PORT: z.coerce.number().int().min(1).max(65_535).default(3000),
+    /** Which parts run in this process: everything (default), or one role per service. */
+    SERVICE: z.enum(['all', 'telegram', 'worker']).default('all'),
+    WORKER_CONCURRENCY: z.coerce.number().int().min(1).max(50).default(4),
     DEFAULT_LOCALE: z.enum(LOCALES).default('es'),
 
     TELEGRAM_BOT_TOKEN: z
@@ -37,6 +40,15 @@ const configSchema = z
     TELEGRAM_WEBHOOK_SECRET: z
       .string()
       .regex(/^[A-Za-z0-9_-]{16,256}$/, 'must be 16-256 chars of A-Z, a-z, 0-9, _ or -')
+      .optional(),
+
+    /**
+     * One-time code: the first person to open t.me/<bot>?start=<code> becomes
+     * OWNER of the demo dealership. Useless once claimed.
+     */
+    BOOTSTRAP_CODE: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{12,64}$/, 'must be 12-64 characters of A-Z, a-z, 0-9, _ or -')
       .optional(),
 
     /** Vision provider credentials (real provider arrives in Phase 4). */
@@ -57,6 +69,16 @@ const configSchema = z
       .string()
       .regex(/^\d+:[A-Za-z0-9+/]{43}=(,\s*\d+:[A-Za-z0-9+/]{43}=)*$/, 'must look like "1:<44-char base64 key>"')
       .optional(),
+    /** S3-compatible storage (Cloudflare R2, AWS S3, Backblaze B2…). All four or none. */
+    STORAGE_ENDPOINT: z.url({ protocol: /^https?$/ }).optional(),
+    STORAGE_ACCESS_KEY: z.string().min(1).optional(),
+    STORAGE_SECRET_KEY: z.string().min(1).optional(),
+    STORAGE_BUCKET: z.string().regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/, 'must be a valid bucket name').optional(),
+    STORAGE_REGION: z.string().default('auto'),
+    STORAGE_FORCE_PATH_STYLE: bool.default(false),
+    /** Fallback when S3 is not configured: files on the server's disk (not durable). */
+    STORAGE_LOCAL_DIR: z.string().default('/tmp/autocontent-storage'),
+
     /** Retries after the first attempt (spec: MAX_RETRIES = 3 → up to 4 attempts). */
     JOB_MAX_RETRIES: z.coerce.number().int().min(0).max(10).default(3),
 
@@ -65,6 +87,13 @@ const configSchema = z
     MAX_IMAGE_DIMENSION: z.coerce.number().int().positive().default(10_000),
   })
   .superRefine((c, ctx) => {
+    const storage = ['STORAGE_ENDPOINT', 'STORAGE_ACCESS_KEY', 'STORAGE_SECRET_KEY', 'STORAGE_BUCKET'] as const;
+    const set = storage.filter((k) => c[k] !== undefined);
+    if (set.length > 0 && set.length < storage.length) {
+      for (const k of storage.filter((k) => c[k] === undefined)) {
+        ctx.addIssue({ code: 'custom', path: [k], message: 'required when any STORAGE_* variable is set' });
+      }
+    }
     if (c.TELEGRAM_MODE === 'webhook') {
       if (!c.TELEGRAM_WEBHOOK_URL) {
         ctx.addIssue({ code: 'custom', path: ['TELEGRAM_WEBHOOK_URL'], message: 'required when TELEGRAM_MODE=webhook' });

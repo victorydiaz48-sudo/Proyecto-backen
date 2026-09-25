@@ -9,7 +9,7 @@
     "generate": "prisma generate",
     "migrate:deploy": "prisma migrate deploy",
     "migrate:dev": "prisma migrate dev",
-    "seed": "tsx src/seed.ts",
+    "seed": "tsx src/seed-cli.ts",
     "typecheck": "prisma generate >/dev/null && tsc -p tsconfig.json",
     "postinstall": "prisma generate"
   },

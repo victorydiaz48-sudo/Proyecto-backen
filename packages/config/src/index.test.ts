@@ -53,4 +53,21 @@ describe('loadConfig', () => {
     expect(() => loadConfig({ ENCRYPTION_KEYS: 'short' })).toThrow(/ENCRYPTION_KEYS/);
     expect(loadConfig({}).JOB_MAX_RETRIES).toBe(3);
   });
+
+  it('requires all four S3 variables together', () => {
+    expect(() => loadConfig({ STORAGE_BUCKET: 'media' })).toThrow(/STORAGE_ENDPOINT/);
+    const c = loadConfig({
+      STORAGE_ENDPOINT: 'https://acc.r2.cloudflarestorage.com',
+      STORAGE_ACCESS_KEY: 'a',
+      STORAGE_SECRET_KEY: 'b',
+      STORAGE_BUCKET: 'media',
+    });
+    expect(c.STORAGE_REGION).toBe('auto');
+  });
+
+  it('rejects a weak bootstrap code', () => {
+    expect(() => loadConfig({ BOOTSTRAP_CODE: 'abc' })).toThrow(/BOOTSTRAP_CODE/);
+    expect(loadConfig({ BOOTSTRAP_CODE: 'mi-concesionario-2026' }).BOOTSTRAP_CODE).toBe('mi-concesionario-2026');
+    expect(loadConfig({}).SERVICE).toBe('all');
+  });
 });

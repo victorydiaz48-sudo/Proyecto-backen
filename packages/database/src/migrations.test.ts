@@ -40,6 +40,8 @@ export const TENANT_CONSTRAINTS = [
   'tenant_TelegramInvite_uses',
 ];
 const TENANT_INDEXES = ['tenant_APIProvider_platform_adapter', 'tenant_APIProvider_dealership_adapter'];
+/** Hand-written objects without the tenant_ prefix (target of a composite foreign key). */
+const OTHER_HAND_WRITTEN = ['APIKeyReference_id_dealershipId_key'];
 
 describe('migrations', () => {
   it('create every tenant-boundary constraint', () => {
@@ -50,6 +52,9 @@ describe('migrations', () => {
   it('never drop a tenant-boundary constraint (Prisma generates such drops — delete them by hand)', () => {
     for (const m of migrations) {
       expect(sql(m), `migration ${m} drops a tenant_* object`).not.toMatch(/DROP\s+(CONSTRAINT|INDEX)\s+(IF EXISTS\s+)?"tenant_/i);
+      for (const name of OTHER_HAND_WRITTEN) {
+        expect(sql(m), `migration ${m} drops ${name}`).not.toMatch(new RegExp(`DROP\\s+(CONSTRAINT|INDEX)\\s+(IF EXISTS\\s+)?"${name}"`, 'i'));
+      }
     }
   });
 

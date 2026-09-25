@@ -11,14 +11,15 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "vitest run",
     "check": "pnpm typecheck && pnpm test && pnpm build",
-    "dev:telegram": "pnpm --filter @autocontent/telegram dev"
+    "dev": "pnpm --filter @autocontent/server dev"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsup": "^8.5.0",
     "tsx": "^4.20.0",
     "typescript": "^5.9.0",
-    "vitest": "^3.2.0"
+    "vitest": "^3.2.0",
+    "s3rver": "^3.7.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

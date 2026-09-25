@@ -1,7 +1,6 @@
-import { fileURLToPath } from 'node:url';
 import type { CostConfig } from '@autocontent/shared';
 import { costConfigSchema } from '@autocontent/shared';
-import { createPrismaClient, type Prisma, type PrismaClient } from './client.js';
+import type { Prisma, PrismaClient } from './client.js';
 import type { ProviderKind } from './generated/enums.js';
 import { PLANS } from './plans.js';
 
@@ -83,21 +82,4 @@ export async function seed(prisma: PrismaClient, now = new Date()) {
   }
 
   return { dealershipId: dealership.id };
-}
-
-// CLI entry: `pnpm --filter @autocontent/database seed`
-if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  const url = process.env.DATABASE_URL;
-  if (!url) {
-    console.error('DATABASE_URL is not set');
-    process.exit(1);
-  }
-  const prisma = createPrismaClient(url);
-  seed(prisma)
-    .then((r) => console.log(JSON.stringify({ level: 'info', msg: 'seed complete', ...r })))
-    .catch((err: unknown) => {
-      console.error(JSON.stringify({ level: 'error', msg: 'seed failed', err: String(err) }));
-      process.exitCode = 1;
-    })
-    .finally(() => prisma.$disconnect());
 }

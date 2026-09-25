@@ -4,16 +4,21 @@ Content automation for car dealerships: an employee sends **one vehicle photo**
 to a Telegram bot, and the system identifies the vehicle and produces marketing
 content (captions, posts, stories, reels) — and later publishes it.
 
-> **Status: Phase 1 — foundations complete.** The bot runs the Phase 0 flow
-> (Telegram photo → validated → mock vision analysis → caption → reply);
-> the database schema, tenant isolation, provider contracts, API contracts
-> and templates are built and tested, and get wired in from Phase 2.
-> See [SETUP.md](SETUP.md) to deploy it from your phone.
+> **Status: Phase 2 — core backend + job queue.** Invite-only Telegram bot →
+> PostgreSQL (vehicles, jobs, usage) → Redis/BullMQ queue → worker → photo
+> storage → mock vision analysis → caption → reply. Vision is still simulated
+> (MOCK_MODE). See [SETUP.md](SETUP.md) to deploy it from your phone.
 
 ## What works today
 
-- Telegram bot (`/start`, `/help`, photos, images sent as files), polling or
-  secured webhook mode
+- Invite-only Telegram bot (`/start`, `/help`, `/invite`, photos, images sent
+  as files), polling or secured webhook mode; first owner via a one-time
+  bootstrap link
+- Every photo becomes a Vehicle + ContentJob in PostgreSQL; daily/monthly
+  limits per dealership; usage and provider cost recorded exactly once
+- Queue on Redis (BullMQ) or in memory; unfinished jobs resume after a restart
+- Original photos stored in S3-compatible storage (e.g. Cloudflare R2) or on
+  local disk; an identical photo reuses its analysis instead of paying again
 - Immediate acknowledgement; processing runs in a background job queue with
   up to 3 retries (4 attempts), exponential backoff and idempotent job ids
 - Upload validation from the actual bytes: type (JPEG/PNG/WebP), size,
@@ -29,21 +34,23 @@ content (captions, posts, stories, reels) — and later publishes it.
 - Photos that show no vehicle, several vehicles, or an unclear view get a
   specific reply and no further processing
 
-Built and tested, wired in from Phase 2:
-
 - PostgreSQL schema for all 15 entities (+ settings, sessions, invites,
   publications, audit log) with tenant isolation enforced by the database
-- Tenant-scoped data access, settings snapshots, encrypted API-key storage
-- Full provider contracts (vision, text, image, video, storage, social,
-  analytics) and a conformance test suite for vision adapters
-- REST API contract with per-route roles, published as OpenAPI
-- Five content templates, 15 formats, 7 video styles
+- `/health` and `/ready` report database, queue, storage, Telegram and vision
+
+Built and tested, not yet used by the running app:
+
+- Encrypted API-key storage, REST API contract (OpenAPI), five content
+  templates / 15 formats / 7 video styles, provider interfaces for text,
+  image, video, social publishing and analytics
 
 ## Repository layout
 
 ```
 apps/
-  telegram/          Bot service
+  server/            Entry point + Dockerfile: runs bot and/or worker (SERVICE=all|telegram|worker)
+  telegram/          Bot: access control, invites, job creation; HTTP server
+  worker/            Content-job processor (ingest → analyse → caption → deliver)
 packages/
   shared/            Vehicle data model, i18n, logger, errors, image validation, QA/video-plan schemas
   config/            Validated environment configuration
@@ -56,7 +63,7 @@ packages/
 docs/api/            Generated OpenAPI document
 ```
 
-More apps (`api`, `worker`, `web`) and packages are added phase by phase; see
+More apps (`api`, `web`) and packages are added phase by phase; see
 [ARCHITECTURE.md](ARCHITECTURE.md).
 
 `generador-pagina-contacto.html` is an earlier, unrelated standalone tool and
@@ -67,6 +74,7 @@ is left untouched.
 ```bash
 corepack enable
 pnpm install
-pnpm check          # typecheck + tests + build
-pnpm dev:telegram   # needs TELEGRAM_BOT_TOKEN in the environment
+pnpm check          # typecheck + tests + build (DB/Redis tests need TEST_DATABASE_URL / TEST_REDIS_URL)
+pnpm dev            # needs DATABASE_URL and TELEGRAM_BOT_TOKEN in the environment
+docker compose up   # app + PostgreSQL + Redis
 ```

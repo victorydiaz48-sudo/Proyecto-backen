@@ -1,6 +1,6 @@
 import { ImageValidationError } from '@autocontent/shared';
 import type { Api } from 'grammy';
-import type { ChatNotifier, TelegramFileFetcher } from './ports.js';
+import type { ChatNotifier, TelegramFileFetcher } from './types.js';
 
 const DOWNLOAD_TIMEOUT_MS = 20_000;
 

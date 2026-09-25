@@ -19,7 +19,7 @@ const server = createHttpServer({
   logger: silentLogger,
   mode: 'webhook',
   webhookSecret: SECRET,
-  health: () => ({ mockMode: true }),
+  health: () => ({ status: 'ok' as const, ready: true, mockMode: true }),
 });
 let base = '';
 
@@ -52,6 +52,22 @@ describe('http server', () => {
   it('accepts webhook calls with the secret token', async () => {
     expect((await post({ 'x-telegram-bot-api-secret-token': SECRET })).status).toBe(200);
     expect(received).toEqual([99]);
+  });
+
+  it('serves /ready without exposing the ready flag in the body', async () => {
+    const res = await fetch(`${base}/ready`);
+    expect(res.status).toBe(200);
+    expect(await res.json()).not.toHaveProperty('ready');
+  });
+
+  it('answers 503 on /ready when not ready, but /health stays 200', async () => {
+    const s = createHttpServer({ logger: silentLogger, mode: 'polling', health: () => ({ status: 'degraded', ready: false }) });
+    await new Promise<void>((r) => s.listen(0, r));
+    const b = `http://127.0.0.1:${(s.address() as AddressInfo).port}`;
+    expect((await fetch(`${b}/ready`)).status).toBe(503);
+    expect((await fetch(`${b}/health`)).status).toBe(200);
+    expect((await fetch(`${b}/telegram/webhook`, { method: 'POST' })).status).toBe(404); // no bot → no webhook
+    await new Promise<void>((r) => s.close(() => r()));
   });
 
   it('returns 404 for unknown routes', async () => {

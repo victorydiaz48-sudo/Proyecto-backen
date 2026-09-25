@@ -1,11 +1,41 @@
-# Local / self-hosted run of the Phase 0 bot. Postgres, Redis and object
-# storage are added in Phases 1-2.
+# Full local stack: app (bot + worker), PostgreSQL and Redis.
+# Usage: copy .env.example to .env, set TELEGRAM_BOT_TOKEN, then `docker compose up`.
 services:
-  telegram:
+  app:
     build:
       context: .
-      dockerfile: apps/telegram/Dockerfile
+      dockerfile: apps/server/Dockerfile
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql://app:app@postgres:5432/autocontent
+      REDIS_URL: redis://redis:6379
     ports:
       - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
     restart: unless-stopped
+
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app
+      POSTGRES_DB: autocontent
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:

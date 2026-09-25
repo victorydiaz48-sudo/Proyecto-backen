@@ -1,9 +1,47 @@
 # Architecture
 
-Status: **Phase 1 complete** (foundations). The running bot still uses the
-Phase 0 flow; Phase 2 connects it to the database and the Redis queue.
+Status: **Phase 2 complete** — the bot, database, queue, worker and storage
+are wired together. `apps/api` and the dashboard come in later phases.
 
-## Target runtime (Phase 2 onward)
+## Phase 2 flow
+
+```
+Telegram ─update─▶ bot (apps/telegram)
+                     │ rate limit per user (20/min)
+                     │ TelegramAccount lookup  ── unknown → "private bot, ask for an invite"
+                     │ SettingsService → settings snapshot (locale, limits, template)
+                     │ tx + per-dealership advisory lock:
+                     │   duplicate? (idempotencyKey tg:{bot}:{chat}:{message}) → stop
+                     │   daily / monthly limits (dealership time zone) → refuse
+                     │   Vehicle(DRAFT) + ContentJob(PENDING) + Usage JOBS_CREATED
+                     │ enqueue { contentJobId, dealershipId }   reply "🚗 Analizando…"
+                     ▼
+               queue "content-jobs" (BullMQ on Redis, or in memory)
+                     ▼
+worker (apps/worker) — each step checks the database first, so retries resume:
+  1 ingest    download from Telegram → validate bytes → StorageProvider
+              dealerships/{d}/vehicles/{v}/originals/{sha256}.{ext} → VehicleImage
+  2 analyse   reuse analysis of an identical photo in the same dealership (free),
+              else VisionProvider → GenerationLog + Usage + job cost (charged once)
+              → Vehicle columns + per-field provenance
+              subject ≠ vehicle → tell the user, archive vehicle, done
+  3 copy      ContentAsset (job, instagram_caption, v1)  status QA_REVIEW until Phase 8
+  4 deliver   analysis + caption (analysisDeliveredAt / deliveredAt)
+  5 complete  COMPLETED exactly once → Usage VEHICLES_PROCESSED
+  final failure → FAILED + lastError + one localized message
+```
+
+Startup (`apps/server`): migrations (container entrypoint) → `SELECT 1` →
+idempotent seed → storage check → queue → worker (+ re-enqueue of
+PENDING/PROCESSING/RETRYING jobs) → bot → HTTP (`/health`, `/ready`, webhook).
+Without `DATABASE_URL` it stays up in degraded mode and the bot answers
+"not configured".
+
+Delivery is at-least-once: a crash between sending a Telegram message and
+recording it can repeat that message on retry; it can never repeat a provider
+call's charge.
+
+## Target runtime
 
 ```
                  ┌──────────────┐   webhook/polling   ┌───────────────┐
@@ -29,14 +67,16 @@ starts with a single `all` service plus the Postgres and Redis add-ons.
 | `shared` | Vehicle analysis model (field provenance), i18n (es/pt/en), logger with secret redaction, typed errors, image validation, QA + VIDEO_PLAN schemas, money helpers, cost units | ✅ |
 | `config` | Validated environment configuration | ✅ |
 | `database` | Prisma schema, migrations, tenant-scoped client, settings snapshot, secret encryption, seed | ✅ Phase 1 |
-| `queue` | `JobQueue` / `JobWorker` interfaces; in-memory implementation (BullMQ in Phase 2) | ✅ Phase 1 |
-| `providers` | Provider interfaces (vision, text, image, video, storage, social, analytics), vision normalizer + contract suite, cost calculator, mock vision | ✅ Phase 1 (interfaces) |
+| `queue` | `JobQueue` / `JobWorker` interfaces; in-memory and BullMQ (Redis) implementations, `createQueue()` | ✅ Phase 2 |
+| `providers` | Provider interfaces (vision, text, image, video, storage, social, analytics), vision normalizer + contract suites, cost calculator, mock vision, **S3 + local-disk storage**, **Telegram adapters** | ✅ Phase 2 |
 | `contracts` | REST API request/response schemas + route table → `docs/api/openapi.json` | ✅ Phase 1 |
 | `templates` | 5 automotive templates, 15 content formats, 7 video styles (JSON, validated) | ✅ Phase 1 |
 | `content-engine` | Publication policy + template caption (LLM copywriting in Phase 5) | Phase 0 |
 | `ai`, `image-engine`, `video-engine` | Prompt registry, scene generation, reel engine | Phases 4–7 |
-| `apps/telegram` | Bot (Phase 0 flow) | ✅ running |
-| `apps/api`, `apps/worker`, `apps/web` | REST API, queue processors, dashboard | Phases 2, 9 |
+| `apps/telegram` | Bot (library): invite-only access, `/invite`, job creation; HTTP server | ✅ Phase 2 |
+| `apps/worker` | Content-job processor (library) | ✅ Phase 2 |
+| `apps/server` | Composition root: one image, `SERVICE=all\|telegram\|worker` | ✅ Phase 2 |
+| `apps/api`, `apps/web` | REST API, dashboard | Phase 9 |
 
 ## Multi-tenancy
 
@@ -67,8 +107,10 @@ Roles, from most to least powerful:
 Each API route declares its minimum role in `packages/contracts/src/routes.ts`.
 Telegram-only users get the role of the invite they used (default OPERATOR).
 Telegram access is **invite-only**, via one-time `t.me/<bot>?start=<code>`
-links; the first OWNER claims the demo dealership with `BOOTSTRAP_CODE`
-(Phase 2).
+links created with `/invite [editor|admin]` (only the SHA-256 of a code is
+stored; redemption is an atomic `uses < maxUses` update). The first OWNER
+claims the demo dealership with `BOOTSTRAP_CODE`, once (timing-safe compare,
+serialised by an advisory lock). Nobody can create an OWNER through Telegram.
 
 ## Data model
 
@@ -192,6 +234,23 @@ strategy with es/pt/en examples, formats and allowed video styles. Formats
 (`formats.json`) and video styles (`video-styles.json`) are catalogues;
 templates reference them by id and are cross-checked at load.
 
+## Storage
+
+`createStorageProvider(config)`: S3-compatible (`STORAGE_*`, e.g. Cloudflare
+R2) when configured, otherwise local disk (`STORAGE_LOCAL_DIR`, reported as
+`durable: false`). Keys always start with `dealerships/{id}/`; objects are
+private; access via short-lived signed URLs (HMAC-signed for local disk).
+Both adapters pass `describeStorageProviderContract()` (S3 is tested against
+an in-process S3 server).
+
+## Deployment
+
+`apps/server/Dockerfile` → one self-contained ESM bundle (Prisma client and
+its WASM query compiler included) + the Prisma CLI for migrations.
+`docker/start.sh` runs `prisma migrate deploy`, then the app, as the
+unprivileged `node` user. `railway.json` points Railway at it with `/health`
+as health check. `docker-compose.yml` runs app + PostgreSQL + Redis locally.
+
 ## Security (so far)
 
 - Webhook secret verification (401 without the header) — Phase 0
@@ -200,6 +259,10 @@ templates reference them by id and are cross-checked at load.
 - Tenant isolation at DB + data-access + API layers
 - Encrypted credentials at rest (AES-256-GCM, owner-bound, rotatable)
 - http(s)-only URLs in API input
+- Invite-only Telegram access; per-user rate limit; hashed single-use invite
+  codes; one-time bootstrap
+- Connection-string passwords, storage secret and bootstrap code redacted
+  from logs
 
 ## Logging
 

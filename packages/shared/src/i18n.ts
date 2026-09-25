@@ -22,6 +22,22 @@ export interface Messages {
   multipleVehicles: string;
   unclearPhoto: string;
   jobFailed: string;
+  access: {
+    needInvite: string;
+    inviteInvalid: string;
+    alreadyClaimed: string;
+    linked: (role: string) => string;
+    alreadyLinked: string;
+    blocked: string;
+    suspended: string;
+    notConfigured: string;
+    dailyLimit: string;
+    monthlyLimit: string;
+    inviteForbidden: string;
+    inviteUsage: string;
+    inviteCreated: (link: string, role: string, hours: number) => string;
+  };
+  roles: Record<'OWNER' | 'ADMIN' | 'EDITOR' | 'OPERATOR', string>;
   mockNotice: string;
   captionIntro: string;
   labels: {
@@ -49,7 +65,7 @@ const es: Messages = {
   help:
     '📸 Envía una foto clara del vehículo (JPG, PNG o WebP).\n' +
     'Identifico marca, modelo, color y carrocería, y te devuelvo un texto para redes.\n\n' +
-    'Comandos:\n/start – bienvenida\n/help – esta ayuda',
+    'Comandos:\n/start – bienvenida\n/help – esta ayuda\n/invite – invitar a alguien (propietario/administrador)',
   sendPhoto: '📸 Envíame una foto del vehículo para empezar.',
   unsupportedFile: '⚠️ Solo acepto imágenes JPG, PNG o WebP.',
   imageTooLarge: (mb) => `⚠️ La imagen es demasiado grande. Máximo ${mb} MB.`,
@@ -61,6 +77,23 @@ const es: Messages = {
   multipleVehicles: '🚗🚗 Veo varios vehículos. Envía una foto con un solo coche, por favor.',
   unclearPhoto: '📷 No puedo ver bien el vehículo. Prueba con una foto más clara, con buena luz y el coche completo.',
   jobFailed: '❌ No pude procesar la foto. Inténtalo de nuevo en unos minutos.',
+  access: {
+    needInvite: '🔒 Este bot es privado. Pide a tu concesionario un enlace de invitación y ábrelo para empezar.',
+    inviteInvalid: '⚠️ Esta invitación no es válida o ha caducado. Pide un enlace nuevo.',
+    alreadyClaimed: '⚠️ Este sistema ya tiene propietario. Pide una invitación a tu concesionario.',
+    linked: (role) => `✅ ¡Listo! Tu cuenta quedó vinculada como <b>${role}</b>. Envíame una foto de un vehículo para empezar.`,
+    alreadyLinked: 'ℹ️ Tu cuenta ya está vinculada. Envíame una foto de un vehículo.',
+    blocked: '⛔ Tu acceso está desactivado. Habla con el administrador de tu concesionario.',
+    suspended: '⛔ La cuenta de este concesionario está suspendida.',
+    notConfigured: '🛠️ El sistema aún no está configurado (falta la base de datos). Avisa al administrador.',
+    dailyLimit: '⏳ Se alcanzó el límite diario de vehículos de tu concesionario. Inténtalo mañana.',
+    monthlyLimit: '⏳ Se alcanzó el límite mensual de vehículos de tu plan.',
+    inviteForbidden: '⛔ No tienes permiso para crear esa invitación.',
+    inviteUsage: 'Uso: /invite [operador|editor|admin]',
+    inviteCreated: (link, role, hours) =>
+      `🔗 Invitación de un solo uso como <b>${role}</b> (caduca en ${hours} h):\n\n${link}\n\nEnvíala solo a la persona que quieras dar de alta.`,
+  },
+  roles: { OWNER: 'propietario', ADMIN: 'administrador', EDITOR: 'editor', OPERATOR: 'operador' },
   mockNotice: '🧪 <i>Modo demo: análisis simulado, no es una identificación real.</i>',
   captionIntro: '✍️ Texto para publicar:',
   labels: {
@@ -118,7 +151,7 @@ const pt: Messages = {
   help:
     '📸 Envie uma foto nítida do veículo (JPG, PNG ou WebP).\n' +
     'Identifico marca, modelo, cor e carroceria, e devolvo um texto para redes sociais.\n\n' +
-    'Comandos:\n/start – boas-vindas\n/help – esta ajuda',
+    'Comandos:\n/start – boas-vindas\n/help – esta ajuda\n/invite – convidar alguém (proprietário/administrador)',
   sendPhoto: '📸 Envie uma foto do veículo para começar.',
   unsupportedFile: '⚠️ Só aceito imagens JPG, PNG ou WebP.',
   imageTooLarge: (mb) => `⚠️ A imagem é grande demais. Máximo ${mb} MB.`,
@@ -130,6 +163,23 @@ const pt: Messages = {
   multipleVehicles: '🚗🚗 Vejo vários veículos. Envie uma foto com um só carro, por favor.',
   unclearPhoto: '📷 Não consigo ver bem o veículo. Tente uma foto mais nítida, com boa luz e o carro inteiro.',
   jobFailed: '❌ Não consegui processar a foto. Tente novamente em alguns minutos.',
+  access: {
+    needInvite: '🔒 Este bot é privado. Peça à sua concessionária um link de convite e abra-o para começar.',
+    inviteInvalid: '⚠️ Este convite não é válido ou expirou. Peça um link novo.',
+    alreadyClaimed: '⚠️ Este sistema já tem proprietário. Peça um convite à sua concessionária.',
+    linked: (role) => `✅ Pronto! Sua conta foi vinculada como <b>${role}</b>. Envie uma foto de um veículo para começar.`,
+    alreadyLinked: 'ℹ️ Sua conta já está vinculada. Envie uma foto de um veículo.',
+    blocked: '⛔ Seu acesso está desativado. Fale com o administrador da sua concessionária.',
+    suspended: '⛔ A conta desta concessionária está suspensa.',
+    notConfigured: '🛠️ O sistema ainda não está configurado (falta o banco de dados). Avise o administrador.',
+    dailyLimit: '⏳ O limite diário de veículos da sua concessionária foi atingido. Tente amanhã.',
+    monthlyLimit: '⏳ O limite mensal de veículos do seu plano foi atingido.',
+    inviteForbidden: '⛔ Você não tem permissão para criar esse convite.',
+    inviteUsage: 'Uso: /invite [operador|editor|admin]',
+    inviteCreated: (link, role, hours) =>
+      `🔗 Convite de uso único como <b>${role}</b> (expira em ${hours} h):\n\n${link}\n\nEnvie apenas para a pessoa que você quer cadastrar.`,
+  },
+  roles: { OWNER: 'proprietário', ADMIN: 'administrador', EDITOR: 'editor', OPERATOR: 'operador' },
   mockNotice: '🧪 <i>Modo demo: análise simulada, não é uma identificação real.</i>',
   captionIntro: '✍️ Texto para publicar:',
   labels: {
@@ -187,7 +237,7 @@ const en: Messages = {
   help:
     '📸 Send a clear photo of the vehicle (JPG, PNG or WebP).\n' +
     'I identify make, model, color and body type, and reply with social media copy.\n\n' +
-    'Commands:\n/start – welcome\n/help – this help',
+    'Commands:\n/start – welcome\n/help – this help\n/invite – invite someone (owner/admin)',
   sendPhoto: '📸 Send me a photo of the vehicle to get started.',
   unsupportedFile: '⚠️ I only accept JPG, PNG or WebP images.',
   imageTooLarge: (mb) => `⚠️ The image is too large. Maximum ${mb} MB.`,
@@ -199,6 +249,23 @@ const en: Messages = {
   multipleVehicles: '🚗🚗 I can see several vehicles. Please send a photo with just one car.',
   unclearPhoto: '📷 I can’t see the vehicle clearly. Try a sharper photo, with good light and the whole car in view.',
   jobFailed: '❌ I could not process the photo. Please try again in a few minutes.',
+  access: {
+    needInvite: '🔒 This bot is private. Ask your dealership for an invite link and open it to get started.',
+    inviteInvalid: '⚠️ This invite is invalid or has expired. Ask for a new link.',
+    alreadyClaimed: '⚠️ This system already has an owner. Ask your dealership for an invite.',
+    linked: (role) => `✅ Done! Your account is linked as <b>${role}</b>. Send me a vehicle photo to get started.`,
+    alreadyLinked: 'ℹ️ Your account is already linked. Send me a vehicle photo.',
+    blocked: '⛔ Your access is disabled. Please talk to your dealership admin.',
+    suspended: '⛔ This dealership account is suspended.',
+    notConfigured: '🛠️ The system is not configured yet (database missing). Please tell your administrator.',
+    dailyLimit: '⏳ Your dealership reached its daily vehicle limit. Please try tomorrow.',
+    monthlyLimit: '⏳ Your plan reached its monthly vehicle limit.',
+    inviteForbidden: '⛔ You are not allowed to create that invite.',
+    inviteUsage: 'Usage: /invite [operator|editor|admin]',
+    inviteCreated: (link, role, hours) =>
+      `🔗 Single-use invite as <b>${role}</b> (expires in ${hours} h):\n\n${link}\n\nOnly send it to the person you want to add.`,
+  },
+  roles: { OWNER: 'owner', ADMIN: 'admin', EDITOR: 'editor', OPERATOR: 'operator' },
   mockNotice: '🧪 <i>Demo mode: simulated analysis, not a real identification.</i>',
   captionIntro: '✍️ Ready-to-post copy:',
   labels: {

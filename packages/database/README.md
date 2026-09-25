@@ -15,8 +15,10 @@ data-access layer.
    that Prisma's schema language cannot express. Because Prisma doesn't know
    about them, `prisma migrate dev` will put `DROP CONSTRAINT "tenant_…"`
    statements into every new migration it generates — **delete those lines**
-   before committing. `migrations.test.ts` fails the build if you forget, and
-   the live-database test checks every constraint still exists.
+   (and `DROP INDEX "APIKeyReference_id_dealershipId_key"`) before committing.
+   `migrations.test.ts` fails the build if you forget, and the live-database
+   test checks every constraint still exists. Example: migration
+   `…_content_job_telegram_source` keeps only its `ADD COLUMN` lines.
 3. **New tenant table?** Give it a required `dealershipId`, a
    `@@unique([id, dealershipId])`, add it to `TENANT_MODELS` in `tenant.ts`
    (a test checks this), and add composite foreign keys for its relations in
@@ -29,8 +31,9 @@ data-access layer.
 
 ## Commands
 
-These run automatically in CI and (from Phase 2) on deploy; you only need them
-with a local terminal.
+These run automatically: in CI, and on every deploy (`apps/server/docker/start.sh`
+runs `prisma migrate deploy` before the app starts; the app runs the
+idempotent seed at startup). You only need them with a local terminal.
 
 ```bash
 pnpm --filter @autocontent/database generate         # Prisma client (also runs on install)

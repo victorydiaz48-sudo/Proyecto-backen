@@ -9,6 +9,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@autocontent/shared": "workspace:*"
+    "@autocontent/shared": "workspace:*",
+    "bullmq": "^5.0.0",
+    "ioredis": "^5.4.0"
   }
 }

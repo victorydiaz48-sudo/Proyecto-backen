@@ -1,6 +1,10 @@
 import type { AppConfig } from '@autocontent/config';
 import { ProviderNotConfiguredError } from '@autocontent/shared';
 import type { ProviderStatus } from './status.js';
+import { randomBytes } from 'node:crypto';
+import { LocalDiskStorageProvider } from './storage/local-disk.js';
+import { S3StorageProvider } from './storage/s3.js';
+import type { StorageProvider } from './storage/types.js';
 import { MockVisionProvider } from './vision/mock.js';
 import type { VisionCapabilities, VisionProvider } from './vision/types.js';
 
@@ -52,4 +56,27 @@ export function createVisionProvider(config: AppConfig): VisionProvider {
       ? 'Real vision provider not implemented yet (Phase 4). Set MOCK_MODE=true.'
       : 'AI_API_KEY is not set',
   );
+}
+
+/**
+ * S3-compatible storage when all STORAGE_* variables are set; otherwise the
+ * server's disk (works, but is wiped by redeploys unless a volume is mounted —
+ * `durable: false` is surfaced on /health).
+ */
+export function createStorageProvider(config: AppConfig): { storage: StorageProvider; durable: boolean } {
+  if (config.STORAGE_ENDPOINT && config.STORAGE_ACCESS_KEY && config.STORAGE_SECRET_KEY && config.STORAGE_BUCKET) {
+    return {
+      durable: true,
+      storage: new S3StorageProvider({
+        endpoint: config.STORAGE_ENDPOINT,
+        accessKeyId: config.STORAGE_ACCESS_KEY,
+        secretAccessKey: config.STORAGE_SECRET_KEY,
+        bucket: config.STORAGE_BUCKET,
+        region: config.STORAGE_REGION,
+        forcePathStyle: config.STORAGE_FORCE_PATH_STYLE,
+      }),
+    };
+  }
+  // Signed local URLs only need to survive one process lifetime.
+  return { durable: false, storage: new LocalDiskStorageProvider(config.STORAGE_LOCAL_DIR, randomBytes(32).toString('hex')) };
 }

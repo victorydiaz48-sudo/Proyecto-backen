@@ -485,6 +485,9 @@ model ContentJob {
   source              JobSource
   telegramAccountId   String?    @db.Uuid
   telegramChatId      BigInt?
+  /// Telegram file to ingest (TELEGRAM source). Not secret; downloaded once, then stored.
+  telegramFileId      String?
+  telegramMessageId   Int?
   progressMessageId   Int?
   requestedById       String?    @db.Uuid
   campaignId          String?    @db.Uuid

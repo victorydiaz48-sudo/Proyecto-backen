@@ -1,6 +1,6 @@
 /**
- * Narrow ports between the job pipeline and Telegram, so the pipeline can be
- * tested without network access and later moved into the worker app.
+ * Narrow ports between the job pipeline and Telegram, so the worker can be
+ * tested without network access. grammy.ts holds the real adapters.
  */
 export interface ChatNotifier {
   sendHtml(chatId: number, html: string): Promise<void>;

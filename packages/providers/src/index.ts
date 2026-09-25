@@ -11,3 +11,7 @@ export * from './storage/types.js';
 export * from './social/types.js';
 export * from './analytics/types.js';
 export * from './registry.js';
+export * from './storage/local-disk.js';
+export * from './storage/s3.js';
+export * from './telegram/types.js';
+export * from './telegram/grammy.js';
