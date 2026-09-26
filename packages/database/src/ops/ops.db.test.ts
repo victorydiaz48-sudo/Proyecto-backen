@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PrismaClient } from '../client.js';
 import { seed } from '../seed.js';
 import { SettingsService, buildSettingsSnapshot, type SettingsSnapshot } from '../settings.js';
-import { hasDb, makeDealership, testPrisma } from '../test-db.js';
+import { hasDb, makeOrganization, testPrisma } from '../test-db.js';
 import { createTelegramContentJob, recordProviderCall } from './jobs.js';
 import {
   canInvite,
@@ -48,7 +48,7 @@ describe('invite permissions', () => {
 
 describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', () => {
   let prisma: PrismaClient;
-  let snapshot: (dealershipId: string) => Promise<SettingsSnapshot>;
+  let snapshot: (organizationId: string) => Promise<SettingsSnapshot>;
 
   beforeAll(async () => {
     prisma = testPrisma();
@@ -60,15 +60,15 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
 
   it('bootstrap: wrong code is rejected; the right code makes the first user OWNER exactly once', async () => {
     // Fresh demo owner state for this test.
-    const demo = await prisma.dealership.findUniqueOrThrow({ where: { slug: 'demo' } });
-    await prisma.telegramAccount.deleteMany({ where: { dealershipId: demo.id } });
+    const demo = await prisma.organization.findUniqueOrThrow({ where: { slug: 'demo' } });
+    await prisma.telegramAccount.deleteMany({ where: { organizationId: demo.id } });
 
     expect((await claimBootstrap(prisma, { code: 'wrong-code-123', expectedCode: 'right-code-123', identity: identity() })).status).toBe('invalid');
     expect((await claimBootstrap(prisma, { code: 'x', expectedCode: undefined, identity: identity() })).status).toBe('invalid');
 
     const first = identity();
     const r = await claimBootstrap(prisma, { code: 'right-code-123', expectedCode: 'right-code-123', identity: first });
-    expect(r).toMatchObject({ status: 'linked', role: 'OWNER', dealershipId: demo.id });
+    expect(r).toMatchObject({ status: 'linked', role: 'OWNER', organizationId: demo.id });
 
     // Same person again → already linked; anyone else → already claimed.
     expect((await claimBootstrap(prisma, { code: 'right-code-123', expectedCode: 'right-code-123', identity: first })).status).toBe('already_linked');
@@ -76,12 +76,12 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
 
     const account = await findTelegramAccount(prisma, first.telegramUserId);
     expect(account && effectiveRole(account)).toBe('OWNER');
-    expect(await prisma.auditLog.count({ where: { dealershipId: demo.id, action: 'telegram.bootstrap_claimed' } })).toBeGreaterThan(0);
+    expect(await prisma.auditLog.count({ where: { organizationId: demo.id, action: 'telegram.bootstrap_claimed' } })).toBeGreaterThan(0);
   });
 
   it('bootstrap claims race safely: only one of many parallel claims wins', async () => {
-    const demo = await prisma.dealership.findUniqueOrThrow({ where: { slug: 'demo' } });
-    await prisma.telegramAccount.deleteMany({ where: { dealershipId: demo.id } });
+    const demo = await prisma.organization.findUniqueOrThrow({ where: { slug: 'demo' } });
+    await prisma.telegramAccount.deleteMany({ where: { organizationId: demo.id } });
     const results = await Promise.all(
       Array.from({ length: 6 }, () => claimBootstrap(prisma, { code: 'c0de-c0de-c0de', expectedCode: 'c0de-c0de-c0de', identity: identity() })),
     );
@@ -89,25 +89,25 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
     expect(results.filter((r) => r.status === 'already_claimed')).toHaveLength(5);
   });
 
-  it('invites: single use, expiring, role-limited, and bound to their dealership', async () => {
-    const d = await makeDealership(prisma);
-    const owner = await prisma.telegramAccount.create({ data: { dealershipId: d.id, ...identity(), role: 'OWNER' } });
+  it('invites: single use, expiring, role-limited, and bound to their organization', async () => {
+    const d = await makeOrganization(prisma);
+    const owner = await prisma.telegramAccount.create({ data: { organizationId: d.id, ...identity(), role: 'OWNER' } });
 
-    expect(await createTelegramInvite(prisma, { dealershipId: d.id, inviterRole: 'EDITOR', inviterAccountId: owner.id, role: 'OPERATOR' })).toEqual({
+    expect(await createTelegramInvite(prisma, { organizationId: d.id, inviterRole: 'EDITOR', inviterAccountId: owner.id, role: 'OPERATOR' })).toEqual({
       error: 'forbidden',
     });
 
-    const inv = await createTelegramInvite(prisma, { dealershipId: d.id, inviterRole: 'OWNER', inviterAccountId: owner.id, role: 'EDITOR' });
+    const inv = await createTelegramInvite(prisma, { organizationId: d.id, inviterRole: 'OWNER', inviterAccountId: owner.id, role: 'EDITOR' });
     if ('error' in inv) throw new Error('expected an invite');
     expect(inv.code).toMatch(/^[A-Za-z0-9_-]{24}$/);
     expect(await prisma.telegramInvite.count({ where: { codeHash: inv.code } })).toBe(0); // only the hash is stored
 
     const joiner = identity();
-    expect(await redeemTelegramInvite(prisma, { code: inv.code, identity: joiner })).toMatchObject({ status: 'linked', role: 'EDITOR', dealershipId: d.id });
+    expect(await redeemTelegramInvite(prisma, { code: inv.code, identity: joiner })).toMatchObject({ status: 'linked', role: 'EDITOR', organizationId: d.id });
     expect((await redeemTelegramInvite(prisma, { code: inv.code, identity: identity() })).status).toBe('invalid'); // used up
 
     const expired = await createTelegramInvite(prisma, {
-      dealershipId: d.id,
+      organizationId: d.id,
       inviterRole: 'OWNER',
       inviterAccountId: owner.id,
       role: 'OPERATOR',
@@ -117,20 +117,20 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
     expect((await redeemTelegramInvite(prisma, { code: expired.code, identity: identity() })).status).toBe('invalid');
 
     // Parallel redemptions of a 2-use invite: exactly two succeed.
-    const two = await createTelegramInvite(prisma, { dealershipId: d.id, inviterRole: 'OWNER', inviterAccountId: owner.id, role: 'OPERATOR', maxUses: 2 });
+    const two = await createTelegramInvite(prisma, { organizationId: d.id, inviterRole: 'OWNER', inviterAccountId: owner.id, role: 'OPERATOR', maxUses: 2 });
     if ('error' in two) throw new Error('expected an invite');
     const results = await Promise.all(Array.from({ length: 5 }, () => redeemTelegramInvite(prisma, { code: two.code, identity: identity() })));
     expect(results.filter((r) => r.status === 'linked')).toHaveLength(2);
 
-    await prisma.dealership.delete({ where: { id: d.id } });
+    await prisma.organization.delete({ where: { id: d.id } });
   });
 
   it('creates a job once per Telegram message and enforces the daily limit under concurrency', async () => {
-    const d = await makeDealership(prisma);
-    await prisma.dealershipSettings.create({ data: { dealershipId: d.id, dailyJobLimit: 3, timezone: 'America/Sao_Paulo' } });
-    const acct = await prisma.telegramAccount.create({ data: { dealershipId: d.id, ...identity() } });
+    const d = await makeOrganization(prisma);
+    await prisma.organizationSettings.create({ data: { organizationId: d.id, dailyJobLimit: 3, timezone: 'America/Sao_Paulo' } });
+    const acct = await prisma.telegramAccount.create({ data: { organizationId: d.id, ...identity() } });
     const snap = await snapshot(d.id);
-    const base = { dealershipId: d.id, telegramAccountId: acct.id, telegramFileId: 'f', telegramChatId: 1n, snapshot: snap };
+    const base = { organizationId: d.id, telegramAccountId: acct.id, telegramFileId: 'f', telegramChatId: 1n, snapshot: snap };
 
     const first = await createTelegramContentJob(prisma, { ...base, idempotencyKey: `k-${randomUUID()}`, telegramMessageId: 1 });
     expect(first.status).toBe('created');
@@ -144,22 +144,22 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
     );
     expect(burst.filter((r) => r.status === 'created')).toHaveLength(1);
     expect(burst.filter((r) => r.status === 'limit_reached')).toHaveLength(4);
-    expect(await prisma.contentJob.count({ where: { dealershipId: d.id } })).toBe(3);
+    expect(await prisma.contentJob.count({ where: { organizationId: d.id } })).toBe(3);
 
-    const usage = await prisma.usage.findMany({ where: { dealershipId: d.id, metric: 'JOBS_CREATED' } });
+    const usage = await prisma.usage.findMany({ where: { organizationId: d.id, metric: 'JOBS_CREATED' } });
     expect(usage.reduce((s, u) => s + u.quantity, 0n)).toBe(3n);
     expect((await prisma.telegramAccount.findUniqueOrThrow({ where: { id: acct.id } })).activeContentJobId).not.toBeNull();
 
-    await prisma.dealership.delete({ where: { id: d.id } });
+    await prisma.organization.delete({ where: { id: d.id } });
   });
 
   it('records a provider call once: a replayed step never charges twice', async () => {
-    const d = await makeDealership(prisma);
-    await prisma.dealershipSettings.create({ data: { dealershipId: d.id } });
-    const acct = await prisma.telegramAccount.create({ data: { dealershipId: d.id, ...identity() } });
+    const d = await makeOrganization(prisma);
+    await prisma.organizationSettings.create({ data: { organizationId: d.id } });
+    const acct = await prisma.telegramAccount.create({ data: { organizationId: d.id, ...identity() } });
     const snap = await snapshot(d.id);
     const job = await createTelegramContentJob(prisma, {
-      dealershipId: d.id,
+      organizationId: d.id,
       telegramAccountId: acct.id,
       idempotencyKey: `k-${randomUUID()}`,
       telegramFileId: 'f',
@@ -170,7 +170,7 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
     if (job.status !== 'created') throw new Error('expected a job');
 
     const call = {
-      dealershipId: d.id,
+      organizationId: d.id,
       contentJobId: job.jobId,
       adapter: 'vision-x',
       operation: 'VISION_ANALYZE' as const,
@@ -187,7 +187,7 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
 
     const j = await prisma.contentJob.findUniqueOrThrow({ where: { id: job.jobId } });
     expect(j.actualCostMicros).toBe(2500n);
-    const u = await prisma.usage.findFirstOrThrow({ where: { dealershipId: d.id, metric: 'VISION_CALLS' } });
+    const u = await prisma.usage.findFirstOrThrow({ where: { organizationId: d.id, metric: 'VISION_CALLS' } });
     expect(u.quantity).toBe(1n);
     expect(u.costMicros).toBe(2500n);
 
@@ -196,6 +196,6 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
     expect((await prisma.contentJob.findUniqueOrThrow({ where: { id: job.jobId } })).actualCostMicros).toBe(2500n);
     expect(await prisma.generationLog.count({ where: { contentJobId: job.jobId } })).toBe(2);
 
-    await prisma.dealership.delete({ where: { id: d.id } });
+    await prisma.organization.delete({ where: { id: d.id } });
   });
 });

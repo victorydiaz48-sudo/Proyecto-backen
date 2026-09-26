@@ -3,7 +3,7 @@
   "info": {
     "title": "Dealer Content Platform API",
     "version": "1.0.0",
-    "description": "REST API used by the dashboard. The dealership is always taken from the session; requests never carry a dealershipId. Money is micro-USD as decimal strings."
+    "description": "REST API used by the dashboard. The organization is always taken from the session; requests never carry a organizationId. Money is micro-USD as decimal strings."
   },
   "servers": [
     {
@@ -110,7 +110,7 @@
         }
       },
       "E403": {
-        "description": "Role too low or other dealership (FORBIDDEN)",
+        "description": "Role too low or other organization (FORBIDDEN)",
         "content": {
           "application/json": {
             "schema": {
@@ -155,7 +155,7 @@
         }
       },
       "E404": {
-        "description": "Not found in this dealership (NOT_FOUND)",
+        "description": "Not found in this organization (NOT_FOUND)",
         "content": {
           "application/json": {
             "schema": {
@@ -372,7 +372,7 @@
                       ],
                       "additionalProperties": false
                     },
-                    "dealership": {
+                    "organization": {
                       "type": "object",
                       "properties": {
                         "id": {
@@ -397,7 +397,7 @@
                   },
                   "required": [
                     "user",
-                    "dealership"
+                    "organization"
                   ],
                   "additionalProperties": false
                 }
@@ -410,7 +410,7 @@
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -470,11 +470,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -490,7 +490,7 @@
     "/auth/me": {
       "get": {
         "operationId": "auth.me",
-        "summary": "Current user and dealership",
+        "summary": "Current user and organization",
         "tags": [
           "Auth"
         ],
@@ -543,7 +543,7 @@
                       ],
                       "additionalProperties": false
                     },
-                    "dealership": {
+                    "organization": {
                       "type": "object",
                       "properties": {
                         "id": {
@@ -568,7 +568,7 @@
                   },
                   "required": [
                     "user",
-                    "dealership"
+                    "organization"
                   ],
                   "additionalProperties": false
                 }
@@ -585,11 +585,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -602,12 +602,12 @@
         }
       }
     },
-    "/dealership": {
+    "/organization": {
       "get": {
-        "operationId": "dealership.get",
-        "summary": "The session’s dealership",
+        "operationId": "organization.get",
+        "summary": "The session’s organization",
         "tags": [
-          "Dealership"
+          "Organization"
         ],
         "description": "Requires a session with role OPERATOR or higher.",
         "security": [
@@ -673,11 +673,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -690,10 +690,10 @@
         }
       },
       "patch": {
-        "operationId": "dealership.update",
-        "summary": "Rename the dealership",
+        "operationId": "organization.update",
+        "summary": "Rename the organization",
         "tags": [
-          "Dealership"
+          "Organization"
         ],
         "description": "Requires a session with role OWNER or higher.",
         "security": [
@@ -777,11 +777,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -794,12 +794,12 @@
         }
       }
     },
-    "/dealership/settings": {
+    "/organization/settings": {
       "get": {
         "operationId": "settings.get",
-        "summary": "Dealership settings (language, publishing mode, limits…)",
+        "summary": "Organization settings (language, publishing mode, limits…)",
         "tags": [
-          "Dealership"
+          "Organization"
         ],
         "description": "Requires a session with role EDITOR or higher.",
         "security": [
@@ -967,11 +967,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -987,7 +987,7 @@
         "operationId": "settings.update",
         "summary": "Update settings. Audited; cost caps can only tighten plan limits.",
         "tags": [
-          "Dealership"
+          "Organization"
         ],
         "description": "Requires a session with role ADMIN or higher.",
         "security": [
@@ -1295,11 +1295,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -1445,11 +1445,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -1592,11 +1592,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -1748,11 +1748,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -1821,11 +1821,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -1841,7 +1841,7 @@
     "/telegram/invites": {
       "post": {
         "operationId": "telegram.invites.create",
-        "summary": "Create a one-time t.me deep link that links a Telegram user to this dealership",
+        "summary": "Create a one-time t.me deep link that links a Telegram user to this organization",
         "tags": [
           "Telegram"
         ],
@@ -1948,11 +1948,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -2126,11 +2126,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -2320,11 +2320,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -2672,11 +2672,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -2972,11 +2972,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -3353,11 +3353,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -3612,11 +3612,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -3882,11 +3882,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -4085,11 +4085,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -4288,11 +4288,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -4491,11 +4491,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -4694,11 +4694,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -5103,11 +5103,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -5440,11 +5440,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -5794,11 +5794,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -6131,11 +6131,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -6232,11 +6232,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -6331,11 +6331,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -6502,11 +6502,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -6674,11 +6674,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -6817,11 +6817,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -7037,11 +7037,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -7110,11 +7110,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -7243,11 +7243,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -7263,7 +7263,7 @@
     "/publishing-accounts/sync": {
       "post": {
         "operationId": "publishingAccounts.sync",
-        "summary": "Fetch accounts from the dealership’s Blotato workspace",
+        "summary": "Fetch accounts from the organization’s Blotato workspace",
         "tags": [
           "Publishing"
         ],
@@ -7376,11 +7376,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -7451,11 +7451,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -7678,11 +7678,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -7896,11 +7896,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -8079,11 +8079,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -8148,7 +8148,7 @@
                             "type": "string",
                             "enum": [
                               "platform",
-                              "dealership"
+                              "organization"
                             ]
                           },
                           "enabled": {
@@ -8220,11 +8220,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -8308,11 +8308,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -8328,7 +8328,7 @@
     "/api-keys/{adapter}": {
       "put": {
         "operationId": "apiKeys.put",
-        "summary": "Store the dealership’s key for a provider (encrypted, write-only)",
+        "summary": "Store the organization’s key for a provider (encrypted, write-only)",
         "tags": [
           "Integrations"
         ],
@@ -8416,11 +8416,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -8434,7 +8434,7 @@
       },
       "delete": {
         "operationId": "apiKeys.delete",
-        "summary": "Revoke the dealership’s key for a provider",
+        "summary": "Revoke the organization’s key for a provider",
         "tags": [
           "Integrations"
         ],
@@ -8488,11 +8488,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -8635,11 +8635,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -8768,11 +8768,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -8933,11 +8933,11 @@
           },
           "403": {
             "$ref": "#/components/responses/E403",
-            "description": "Role too low or other dealership (FORBIDDEN)"
+            "description": "Role too low or other organization (FORBIDDEN)"
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -8995,7 +8995,7 @@
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",
@@ -9065,7 +9065,7 @@
           },
           "404": {
             "$ref": "#/components/responses/E404",
-            "description": "Not found in this dealership (NOT_FOUND)"
+            "description": "Not found in this organization (NOT_FOUND)"
           },
           "409": {
             "$ref": "#/components/responses/E409",

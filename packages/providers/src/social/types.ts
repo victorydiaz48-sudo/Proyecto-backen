@@ -14,7 +14,7 @@ export const SOCIAL_PLATFORMS = [
 ] as const;
 export type SocialPlatform = (typeof SOCIAL_PLATFORMS)[number];
 
-/** Credentials of ONE dealership (e.g. its own Blotato API key). */
+/** Credentials of ONE organization (e.g. its own Blotato API key). */
 export interface SocialCredentials {
   apiKey: string;
 }
@@ -47,7 +47,7 @@ export interface PostStatus {
 /**
  * Publishing adapter. Default implementation: Blotato (Phase 10). A direct
  * Meta Graph adapter can implement this later without changing callers.
- * Callers — not adapters — enforce the dealership's publishing mode.
+ * Callers — not adapters — enforce the organization's publishing mode.
  */
 export interface SocialPublishingProvider extends TestableProvider {
   readonly kind: 'SOCIAL_PUBLISHING';

@@ -39,9 +39,9 @@ export const TENANT_CONSTRAINTS = [
   'tenant_ContentAsset_version_positive',
   'tenant_TelegramInvite_uses',
 ];
-const TENANT_INDEXES = ['tenant_APIProvider_platform_adapter', 'tenant_APIProvider_dealership_adapter'];
+const TENANT_INDEXES = ['tenant_APIProvider_platform_adapter', 'tenant_APIProvider_organization_adapter'];
 /** Hand-written objects without the tenant_ prefix (target of a composite foreign key). */
-const OTHER_HAND_WRITTEN = ['APIKeyReference_id_dealershipId_key'];
+const OTHER_HAND_WRITTEN = ['APIKeyReference_id_organizationId_key'];
 
 describe('migrations', () => {
   it('create every tenant-boundary constraint', () => {
@@ -58,10 +58,10 @@ describe('migrations', () => {
     }
   });
 
-  it('TENANT_MODELS lists every model with a dealershipId column', () => {
+  it('TENANT_MODELS lists every model with a organizationId column', () => {
     const schema = readFileSync(join(root, 'schema.prisma'), 'utf8');
     const withTenant = [...schema.matchAll(/^model (\w+) \{([\s\S]*?)^\}/gm)]
-      .filter(([, , body]) => /^\s+dealershipId\s/m.test(body!))
+      .filter(([, , body]) => /^\s+organizationId\s/m.test(body!))
       .map(([, name]) => name);
     expect([...TENANT_MODELS].sort()).toEqual(withTenant.sort());
   });

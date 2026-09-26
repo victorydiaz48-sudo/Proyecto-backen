@@ -6,7 +6,7 @@ import {
   SettingsService,
   createPrismaClient,
   findUnfinishedJobs,
-  forDealership,
+  forOrganization,
   seed,
   type PrismaClient,
 } from '@autocontent/database';
@@ -86,7 +86,7 @@ function world(prisma: PrismaClient, opts: { slug: string; bootstrapCode: string
     limits,
     defaultLocale: 'es',
     bootstrapCode: opts.bootstrapCode,
-    bootstrapDealershipSlug: opts.slug,
+    bootstrapOrganizationSlug: opts.slug,
     botInfo: BOT_INFO,
   });
   bot.api.config.use(recorder);
@@ -111,7 +111,7 @@ function world(prisma: PrismaClient, opts: { slug: string; bootstrapCode: string
     // BullMQ: wait until no job for this world is unfinished in the database.
     const end = Date.now() + 15_000;
     while (Date.now() < end) {
-      const open = await prisma.contentJob.count({ where: { dealership: { slug: opts.slug }, status: { in: ['PENDING', 'PROCESSING', 'RETRYING'] } } });
+      const open = await prisma.contentJob.count({ where: { organization: { slug: opts.slug }, status: { in: ['PENDING', 'PROCESSING', 'RETRYING'] } } });
       if (open === 0) return;
       await new Promise((r) => setTimeout(r, 50));
     }
@@ -125,11 +125,11 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
   let prisma: PrismaClient;
   const storageRoot = mkdtempSync(join(tmpdir(), 'e2e-storage-'));
   const slugs: string[] = [];
-  const newDealership = async () => {
+  const newOrganization = async () => {
     const slug = `e2e-${randomUUID()}`;
     slugs.push(slug);
-    const d = await prisma.dealership.create({ data: { slug, name: 'Autos E2E' } });
-    await prisma.dealershipSettings.create({ data: { dealershipId: d.id, timezone: 'America/Sao_Paulo' } });
+    const d = await prisma.organization.create({ data: { slug, name: 'Autos E2E' } });
+    await prisma.organizationSettings.create({ data: { organizationId: d.id, timezone: 'America/Sao_Paulo' } });
     return { slug, id: d.id };
   };
 
@@ -138,24 +138,24 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     await seed(prisma); // provider catalogue (mock-vision)
   });
   afterAll(async () => {
-    await prisma.dealership.deleteMany({ where: { slug: { in: slugs } } });
+    await prisma.organization.deleteMany({ where: { slug: { in: slugs } } });
     await prisma.$disconnect();
     rmSync(storageRoot, { recursive: true, force: true });
   });
 
   it('unknown users are turned away and nothing is created', async () => {
-    const d = await newDealership();
+    const d = await newOrganization();
     const w = world(prisma, { slug: d.slug, bootstrapCode: 'bootstrap-code-xyz', storageRoot });
     const stranger = w.user();
     await stranger.photo();
     await stranger.command('/start not-a-valid-code');
     expect(stranger.inbox()[0]).toContain('bot es privado');
     expect(stranger.inbox()[1]).toContain('no es válida');
-    expect(await prisma.contentJob.count({ where: { dealershipId: d.id } })).toBe(0);
+    expect(await prisma.contentJob.count({ where: { organizationId: d.id } })).toBe(0);
   });
 
   it('bootstrap → photo → stored, analysed, captioned, delivered, counted; duplicates ignored', async () => {
-    const d = await newDealership();
+    const d = await newOrganization();
     const w = world(prisma, { slug: d.slug, bootstrapCode: 'bootstrap-code-abc', storageRoot });
     const owner = w.user();
     await owner.command('/start bootstrap-code-abc');
@@ -172,7 +172,7 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     expect(texts.some((t) => t.includes('Modo demo'))).toBe(true);
     expect(texts.some((t) => t.includes('Texto para publicar'))).toBe(true);
 
-    const db = forDealership(prisma, d.id);
+    const db = forOrganization(prisma, d.id);
     const job = await db.contentJob.findFirstOrThrow({ include: { vehicle: { include: { images: true } }, assets: true } });
     expect(job.status).toBe('COMPLETED');
     expect(job.stage).toBe('DONE');
@@ -180,7 +180,7 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     expect(job.vehicle.provenance).toHaveProperty('make');
     expect(job.vehicle.images).toHaveLength(1);
     const img = job.vehicle.images[0]!;
-    expect(img.storageKey.startsWith(`dealerships/${d.id}/vehicles/${job.vehicleId}/originals/`)).toBe(true);
+    expect(img.storageKey.startsWith(`organizations/${d.id}/vehicles/${job.vehicleId}/originals/`)).toBe(true);
     expect((await w.storage.head(img.storageKey))?.bytes).toBe(img.bytes);
     expect(job.assets).toHaveLength(1);
     expect(job.assets[0]!.deliveredAt).not.toBeNull();
@@ -192,7 +192,7 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
   });
 
   it('invites: owner invites an editor; an identical photo reuses the analysis without a new provider call', async () => {
-    const d = await newDealership();
+    const d = await newOrganization();
     let visionCalls = 0;
     const mock = new MockVisionProvider();
     const counting: VisionProvider = { ...mock, name: mock.name, kind: 'VISION', capabilities: () => mock.capabilities(), testConnection: () => mock.testConnection(), analyze: (i, o) => (visionCalls++, mock.analyze(i, o)) };
@@ -217,7 +217,7 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     await editor.photo('same-photo'); // identical bytes, different message
     await w.settle();
     expect(visionCalls).toBe(1);
-    const db = forDealership(prisma, d.id);
+    const db = forOrganization(prisma, d.id);
     expect(await db.contentJob.count({ where: { status: 'COMPLETED' } })).toBe(2);
     expect(editor.inbox().some((t) => t.includes('Texto para publicar'))).toBe(true);
 
@@ -226,33 +226,33 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     expect(editor.inbox().at(-1)).toContain('No tienes permiso');
   });
 
-  it('keeps dealerships isolated end to end', async () => {
-    const a = await newDealership();
-    const b = await newDealership();
+  it('keeps organizations isolated end to end', async () => {
+    const a = await newOrganization();
+    const b = await newOrganization();
     const wa = world(prisma, { slug: a.slug, bootstrapCode: 'bootstrap-code-aaa', storageRoot });
     const wb = world(prisma, { slug: b.slug, bootstrapCode: 'bootstrap-code-bbb', storageRoot });
     const ownerA = wa.user();
     const ownerB = wb.user();
     await ownerA.command('/start bootstrap-code-aaa');
     await ownerB.command('/start bootstrap-code-bbb');
-    // A's bootstrap code does nothing for B's dealership (already claimed there by B).
+    // A's bootstrap code does nothing for B's organization (already claimed there by B).
     await ownerA.photo();
     await ownerB.photo();
     await wa.settle();
     await wb.settle();
 
-    const jobsA = await forDealership(prisma, a.id).contentJob.findMany();
-    const jobsB = await forDealership(prisma, b.id).contentJob.findMany();
+    const jobsA = await forOrganization(prisma, a.id).contentJob.findMany();
+    const jobsB = await forOrganization(prisma, b.id).contentJob.findMany();
     expect(jobsA).toHaveLength(1);
     expect(jobsB).toHaveLength(1);
     expect(jobsA[0]!.id).not.toBe(jobsB[0]!.id);
-    const imgB = await forDealership(prisma, b.id).vehicleImage.findFirstOrThrow();
-    expect(imgB.storageKey.startsWith(`dealerships/${b.id}/`)).toBe(true);
-    expect(await forDealership(prisma, a.id).vehicleImage.findUnique({ where: { id: imgB.id } })).toBeNull();
+    const imgB = await forOrganization(prisma, b.id).vehicleImage.findFirstOrThrow();
+    expect(imgB.storageKey.startsWith(`organizations/${b.id}/`)).toBe(true);
+    expect(await forOrganization(prisma, a.id).vehicleImage.findUnique({ where: { id: imgB.id } })).toBeNull();
   });
 
   it('a bad file fails once, clearly, without retries; a flaky provider is retried and charged once', async () => {
-    const d = await newDealership();
+    const d = await newOrganization();
     let calls = 0;
     const mock = new MockVisionProvider();
     const flaky: VisionProvider = {
@@ -278,7 +278,7 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     await owner.photo('pdf');
     await w.settle();
     expect(owner.inbox().at(-1)).toContain('Solo acepto');
-    const db = forDealership(prisma, d.id);
+    const db = forOrganization(prisma, d.id);
     const failed = await db.contentJob.findFirstOrThrow({ where: { telegramFileId: 'pdf' } });
     expect(failed.status).toBe('FAILED');
     expect(failed.lastError).toMatchObject({ code: 'ImageValidationError' });
@@ -295,9 +295,9 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     expect(usage.quantity).toBe(1n);
   });
 
-  it('enforces the daily limit from the dealership settings', async () => {
-    const d = await newDealership();
-    await prisma.dealershipSettings.update({ where: { dealershipId: d.id }, data: { dailyJobLimit: 1 } });
+  it('enforces the daily limit from the organization settings', async () => {
+    const d = await newOrganization();
+    await prisma.organizationSettings.update({ where: { organizationId: d.id }, data: { dailyJobLimit: 1 } });
     const w = world(prisma, { slug: d.slug, bootstrapCode: 'bootstrap-code-lim', storageRoot });
     const owner = w.user();
     await owner.command('/start bootstrap-code-lim');
@@ -305,23 +305,23 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     await owner.photo();
     await w.settle();
     expect(owner.inbox().filter((t) => t.includes('límite diario'))).toHaveLength(1);
-    expect(await forDealership(prisma, d.id).contentJob.count()).toBe(1);
+    expect(await forOrganization(prisma, d.id).contentJob.count()).toBe(1);
   });
 
   it('jobs accepted before a restart are finished after it', async () => {
-    const d = await newDealership();
+    const d = await newOrganization();
     // "Before": bot accepts the photo, but the process dies before the worker runs.
     const before = world(prisma, { slug: d.slug, bootstrapCode: 'bootstrap-code-rst', storageRoot, startWorker: false });
     const owner = before.user();
     await owner.command('/start bootstrap-code-rst');
     await owner.photo('photo-before-restart');
-    const db = forDealership(prisma, d.id);
+    const db = forOrganization(prisma, d.id);
     expect((await db.contentJob.findFirstOrThrow()).status).toBe('PENDING');
 
     // "After": fresh in-memory queue + worker; startup recovery re-enqueues from the database.
     const after = world(prisma, { slug: d.slug, bootstrapCode: 'bootstrap-code-rst', storageRoot });
-    for (const j of (await findUnfinishedJobs(prisma)).filter((j) => j.dealershipId === d.id)) {
-      await after.queue.enqueue({ contentJobId: j.id, dealershipId: j.dealershipId }, { jobId: j.id });
+    for (const j of (await findUnfinishedJobs(prisma)).filter((j) => j.organizationId === d.id)) {
+      await after.queue.enqueue({ contentJobId: j.id, organizationId: j.organizationId }, { jobId: j.id });
     }
     await after.settle();
     expect((await db.contentJob.findFirstOrThrow()).status).toBe('COMPLETED');
@@ -329,18 +329,18 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
   });
 
   it('repairs a vehicle left without identity when a previous attempt crashed after the analysis', async () => {
-    const d = await newDealership();
+    const d = await newOrganization();
     const w = world(prisma, { slug: d.slug, bootstrapCode: 'bootstrap-code-rep', storageRoot });
     const owner = w.user();
     await owner.command('/start bootstrap-code-rep');
     await owner.photo('repair');
     await w.settle();
-    const db = forDealership(prisma, d.id);
+    const db = forOrganization(prisma, d.id);
     const job = await db.contentJob.findFirstOrThrow();
     // Simulate the crash window: analysis saved, vehicle identity not yet written, job unfinished.
     await db.vehicle.update({ where: { id: job.vehicleId }, data: { make: null, model: null, provenance: {} } });
     await db.contentJob.update({ where: { id: job.id }, data: { status: 'RETRYING' } });
-    await w.queue.enqueue({ contentJobId: job.id, dealershipId: d.id }, { jobId: `${job.id}-retry` });
+    await w.queue.enqueue({ contentJobId: job.id, organizationId: d.id }, { jobId: `${job.id}-retry` });
     await w.settle();
     const v = await db.vehicle.findUniqueOrThrow({ where: { id: job.vehicleId } });
     expect(v.make).not.toBeNull();
@@ -350,7 +350,7 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
 
   describe.skipIf(!REDIS)('with Redis (BullMQ)', () => {
     it('runs the same flow through a real Redis queue', async () => {
-      const d = await newDealership();
+      const d = await newOrganization();
       const queue = new BullMqQueue<ContentJobPayload>(`e2e-${randomUUID()}`, { redisUrl: REDIS!, retry: { maxRetries: 3, baseDelayMs: 10 }, prefix: 'test' });
       try {
         const w = world(prisma, { slug: d.slug, bootstrapCode: 'bootstrap-code-rds', storageRoot, queue });
@@ -358,7 +358,7 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
         await owner.command('/start bootstrap-code-rds');
         await owner.photo();
         await w.settle();
-        expect((await forDealership(prisma, d.id).contentJob.findFirstOrThrow()).status).toBe('COMPLETED');
+        expect((await forOrganization(prisma, d.id).contentJob.findFirstOrThrow()).status).toBe('COMPLETED');
         expect(owner.inbox().some((t) => t.includes('Texto para publicar'))).toBe(true);
       } finally {
         await queue.close();

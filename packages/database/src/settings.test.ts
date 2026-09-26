@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
-import type { DealershipSettings } from './generated/client.js';
-import { seed, DEMO_DEALERSHIP_SLUG } from './seed.js';
+import type { OrganizationSettings } from './generated/client.js';
+import { seed, DEMO_ORGANIZATION_SLUG } from './seed.js';
 import {
   SettingsService,
   buildSettingsSnapshot,
@@ -9,10 +9,10 @@ import {
   settingsSnapshotSchema,
   stricterPublishingMode,
 } from './settings.js';
-import { hasDb, makeDealership, testPrisma } from './test-db.js';
+import { hasDb, makeOrganization, testPrisma } from './test-db.js';
 
-const settings = (over: Partial<DealershipSettings> = {}): DealershipSettings => ({
-  dealershipId: '00000000-0000-4000-8000-000000000001',
+const settings = (over: Partial<OrganizationSettings> = {}): OrganizationSettings => ({
+  organizationId: '00000000-0000-4000-8000-000000000001',
   locale: 'pt',
   timezone: 'America/Sao_Paulo',
   currency: 'BRL',
@@ -39,7 +39,7 @@ const settings = (over: Partial<DealershipSettings> = {}): DealershipSettings =>
 const sub = { dailyJobLimit: 50, monthlyVehicleLimit: 200, monthlyVideoLimit: 20, monthlyCostCapMicros: 25_000_000n };
 
 describe('effectiveLimits', () => {
-  it('lets the dealership tighten but never loosen plan limits', () => {
+  it('lets the organization tighten but never loosen plan limits', () => {
     expect(effectiveLimits(settings({ dailyJobLimit: 10 }), sub)).toMatchObject({ dailyJobLimit: 10, monthlyCostCapMicros: 10_000_000n });
     expect(effectiveLimits(settings({ dailyJobLimit: 999, monthlyCostCapMicros: 99_000_000n }), sub)).toMatchObject({
       dailyJobLimit: 50,
@@ -50,9 +50,9 @@ describe('effectiveLimits', () => {
 });
 
 describe('resolveLocale / stricterPublishingMode', () => {
-  it('follows Telegram override → dealership → default', () => {
-    expect(resolveLocale({ telegramOverride: 'en', dealershipLocale: 'pt', fallback: 'es' })).toBe('en');
-    expect(resolveLocale({ telegramOverride: null, dealershipLocale: 'pt', fallback: 'es' })).toBe('pt');
+  it('follows Telegram override → organization → default', () => {
+    expect(resolveLocale({ telegramOverride: 'en', organizationLocale: 'pt', fallback: 'es' })).toBe('en');
+    expect(resolveLocale({ telegramOverride: null, organizationLocale: 'pt', fallback: 'es' })).toBe('pt');
     expect(resolveLocale({ fallback: 'es' })).toBe('es');
   });
 
@@ -65,7 +65,7 @@ describe('resolveLocale / stricterPublishingMode', () => {
 describe('buildSettingsSnapshot', () => {
   it('freezes settings into a JSON-safe, validated snapshot', () => {
     const snap = buildSettingsSnapshot(
-      { dealership: { id: 'd', name: 'Autos Silva', status: 'ACTIVE' }, settings: settings(), subscription: { ...sub } as never },
+      { organization: { id: 'd', name: 'Autos Silva', status: 'ACTIVE' }, settings: settings(), subscription: { ...sub } as never },
       new Date('2026-09-25T12:00:00Z'),
     );
     expect(snap.brand.name).toBe('Autos Silva');
@@ -80,30 +80,30 @@ describe.skipIf(!hasDb)('seed + SettingsService (real PostgreSQL)', () => {
   const prisma = hasDb ? testPrisma() : undefined;
   afterAll(() => prisma?.$disconnect());
 
-  it('seed is idempotent and creates a usable demo dealership', async () => {
+  it('seed is idempotent and creates a usable demo organization', async () => {
     const a = await seed(prisma!);
     const b = await seed(prisma!);
-    expect(a.dealershipId).toBe(b.dealershipId);
-    expect(await prisma!.dealership.count({ where: { slug: DEMO_DEALERSHIP_SLUG } })).toBe(1);
-    expect(await prisma!.aPIProvider.count({ where: { dealershipId: null, adapter: 'mock-vision' } })).toBe(1);
-    const ctx = await new SettingsService(prisma!).get(a.dealershipId);
+    expect(a.organizationId).toBe(b.organizationId);
+    expect(await prisma!.organization.count({ where: { slug: DEMO_ORGANIZATION_SLUG } })).toBe(1);
+    expect(await prisma!.aPIProvider.count({ where: { organizationId: null, adapter: 'mock-vision' } })).toBe(1);
+    const ctx = await new SettingsService(prisma!).get(a.organizationId);
     expect(ctx.settings.locale).toBe('es');
     expect(ctx.settings.publishingMode).toBe('DRAFT_ONLY');
     expect(ctx.subscription?.planCode).toBe('trial');
   });
 
   it('caches for the TTL, creates default settings lazily, and invalidates', async () => {
-    const d = await makeDealership(prisma!);
+    const d = await makeOrganization(prisma!);
     let now = 0;
     const svc = new SettingsService(prisma!, 1000, () => now);
     expect((await svc.get(d.id)).settings.locale).toBe('es'); // created lazily
-    await prisma!.dealershipSettings.update({ where: { dealershipId: d.id }, data: { locale: 'pt' } });
+    await prisma!.organizationSettings.update({ where: { organizationId: d.id }, data: { locale: 'pt' } });
     expect((await svc.get(d.id)).settings.locale).toBe('es'); // cached
     svc.invalidate(d.id);
     expect((await svc.get(d.id)).settings.locale).toBe('pt');
     now = 5000;
-    await prisma!.dealershipSettings.update({ where: { dealershipId: d.id }, data: { locale: 'en' } });
+    await prisma!.organizationSettings.update({ where: { organizationId: d.id }, data: { locale: 'en' } });
     expect((await svc.get(d.id)).settings.locale).toBe('en'); // TTL expired
-    await prisma!.dealership.delete({ where: { id: d.id } });
+    await prisma!.organization.delete({ where: { id: d.id } });
   });
 });

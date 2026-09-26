@@ -34,13 +34,13 @@ export const ROUTES = [
   // Auth
   route({ id: 'auth.login', method: 'POST', path: '/auth/login', auth: 'public', tag: 'Auth', summary: 'Start a session (sets the httpOnly `sid` cookie)', body: r.loginBody, response: r.me }),
   route({ id: 'auth.logout', method: 'POST', path: '/auth/logout', auth: 'OPERATOR', tag: 'Auth', summary: 'End the current session', response: okResponse }),
-  route({ id: 'auth.me', method: 'GET', path: '/auth/me', auth: 'OPERATOR', tag: 'Auth', summary: 'Current user and dealership', response: r.me }),
+  route({ id: 'auth.me', method: 'GET', path: '/auth/me', auth: 'OPERATOR', tag: 'Auth', summary: 'Current user and organization', response: r.me }),
 
-  // Dealership
-  route({ id: 'dealership.get', method: 'GET', path: '/dealership', auth: 'OPERATOR', tag: 'Dealership', summary: 'The session’s dealership', response: r.dealership }),
-  route({ id: 'dealership.update', method: 'PATCH', path: '/dealership', auth: 'OWNER', tag: 'Dealership', summary: 'Rename the dealership', body: r.dealershipPatch, response: r.dealership }),
-  route({ id: 'settings.get', method: 'GET', path: '/dealership/settings', auth: 'EDITOR', tag: 'Dealership', summary: 'Dealership settings (language, publishing mode, limits…)', response: r.settings }),
-  route({ id: 'settings.update', method: 'PATCH', path: '/dealership/settings', auth: 'ADMIN', tag: 'Dealership', summary: 'Update settings. Audited; cost caps can only tighten plan limits.', body: r.settingsPatch, response: r.settings }),
+  // Organization
+  route({ id: 'organization.get', method: 'GET', path: '/organization', auth: 'OPERATOR', tag: 'Organization', summary: 'The session’s organization', response: r.organization }),
+  route({ id: 'organization.update', method: 'PATCH', path: '/organization', auth: 'OWNER', tag: 'Organization', summary: 'Rename the organization', body: r.organizationPatch, response: r.organization }),
+  route({ id: 'settings.get', method: 'GET', path: '/organization/settings', auth: 'EDITOR', tag: 'Organization', summary: 'Organization settings (language, publishing mode, limits…)', response: r.settings }),
+  route({ id: 'settings.update', method: 'PATCH', path: '/organization/settings', auth: 'ADMIN', tag: 'Organization', summary: 'Update settings. Audited; cost caps can only tighten plan limits.', body: r.settingsPatch, response: r.settings }),
 
   // Users
   route({ id: 'users.list', method: 'GET', path: '/users', auth: 'ADMIN', tag: 'Users', summary: 'List users', query: paginationQuery, response: page(r.user) }),
@@ -49,7 +49,7 @@ export const ROUTES = [
   route({ id: 'users.disable', method: 'DELETE', path: '/users/:id', auth: 'ADMIN', tag: 'Users', summary: 'Disable a user (users are never hard-deleted)', params: idParams, response: okResponse }),
 
   // Telegram
-  route({ id: 'telegram.invites.create', method: 'POST', path: '/telegram/invites', auth: 'ADMIN', tag: 'Telegram', summary: 'Create a one-time t.me deep link that links a Telegram user to this dealership', body: r.telegramInviteCreate, response: r.telegramInvite, status: 201 }),
+  route({ id: 'telegram.invites.create', method: 'POST', path: '/telegram/invites', auth: 'ADMIN', tag: 'Telegram', summary: 'Create a one-time t.me deep link that links a Telegram user to this organization', body: r.telegramInviteCreate, response: r.telegramInvite, status: 201 }),
   route({ id: 'telegram.accounts.list', method: 'GET', path: '/telegram/accounts', auth: 'ADMIN', tag: 'Telegram', summary: 'Linked Telegram accounts', query: paginationQuery, response: page(r.telegramAccount) }),
   route({ id: 'telegram.accounts.update', method: 'PATCH', path: '/telegram/accounts/:id', auth: 'ADMIN', tag: 'Telegram', summary: 'Block/unblock, change role or language', params: idParams, body: r.telegramAccountPatch, response: r.telegramAccount }),
 
@@ -85,7 +85,7 @@ export const ROUTES = [
 
   // Publishing
   route({ id: 'publishingAccounts.list', method: 'GET', path: '/publishing-accounts', auth: 'EDITOR', tag: 'Publishing', summary: 'Connected social accounts', response: z.object({ items: z.array(r.publishingAccount) }) }),
-  route({ id: 'publishingAccounts.sync', method: 'POST', path: '/publishing-accounts/sync', auth: 'ADMIN', tag: 'Publishing', summary: 'Fetch accounts from the dealership’s Blotato workspace', response: z.object({ items: z.array(r.publishingAccount) }) }),
+  route({ id: 'publishingAccounts.sync', method: 'POST', path: '/publishing-accounts/sync', auth: 'ADMIN', tag: 'Publishing', summary: 'Fetch accounts from the organization’s Blotato workspace', response: z.object({ items: z.array(r.publishingAccount) }) }),
   route({ id: 'publishingAccounts.delete', method: 'DELETE', path: '/publishing-accounts/:id', auth: 'ADMIN', tag: 'Publishing', summary: 'Disconnect an account', params: idParams, response: okResponse }),
   route({ id: 'publications.list', method: 'GET', path: '/publications', auth: 'OPERATOR', tag: 'Publishing', summary: 'Publications and their status', query: r.publicationListQuery, response: page(r.publication) }),
   route({ id: 'publications.create', method: 'POST', path: '/publications', auth: 'EDITOR', tag: 'Publishing', summary: 'Publish or schedule approved content (respects the publishing mode)', body: r.publicationCreate, response: r.publication, status: 202 }),
@@ -94,8 +94,8 @@ export const ROUTES = [
   // Integrations & keys
   route({ id: 'integrations.list', method: 'GET', path: '/integrations', auth: 'ADMIN', tag: 'Integrations', summary: 'Status of every provider: CONNECTED / NOT_CONFIGURED / ERROR', response: z.object({ items: z.array(r.integration) }) }),
   route({ id: 'integrations.test', method: 'POST', path: '/integrations/:adapter/test', auth: 'ADMIN', tag: 'Integrations', summary: 'Run the provider’s connection test (never spends generation credit)', params: r.adapterParams, response: r.integrationTestResult }),
-  route({ id: 'apiKeys.put', method: 'PUT', path: '/api-keys/:adapter', auth: 'ADMIN', tag: 'Integrations', summary: 'Store the dealership’s key for a provider (encrypted, write-only)', params: r.adapterParams, body: r.apiKeyPut, response: r.apiKeySaved }),
-  route({ id: 'apiKeys.delete', method: 'DELETE', path: '/api-keys/:adapter', auth: 'ADMIN', tag: 'Integrations', summary: 'Revoke the dealership’s key for a provider', params: r.adapterParams, response: okResponse }),
+  route({ id: 'apiKeys.put', method: 'PUT', path: '/api-keys/:adapter', auth: 'ADMIN', tag: 'Integrations', summary: 'Store the organization’s key for a provider (encrypted, write-only)', params: r.adapterParams, body: r.apiKeyPut, response: r.apiKeySaved }),
+  route({ id: 'apiKeys.delete', method: 'DELETE', path: '/api-keys/:adapter', auth: 'ADMIN', tag: 'Integrations', summary: 'Revoke the organization’s key for a provider', params: r.adapterParams, response: okResponse }),
 
   // Usage & audit
   route({ id: 'usage.report', method: 'GET', path: '/usage', auth: 'ADMIN', tag: 'Usage', summary: 'Usage and cost for a date range', query: r.usageQuery, response: r.usageReport }),

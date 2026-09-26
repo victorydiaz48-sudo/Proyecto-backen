@@ -1,0 +1,19 @@
+{
+  "name": "@autocontent/verticals-core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@autocontent/contracts": "workspace:*",
+    "@autocontent/database": "workspace:*",
+    "@autocontent/providers": "workspace:*",
+    "@autocontent/shared": "workspace:*",
+    "@autocontent/templates": "workspace:*",
+    "zod": "^4.1.0"
+  }
+}

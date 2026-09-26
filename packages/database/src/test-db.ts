@@ -18,6 +18,6 @@ export function testPrisma(): PrismaClient {
   return createPrismaClient(TEST_DATABASE_URL!, { maxConnections: 4 });
 }
 
-export async function makeDealership(prisma: PrismaClient, name = 'Test') {
-  return prisma.dealership.create({ data: { name, slug: `test-${randomUUID()}` } });
+export async function makeOrganization(prisma: PrismaClient, name = 'Test') {
+  return prisma.organization.create({ data: { name, slug: `test-${randomUUID()}` } });
 }

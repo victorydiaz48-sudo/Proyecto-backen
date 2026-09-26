@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { generateCaption } from '@autocontent/content-engine';
 import {
   Prisma,
-  forDealership,
+  forOrganization,
   localDay,
   incrementUsage,
   recordProviderCall,
@@ -114,7 +114,7 @@ function failureText(err: unknown, locale: Locale, limits: ImageLimits): string 
  * resumes where it stopped:
  *  - ingest: skipped if the vehicle already has its original image stored
  *  - analysis: skipped if the image was analysed; an identical photo analysed
- *    before in the same dealership is reused without calling (or paying) the
+ *    before in the same organization is reused without calling (or paying) the
  *    provider again; provider calls are logged/charged once per attempt key
  *  - caption: one ContentAsset per (job, format, version)
  *  - delivery: analysisDeliveredAt / deliveredAt mark what was sent
@@ -127,8 +127,8 @@ export function createContentJobProcessor(deps: WorkerDeps): {
   const now = deps.now ?? (() => new Date());
 
   const handler = async (p: ContentJobPayload, ctx: JobContext) => {
-    const log = ctx.logger.child({ dealershipId: p.dealershipId });
-    const db = forDealership(deps.prisma, p.dealershipId);
+    const log = ctx.logger.child({ organizationId: p.organizationId });
+    const db = forOrganization(deps.prisma, p.organizationId);
     const job = await db.contentJob.findUnique({ where: { id: p.contentJobId }, include: { vehicle: true } });
     if (!job) {
       log.warn('content job not found (deleted?)');
@@ -155,12 +155,12 @@ export function createContentJobProcessor(deps: WorkerDeps): {
         bytes = await deps.files.download(job.telegramFileId, deps.limits.maxBytes);
         const v = validateImage(bytes, deps.limits);
         const sha256 = createHash('sha256').update(bytes).digest('hex');
-        const key = storageKey(p.dealershipId, 'vehicles', job.vehicleId, 'originals', `${sha256}.${EXT[v.mime]}`);
+        const key = storageKey(p.organizationId, 'vehicles', job.vehicleId, 'originals', `${sha256}.${EXT[v.mime]}`);
         await deps.storage.put(key, bytes, { mime: v.mime, sha256 });
         image = await db.vehicleImage.upsert({
           where: { storageKey: key },
           create: {
-            dealershipId: p.dealershipId,
+            organizationId: p.organizationId,
             vehicleId: job.vehicleId,
             storageKey: key,
             mime: v.mime,
@@ -193,7 +193,7 @@ export function createContentJobProcessor(deps: WorkerDeps): {
         } else {
           const t0 = Date.now();
           const attemptKey = `${job.id}:vision:${ctx.attempt}`;
-          const provider = await deps.prisma.aPIProvider.findFirst({ where: { dealershipId: null, adapter: deps.vision.name } });
+          const provider = await deps.prisma.aPIProvider.findFirst({ where: { organizationId: null, adapter: deps.vision.name } });
           try {
             const res = await deps.vision.analyze(
               {
@@ -202,7 +202,7 @@ export function createContentJobProcessor(deps: WorkerDeps): {
               },
               {
                 jobId: job.id,
-                dealershipId: p.dealershipId,
+                organizationId: p.organizationId,
                 idempotencyKey: attemptKey,
                 signal: AbortSignal.timeout(deps.visionTimeoutMs ?? 60_000),
                 logger: log,
@@ -214,7 +214,7 @@ export function createContentJobProcessor(deps: WorkerDeps): {
             const units = res.usage.reduce((s, u) => s + u.units, 0);
             await deps.prisma.$transaction(async (tx) => {
               await recordProviderCall(tx, {
-                dealershipId: p.dealershipId,
+                organizationId: p.organizationId,
                 contentJobId: job.id,
                 providerId: provider?.id,
                 adapter: deps.vision.name,
@@ -250,7 +250,7 @@ export function createContentJobProcessor(deps: WorkerDeps): {
             await deps.prisma
               .$transaction((tx) =>
                 recordProviderCall(tx, {
-                  dealershipId: p.dealershipId,
+                  organizationId: p.organizationId,
                   contentJobId: job.id,
                   providerId: provider?.id,
                   adapter: deps.vision.name,
@@ -299,7 +299,7 @@ export function createContentJobProcessor(deps: WorkerDeps): {
       const asset = await db.contentAsset.upsert({
         where: { contentJobId_format_version: { contentJobId: job.id, format: CAPTION_FORMAT, version: 1 } },
         create: {
-          dealershipId: p.dealershipId,
+          organizationId: p.organizationId,
           contentJobId: job.id,
           vehicleId: job.vehicleId,
           kind: 'TEXT',
@@ -345,11 +345,11 @@ export function createContentJobProcessor(deps: WorkerDeps): {
     async function complete(jobId: string) {
       await deps.prisma.$transaction(async (tx) => {
         const res = await tx.contentJob.updateMany({
-          where: { id: jobId, dealershipId: p.dealershipId, status: { notIn: [...FINISHED] } },
+          where: { id: jobId, organizationId: p.organizationId, status: { notIn: [...FINISHED] } },
           data: { status: 'COMPLETED', stage: 'DONE', completedAt: now(), lastError: Prisma.DbNull },
         });
         if (res.count === 1) {
-          await incrementUsage(tx, { dealershipId: p.dealershipId, day: localDay(now(), snap.timezone), metric: 'VEHICLES_PROCESSED' });
+          await incrementUsage(tx, { organizationId: p.organizationId, day: localDay(now(), snap.timezone), metric: 'VEHICLES_PROCESSED' });
         }
       });
       log.info('content job completed', { event: LogEvent.JOB_COMPLETED });
@@ -357,7 +357,7 @@ export function createContentJobProcessor(deps: WorkerDeps): {
   };
 
   const onFinalFailure = async (p: ContentJobPayload, err: unknown, ctx: JobContext) => {
-    const db = forDealership(deps.prisma, p.dealershipId);
+    const db = forOrganization(deps.prisma, p.organizationId);
     const job = await db.contentJob.findUnique({ where: { id: p.contentJobId } });
     if (!job || (FINISHED as readonly string[]).includes(job.status)) return;
     await db.contentJob.update({

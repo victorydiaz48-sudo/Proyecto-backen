@@ -9,7 +9,7 @@ export interface StoredObject {
 
 /**
  * S3-compatible object storage. Keys always start with
- * `dealerships/{dealershipId}/` (see storageKey()), so one bucket can hold every
+ * `organizations/{organizationId}/` (see storageKey()), so one bucket can hold every
  * tenant without mixing data. Objects are private; access is through
  * short-lived signed URLs only.
  */
@@ -25,9 +25,9 @@ export interface StorageProvider extends TestableProvider {
 const SAFE_SEGMENT = /^[A-Za-z0-9._-]+$/;
 
 /** Builds a tenant-prefixed key and refuses path tricks ("..", "/", empty). */
-export function storageKey(dealershipId: string, ...segments: string[]): string {
-  for (const s of [dealershipId, ...segments]) {
+export function storageKey(organizationId: string, ...segments: string[]): string {
+  for (const s of [organizationId, ...segments]) {
     if (!SAFE_SEGMENT.test(s) || s === '.' || s === '..') throw new Error(`Unsafe storage key segment: "${s}"`);
   }
-  return ['dealerships', dealershipId, ...segments].join('/');
+  return ['organizations', organizationId, ...segments].join('/');
 }

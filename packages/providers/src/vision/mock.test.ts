@@ -10,7 +10,7 @@ import type { VisionInput } from './types.js';
 
 describeVisionProviderContract('mock-vision', () => new MockVisionProvider());
 
-const opts = { jobId: 'j', dealershipId: 'd', idempotencyKey: 'k', signal: new AbortController().signal, logger: silentLogger };
+const opts = { jobId: 'j', organizationId: 'd', idempotencyKey: 'k', signal: new AbortController().signal, logger: silentLogger };
 const input = (seed: number, locale: Locale = 'es'): VisionInput => {
   const bytes = makePng(400, 400, seed);
   return {

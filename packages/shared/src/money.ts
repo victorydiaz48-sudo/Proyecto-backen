@@ -1,6 +1,6 @@
 /**
  * Costs are tracked internally in integer micro-USD (1 USD = 1_000_000) so
- * sums are exact. Conversion to a dealership's display currency happens only
+ * sums are exact. Conversion to an organization's display currency happens only
  * at the edges (dashboard, bot messages).
  */
 export const MICROS_PER_USD = 1_000_000n;

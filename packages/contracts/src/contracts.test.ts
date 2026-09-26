@@ -32,9 +32,9 @@ describe('route table', () => {
     }
   });
 
-  it('never accepts a dealershipId from the client', () => {
+  it('never accepts a organizationId from the client', () => {
     const doc = JSON.stringify(buildOpenApiDocument().paths);
-    expect(doc).not.toContain('dealershipId');
+    expect(doc).not.toContain('organizationId');
   });
 });
 

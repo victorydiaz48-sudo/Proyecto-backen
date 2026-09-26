@@ -47,7 +47,7 @@ available), the original photo is stored, and the bot replies with a
    passwords around.
 
 Database tables are created automatically on every deploy (migrations run
-before the app starts). A demo dealership called "Concesionario Demo" is
+before the app starts). A demo organization called "Concesionario Demo" is
 created the first time.
 
 ## 4. Add Redis (1 minute) — recommended
@@ -85,7 +85,7 @@ https://t.me/<your_bot_username>?start=<your BOOTSTRAP_CODE>
 Telegram opens the bot and shows a **Start** button; tap it. The bot answers
 "✅ ¡Listo! Tu cuenta quedó vinculada como **propietario**".
 
-This works **once**: after the first person claims the dealership, the code is
+This works **once**: after the first person claims the organization, the code is
 useless. (You can delete the `BOOTSTRAP_CODE` variable afterwards.)
 
 ## 7. Invite your team

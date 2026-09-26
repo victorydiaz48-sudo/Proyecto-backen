@@ -1,6 +1,6 @@
 # Dealer Content Platform
 
-Content automation for car dealerships: an employee sends **one vehicle photo**
+Content automation for car organizations: an employee sends **one vehicle photo**
 to a Telegram bot, and the system identifies the vehicle and produces marketing
 content (captions, posts, stories, reels) — and later publishes it.
 
@@ -15,7 +15,7 @@ content (captions, posts, stories, reels) — and later publishes it.
   as files), polling or secured webhook mode; first owner via a one-time
   bootstrap link
 - Every photo becomes a Vehicle + ContentJob in PostgreSQL; daily/monthly
-  limits per dealership; usage and provider cost recorded exactly once
+  limits per organization; usage and provider cost recorded exactly once
 - Queue on Redis (BullMQ) or in memory; unfinished jobs resume after a restart
 - Original photos stored in S3-compatible storage (e.g. Cloudflare R2) or on
   local disk; an identical photo reuses its analysis instead of paying again

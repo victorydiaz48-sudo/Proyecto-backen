@@ -36,8 +36,8 @@ export interface BotDeps {
   limits: ImageLimits;
   defaultLocale: Locale;
   bootstrapCode?: string;
-  /** Dealership the bootstrap code claims (default: the seeded demo dealership). */
-  bootstrapDealershipSlug?: string;
+  /** Organization the bootstrap code claims (default: the seeded demo organization). */
+  bootstrapOrganizationSlug?: string;
   /** Pre-supplied bot identity (tests) — skips the getMe call on startup. */
   botInfo?: UserFromGetMe;
   rateLimit?: { max: number; windowMs: number };
@@ -72,8 +72,8 @@ export function createBot(deps: BotDeps): Bot {
   };
 
   const accountLocale = async (a: TelegramAccountInfo): Promise<Locale> => {
-    const s = await deps.settings.get(a.dealershipId);
-    return resolveLocale({ telegramOverride: a.localeOverride, dealershipLocale: s.settings.locale, fallback: deps.defaultLocale });
+    const s = await deps.settings.get(a.organizationId);
+    return resolveLocale({ telegramOverride: a.localeOverride, organizationLocale: s.settings.locale, fallback: deps.defaultLocale });
   };
 
   // Abuse protection: cap updates per Telegram user before touching the database.
@@ -86,7 +86,7 @@ export function createBot(deps: BotDeps): Bot {
     await next();
   });
 
-  /** Loads the sender's account and rejects blocked users / suspended dealerships. */
+  /** Loads the sender's account and rejects blocked users / suspended organizations. */
   const requireAccount = async (ctx: Context): Promise<{ account: TelegramAccountInfo; locale: Locale } | null> => {
     const from = ctx.from;
     if (!from) return null;
@@ -101,7 +101,7 @@ export function createBot(deps: BotDeps): Bot {
       await ctx.reply(m.access.blocked);
       return null;
     }
-    if (account.dealership.status !== 'ACTIVE') {
+    if (account.organization.status !== 'ACTIVE') {
       await ctx.reply(m.access.suspended);
       return null;
     }
@@ -129,7 +129,7 @@ export function createBot(deps: BotDeps): Bot {
         code: payload,
         expectedCode: deps.bootstrapCode,
         identity,
-        dealershipSlug: deps.bootstrapDealershipSlug,
+        organizationSlug: deps.bootstrapOrganizationSlug,
       });
       if (result.status === 'invalid') result = await redeemTelegramInvite(deps.prisma, { code: payload, identity });
     }
@@ -138,7 +138,7 @@ export function createBot(deps: BotDeps): Bot {
     const m = messages(account ? await accountLocale(account) : guestLocale(ctx));
     switch (result.status) {
       case 'linked':
-        log.info('telegram account linked', { dealershipId: result.dealershipId, role: result.role });
+        log.info('telegram account linked', { organizationId: result.organizationId, role: result.role });
         return void (await ctx.reply(m.access.linked(m.roles[result.role]), { parse_mode: 'HTML' }));
       case 'already_linked':
         return void (await ctx.reply(m.access.alreadyLinked));
@@ -164,7 +164,7 @@ export function createBot(deps: BotDeps): Bot {
     if (!role) return void (await ctx.reply(m.access.inviteUsage));
 
     const inv = await createTelegramInvite(deps.prisma, {
-      dealershipId: r.account.dealershipId,
+      organizationId: r.account.organizationId,
       inviterRole: effectiveRole(r.account),
       inviterAccountId: r.account.id,
       role,
@@ -172,7 +172,7 @@ export function createBot(deps: BotDeps): Bot {
     });
     if ('error' in inv) return void (await ctx.reply(m.access.inviteForbidden));
     const link = `https://t.me/${ctx.me.username}?start=${inv.code}`;
-    log.info('telegram invite created', { dealershipId: r.account.dealershipId, role });
+    log.info('telegram invite created', { organizationId: r.account.organizationId, role });
     await ctx.reply(m.access.inviteCreated(link, m.roles[role], inviteHours), {
       parse_mode: 'HTML',
       link_preview_options: { is_disabled: true },
@@ -187,10 +187,10 @@ export function createBot(deps: BotDeps): Bot {
       return void (await ctx.reply(m.imageTooLarge(Math.floor(deps.limits.maxBytes / (1024 * 1024)))));
     }
 
-    const ctxSettings = await deps.settings.get(r.account.dealershipId);
+    const ctxSettings = await deps.settings.get(r.account.organizationId);
     const snapshot = { ...buildSettingsSnapshot(ctxSettings), locale: r.locale };
     const result = await createTelegramContentJob(deps.prisma, {
-      dealershipId: r.account.dealershipId,
+      organizationId: r.account.organizationId,
       telegramAccountId: r.account.id,
       // Same Telegram message → same job, so redelivered updates are duplicates.
       idempotencyKey: `tg:${ctx.me.id}:${ctx.chat!.id}:${ctx.msg!.message_id}`,
@@ -202,18 +202,18 @@ export function createBot(deps: BotDeps): Bot {
 
     switch (result.status) {
       case 'limit_reached':
-        log.info('job refused: limit reached', { dealershipId: r.account.dealershipId, limit: result.limit });
+        log.info('job refused: limit reached', { organizationId: r.account.organizationId, limit: result.limit });
         return void (await ctx.reply(result.limit === 'daily_jobs' ? m.access.dailyLimit : m.access.monthlyLimit));
       case 'duplicate':
         // Re-enqueue in case the first enqueue was lost; the queue dedupes by id.
         if (result.jobStatus === 'PENDING') {
-          await deps.queue.enqueue({ contentJobId: result.jobId, dealershipId: r.account.dealershipId }, { jobId: result.jobId });
+          await deps.queue.enqueue({ contentJobId: result.jobId, organizationId: r.account.organizationId }, { jobId: result.jobId });
         }
         log.info('duplicate update ignored', { jobId: result.jobId });
         return;
       case 'created':
-        await deps.queue.enqueue({ contentJobId: result.jobId, dealershipId: r.account.dealershipId }, { jobId: result.jobId });
-        log.info('job enqueued', { jobId: result.jobId, dealershipId: r.account.dealershipId });
+        await deps.queue.enqueue({ contentJobId: result.jobId, organizationId: r.account.organizationId }, { jobId: result.jobId });
+        log.info('job enqueued', { jobId: result.jobId, organizationId: r.account.organizationId });
         await ctx.reply(m.analyzing);
     }
   };

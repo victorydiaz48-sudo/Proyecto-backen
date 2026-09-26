@@ -10,5 +10,6 @@ export default defineConfig({
   },
   datasource: {
     url: process.env.DATABASE_URL ?? 'postgresql://invalid:invalid@localhost:5432/invalid',
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,
   },
 });

@@ -181,6 +181,27 @@ importers:
         specifier: ^4.1.0
         version: 4.6.5
 
+  packages/verticals/core:
+    dependencies:
+      '@autocontent/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@autocontent/database':
+        specifier: workspace:*
+        version: link:../../database
+      '@autocontent/providers':
+        specifier: workspace:*
+        version: link:../../providers
+      '@autocontent/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@autocontent/templates':
+        specifier: workspace:*
+        version: link:../../templates
+      zod:
+        specifier: ^4.1.0
+        version: 4.6.5
+
 packages:
 
   '@aws-sdk/checksums@3.1001.1':

@@ -1,6 +1,6 @@
 /**
- * Calendar helpers in a dealership's time zone. Daily/monthly limits and the
- * Usage.day column follow the dealership's local calendar, not UTC.
+ * Calendar helpers in an organization's time zone. Daily/monthly limits and the
+ * Usage.day column follow the organization's local calendar, not UTC.
  */
 
 function safeZone(tz: string): string {

@@ -9,8 +9,8 @@ import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
  * stay readable until re-encrypted.
  *
  * The additional authenticated data binds a ciphertext to its owner
- * ("{dealershipId|platform}:{providerId}"): copying an encrypted key into
- * another dealership's row makes decryption fail.
+ * ("{organizationId|platform}:{providerId}"): copying an encrypted key into
+ * another organization's row makes decryption fail.
  */
 
 export interface EncryptedSecret {
@@ -39,8 +39,8 @@ export function parseEncryptionKeys(spec: string): Map<number, Buffer> {
   return keys;
 }
 
-export function secretAad(dealershipId: string | null, providerId: string): string {
-  return `${dealershipId ?? 'platform'}:${providerId}`;
+export function secretAad(organizationId: string | null, providerId: string): string {
+  return `${organizationId ?? 'platform'}:${providerId}`;
 }
 
 export class SecretBox {

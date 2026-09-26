@@ -5,8 +5,8 @@ import { ROUTES, type RouteContract } from './routes.js';
 const ERROR_STATUSES: Record<string, string> = {
   '400': 'Invalid request (BAD_REQUEST)',
   '401': 'Not signed in (UNAUTHENTICATED)',
-  '403': 'Role too low or other dealership (FORBIDDEN)',
-  '404': 'Not found in this dealership (NOT_FOUND)',
+  '403': 'Role too low or other organization (FORBIDDEN)',
+  '404': 'Not found in this organization (NOT_FOUND)',
   '409': 'Conflict / duplicate (CONFLICT)',
   '429': 'Rate limited or usage limit reached (RATE_LIMITED, LIMIT_EXCEEDED)',
 };
@@ -64,7 +64,7 @@ export function buildOpenApiDocument() {
       title: 'Dealer Content Platform API',
       version: '1.0.0',
       description:
-        'REST API used by the dashboard. The dealership is always taken from the session; requests never carry a dealershipId. Money is micro-USD as decimal strings.',
+        'REST API used by the dashboard. The organization is always taken from the session; requests never carry a organizationId. Money is micro-USD as decimal strings.',
     },
     servers: [{ url: '/api/v1' }],
     components: {

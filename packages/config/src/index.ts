@@ -44,7 +44,7 @@ const configSchema = z
 
     /**
      * One-time code: the first person to open t.me/<bot>?start=<code> becomes
-     * OWNER of the demo dealership. Useless once claimed.
+     * OWNER of the demo organization. Useless once claimed.
      */
     BOOTSTRAP_CODE: z
       .string()

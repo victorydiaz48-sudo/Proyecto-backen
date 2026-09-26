@@ -23,7 +23,7 @@ describe('SecretBox', () => {
     expect(Buffer.from(a.iv).equals(Buffer.from(b.iv))).toBe(false);
   });
 
-  it('refuses a ciphertext copied to another dealership or tampered with', () => {
+  it('refuses a ciphertext copied to another organization or tampered with', () => {
     const enc = box.encrypt('secret-value', aad);
     expect(() => box.decrypt(enc, secretAad('dealer-b', 'provider-1'))).toThrow(SecretBoxError);
     const tampered = { ...enc, ciphertext: Uint8Array.from(enc.ciphertext, (x, i) => (i === 0 ? x ^ 1 : x)) };

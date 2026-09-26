@@ -2,7 +2,7 @@ import type { TestableProvider } from '../status.js';
 
 export interface AnalyticsEvent {
   name: string; // "job.completed", "asset.published" …
-  dealershipId: string;
+  organizationId: string;
   properties?: Record<string, string | number | boolean | null>;
   at?: Date;
 }

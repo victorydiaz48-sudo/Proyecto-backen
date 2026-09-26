@@ -60,12 +60,12 @@ describe('LocalDiskStorageProvider', () => {
   });
 
   it('signs and verifies URLs, rejecting tampering and expiry', async () => {
-    const url = new URL(await p.signedUrl('dealerships/d/x.png', { expiresInSec: 60 }));
+    const url = new URL(await p.signedUrl('organizations/d/x.png', { expiresInSec: 60 }));
     const exp = Number(url.searchParams.get('exp'));
     const sig = url.searchParams.get('sig')!;
-    expect(p.verifySignature('dealerships/d/x.png', 'GET', exp, sig)).toBe(true);
-    expect(p.verifySignature('dealerships/OTHER/x.png', 'GET', exp, sig)).toBe(false);
-    expect(p.verifySignature('dealerships/d/x.png', 'PUT', exp, sig)).toBe(false);
-    expect(p.verifySignature('dealerships/d/x.png', 'GET', exp, sig, (exp + 1) * 1000)).toBe(false);
+    expect(p.verifySignature('organizations/d/x.png', 'GET', exp, sig)).toBe(true);
+    expect(p.verifySignature('organizations/OTHER/x.png', 'GET', exp, sig)).toBe(false);
+    expect(p.verifySignature('organizations/d/x.png', 'PUT', exp, sig)).toBe(false);
+    expect(p.verifySignature('organizations/d/x.png', 'GET', exp, sig, (exp + 1) * 1000)).toBe(false);
   });
 });

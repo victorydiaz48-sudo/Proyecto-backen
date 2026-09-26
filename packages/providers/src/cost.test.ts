@@ -27,7 +27,7 @@ describe('computeCostMicros', () => {
 
 describe('storageKey', () => {
   it('always prefixes the tenant and rejects traversal', () => {
-    expect(storageKey('d1', 'vehicles', 'v1', 'originals', 'abc.jpg')).toBe('dealerships/d1/vehicles/v1/originals/abc.jpg');
+    expect(storageKey('d1', 'vehicles', 'v1', 'originals', 'abc.jpg')).toBe('organizations/d1/vehicles/v1/originals/abc.jpg');
     expect(() => storageKey('d1', '..', 'x')).toThrow();
     expect(() => storageKey('d1', 'a/b')).toThrow();
     expect(() => storageKey('d1', '')).toThrow();

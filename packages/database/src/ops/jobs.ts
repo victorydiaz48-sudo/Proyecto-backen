@@ -12,7 +12,7 @@ export type CreateJobResult =
 export async function incrementUsage(
   tx: Prisma.TransactionClient,
   opts: {
-    dealershipId: string;
+    organizationId: string;
     day: Date;
     metric: UsageMetric;
     providerAdapter?: string;
@@ -21,8 +21,8 @@ export async function incrementUsage(
   },
 ) {
   const where = {
-    dealershipId_day_metric_providerAdapter: {
-      dealershipId: opts.dealershipId,
+    organizationId_day_metric_providerAdapter: {
+      organizationId: opts.organizationId,
       day: opts.day,
       metric: opts.metric,
       providerAdapter: opts.providerAdapter ?? '',
@@ -30,7 +30,7 @@ export async function incrementUsage(
   };
   await tx.usage.upsert({
     where,
-    create: { ...where.dealershipId_day_metric_providerAdapter, quantity: opts.quantity ?? 1n, costMicros: opts.costMicros ?? 0n },
+    create: { ...where.organizationId_day_metric_providerAdapter, quantity: opts.quantity ?? 1n, costMicros: opts.costMicros ?? 0n },
     update: { quantity: { increment: opts.quantity ?? 1n }, costMicros: { increment: opts.costMicros ?? 0n } },
   });
 }
@@ -39,15 +39,15 @@ export async function incrementUsage(
  * Creates the Vehicle(DRAFT) + ContentJob for one Telegram photo.
  *
  *  - idempotent: the same idempotencyKey returns the existing job
- *  - limits: daily jobs and monthly vehicles are checked in the dealership's
- *    time zone, under a per-dealership advisory lock so parallel photos can't
+ *  - limits: daily jobs and monthly vehicles are checked in the organization's
+ *    time zone, under a per-organization advisory lock so parallel photos can't
  *    both slip under the limit
  *  - counts JOBS_CREATED usage and marks the job as the sender's active job
  */
 export async function createTelegramContentJob(
   prisma: PrismaClient,
   opts: {
-    dealershipId: string;
+    organizationId: string;
     telegramAccountId: string;
     idempotencyKey: string;
     telegramFileId: string;
@@ -62,7 +62,7 @@ export async function createTelegramContentJob(
   const jobId = deterministicJobId(opts.idempotencyKey);
 
   return prisma.$transaction(async (tx) => {
-    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${opts.dealershipId}, 0))`;
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${opts.organizationId}, 0))`;
 
     const existing = await tx.contentJob.findUnique({ where: { idempotencyKey: opts.idempotencyKey } });
     if (existing) return { status: 'duplicate', jobId: existing.id, jobStatus: existing.status };
@@ -70,24 +70,24 @@ export async function createTelegramContentJob(
     const { dailyJobLimit, monthlyVehicleLimit } = opts.snapshot.limits;
     if (dailyJobLimit !== null) {
       const today = await tx.contentJob.count({
-        where: { dealershipId: opts.dealershipId, createdAt: { gte: startOfLocalDay(now, tz) } },
+        where: { organizationId: opts.organizationId, createdAt: { gte: startOfLocalDay(now, tz) } },
       });
       if (today >= dailyJobLimit) return { status: 'limit_reached', limit: 'daily_jobs' };
     }
     if (monthlyVehicleLimit !== null) {
       const month = await tx.vehicle.count({
-        where: { dealershipId: opts.dealershipId, createdAt: { gte: startOfLocalMonth(now, tz) } },
+        where: { organizationId: opts.organizationId, createdAt: { gte: startOfLocalMonth(now, tz) } },
       });
       if (month >= monthlyVehicleLimit) return { status: 'limit_reached', limit: 'monthly_vehicles' };
     }
 
     const vehicle = await tx.vehicle.create({
-      data: { dealershipId: opts.dealershipId, provenance: {}, visualFeatures: [] },
+      data: { organizationId: opts.organizationId, provenance: {}, visualFeatures: [] },
     });
     await tx.contentJob.create({
       data: {
         id: jobId,
-        dealershipId: opts.dealershipId,
+        organizationId: opts.organizationId,
         vehicleId: vehicle.id,
         idempotencyKey: opts.idempotencyKey,
         source: 'TELEGRAM',
@@ -104,7 +104,7 @@ export async function createTelegramContentJob(
       where: { id: opts.telegramAccountId },
       data: { activeContentJobId: jobId, lastSeenAt: now },
     });
-    await incrementUsage(tx, { dealershipId: opts.dealershipId, day: localDay(now, tz), metric: 'JOBS_CREATED' });
+    await incrementUsage(tx, { organizationId: opts.organizationId, day: localDay(now, tz), metric: 'JOBS_CREATED' });
     return { status: 'created', jobId, vehicleId: vehicle.id };
   });
 }
@@ -112,7 +112,7 @@ export async function createTelegramContentJob(
 /**
  * Jobs that were accepted but never finished (e.g. the in-memory queue lost
  * them in a restart). Re-enqueued at startup; queue dedupe and idempotent
- * steps make this safe. Platform-level: spans all dealerships.
+ * steps make this safe. Platform-level: spans all organizations.
  */
 export async function findUnfinishedJobs(prisma: PrismaClient, opts: { olderThanMs?: number; limit?: number } = {}) {
   return prisma.contentJob.findMany({
@@ -120,14 +120,14 @@ export async function findUnfinishedJobs(prisma: PrismaClient, opts: { olderThan
       status: { in: ['PENDING', 'PROCESSING', 'RETRYING'] },
       createdAt: { lt: new Date(Date.now() - (opts.olderThanMs ?? 0)) },
     },
-    select: { id: true, dealershipId: true },
+    select: { id: true, organizationId: true },
     orderBy: { createdAt: 'asc' },
     take: opts.limit ?? 500,
   });
 }
 
 export interface ProviderCallRecord {
-  dealershipId: string;
+  organizationId: string;
   contentJobId: string;
   providerId?: string | null;
   adapter: string;
@@ -166,7 +166,7 @@ export async function recordProviderCall(
 
   const log = await tx.generationLog.create({
     data: {
-      dealershipId: r.dealershipId,
+      organizationId: r.organizationId,
       contentJobId: r.contentJobId,
       providerId: r.providerId ?? null,
       adapter: r.adapter,
@@ -192,7 +192,7 @@ export async function recordProviderCall(
     const now = r.now ?? new Date();
     if (r.usageMetric) {
       await incrementUsage(tx, {
-        dealershipId: r.dealershipId,
+        organizationId: r.organizationId,
         day: localDay(now, r.timezone),
         metric: r.usageMetric,
         providerAdapter: r.adapter,

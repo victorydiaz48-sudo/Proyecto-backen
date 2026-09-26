@@ -4,7 +4,7 @@ import type { Prisma, PrismaClient } from './client.js';
 import type { ProviderKind } from './generated/enums.js';
 import { PLANS } from './plans.js';
 
-export const DEMO_DEALERSHIP_SLUG = 'demo';
+export const DEMO_ORGANIZATION_SLUG = 'demo';
 
 interface CatalogueEntry {
   adapter: string;
@@ -32,28 +32,28 @@ export const PROVIDER_CATALOGUE: CatalogueEntry[] = [
 ];
 
 /**
- * Idempotent: safe to run on every deploy. Creates the demo dealership, its
+ * Idempotent: safe to run on every deploy. Creates the demo organization, its
  * settings and trial subscription, and the platform provider catalogue.
  */
 export async function seed(prisma: PrismaClient, now = new Date()) {
-  const dealership = await prisma.dealership.upsert({
-    where: { slug: DEMO_DEALERSHIP_SLUG },
+  const organization = await prisma.organization.upsert({
+    where: { slug: DEMO_ORGANIZATION_SLUG },
     update: {},
-    create: { slug: DEMO_DEALERSHIP_SLUG, name: 'Concesionario Demo' },
+    create: { slug: DEMO_ORGANIZATION_SLUG, name: 'Concesionario Demo' },
   });
 
-  await prisma.dealershipSettings.upsert({
-    where: { dealershipId: dealership.id },
+  await prisma.organizationSettings.upsert({
+    where: { organizationId: organization.id },
     update: {},
-    create: { dealershipId: dealership.id, locale: 'es', publishingMode: 'DRAFT_ONLY' },
+    create: { organizationId: organization.id, locale: 'es', publishingMode: 'DRAFT_ONLY' },
   });
 
   const plan = PLANS.trial!;
   await prisma.subscription.upsert({
-    where: { dealershipId: dealership.id },
+    where: { organizationId: organization.id },
     update: {},
     create: {
-      dealershipId: dealership.id,
+      organizationId: organization.id,
       planCode: plan.code,
       status: 'TRIALING',
       currentPeriodStart: now,
@@ -68,7 +68,7 @@ export async function seed(prisma: PrismaClient, now = new Date()) {
   for (const p of PROVIDER_CATALOGUE) {
     const costConfig = costConfigSchema.parse(p.costConfig);
     // Platform rows are unique by a partial index Prisma can't target with upsert.
-    const existing = await prisma.aPIProvider.findFirst({ where: { dealershipId: null, adapter: p.adapter } });
+    const existing = await prisma.aPIProvider.findFirst({ where: { organizationId: null, adapter: p.adapter } });
     if (existing) {
       await prisma.aPIProvider.update({
         where: { id: existing.id },
@@ -81,5 +81,5 @@ export async function seed(prisma: PrismaClient, now = new Date()) {
     }
   }
 
-  return { dealershipId: dealership.id };
+  return { organizationId: organization.id };
 }

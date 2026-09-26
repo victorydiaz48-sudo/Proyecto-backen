@@ -1,7 +1,43 @@
 # Architecture
 
-Status: **Phase 2 complete** — the bot, database, queue, worker and storage
-are wired together. `apps/api` and the dashboard come in later phases.
+Status: **Phase 2 complete, Phase 3a complete.** The bot, database, queue,
+worker and storage are wired together (Phase 2). The tenant concept is
+`Organization` (renamed from `Dealership`) and a `VerticalRegistry` skeleton
+now exists in `packages/verticals/core` — see
+[docs/phase-3-design.md](docs/phase-3-design.md) for the multi-vertical
+design this implements, and §14 (rollout plan) for what 3a covers versus
+what's still ahead (3b re-platforms the dealership flow as the first
+vertical module; nothing in the running app calls the registry yet).
+`apps/api` and the dashboard come in later phases.
+
+## Vertical modules (Phase 3a — skeleton only)
+
+`packages/verticals/core` defines the module contract every vertical
+implements, and nothing else imports it yet:
+
+- `VerticalModule` — what a module registers: slug, config schema, entities,
+  `WorkflowHooks`, content templates, routes, i18n message fragments.
+- `WorkflowHooks<TAnalysis>` — the job-lifecycle contract
+  (`onJobCreate`/`analyze`/`onAnalysisComplete`/`generateCaption`/…) that will
+  replace the vehicle-specific calls inline in `apps/worker` once the
+  dealership module exists (Phase 3b).
+- `VerticalRegistry` — holds the compiled-in modules, validated at
+  construction (no duplicate slugs, no i18n key collisions across modules),
+  dispatches by `Map` lookup only — never a `switch`/`if` keyed on a vertical
+  name.
+- `VerticalEnrollment` (new table) + `loadBusinessProfile()`/
+  `enrollOrganization()` — one vertical per organization, `vertical` is a
+  plain string validated against the registry at write time (not a Prisma
+  enum), so a new module needs no core migration to become enrollable.
+- `ContentJob`/`ContentAsset`/`VideoPlan` still reference `Vehicle` directly
+  (`vehicleId`) — the polymorphic `subjectType`/`subjectId` replacement is
+  Phase 3b, done together with moving `Vehicle` into the dealership module's
+  own schema fragment.
+
+Prisma 7.10 merges multiple `.prisma` files in the schema folder natively
+(confirmed by spike before this phase started) — a module's schema fragment
+will be copied/symlinked into `packages/database/prisma/` rather than
+requiring a custom schema-assembly script.
 
 ## Phase 2 flow
 
@@ -10,18 +46,18 @@ Telegram ─update─▶ bot (apps/telegram)
                      │ rate limit per user (20/min)
                      │ TelegramAccount lookup  ── unknown → "private bot, ask for an invite"
                      │ SettingsService → settings snapshot (locale, limits, template)
-                     │ tx + per-dealership advisory lock:
+                     │ tx + per-organization advisory lock:
                      │   duplicate? (idempotencyKey tg:{bot}:{chat}:{message}) → stop
-                     │   daily / monthly limits (dealership time zone) → refuse
+                     │   daily / monthly limits (organization time zone) → refuse
                      │   Vehicle(DRAFT) + ContentJob(PENDING) + Usage JOBS_CREATED
-                     │ enqueue { contentJobId, dealershipId }   reply "🚗 Analizando…"
+                     │ enqueue { contentJobId, organizationId }   reply "🚗 Analizando…"
                      ▼
                queue "content-jobs" (BullMQ on Redis, or in memory)
                      ▼
 worker (apps/worker) — each step checks the database first, so retries resume:
   1 ingest    download from Telegram → validate bytes → StorageProvider
-              dealerships/{d}/vehicles/{v}/originals/{sha256}.{ext} → VehicleImage
-  2 analyse   reuse analysis of an identical photo in the same dealership (free),
+              organizations/{d}/vehicles/{v}/originals/{sha256}.{ext} → VehicleImage
+  2 analyse   reuse analysis of an identical photo in the same organization (free),
               else VisionProvider → GenerationLog + Usage + job cost (charged once)
               → Vehicle columns + per-field provenance
               subject ≠ vehicle → tell the user, archive vehicle, done
@@ -80,26 +116,26 @@ starts with a single `all` service plus the Postgres and Redis add-ons.
 
 ## Multi-tenancy
 
-Tenant = **Dealership**. Every business table has a required `dealershipId`.
+Tenant = **Organization**. Every business table has a required `organizationId`.
 The boundary is enforced three times:
 
-1. **Database.** Composite `(childId, dealershipId) → parent(id, dealershipId)`
+1. **Database.** Composite `(childId, organizationId) → parent(id, organizationId)`
    foreign keys (hand-written in the init migration, all named `tenant_*`):
-   a row physically cannot reference another dealership's row, even through
+   a row physically cannot reference another organization's row, even through
    the raw client. Tested against real PostgreSQL.
-2. **Data access.** `forDealership(prisma, id)` adds `dealershipId` to every
-   `where` and rejects creates/updates for any other dealership.
-3. **API.** The dealership comes from the session. No endpoint accepts a
-   `dealershipId` (a test scans the OpenAPI document for it).
+2. **Data access.** `forOrganization(prisma, id)` adds `organizationId` to every
+   `where` and rejects creates/updates for any other organization.
+3. **API.** The organization comes from the session. No endpoint accepts a
+   `organizationId` (a test scans the OpenAPI document for it).
 
 Platform-level exceptions: the provider catalogue (`APIProvider` rows with
-`dealershipId = NULL`) and platform API keys.
+`organizationId = NULL`) and platform API keys.
 
 Roles, from most to least powerful:
 
 | Capability | OWNER | ADMIN | EDITOR | OPERATOR |
 |---|:-:|:-:|:-:|:-:|
-| Billing, rename/delete dealership, manage owners | ✓ | | | |
+| Billing, rename/delete organization, manage owners | ✓ | | | |
 | Users, Telegram invites, API keys, integrations, settings, usage & audit | ✓ | ✓ | | |
 | Edit vehicles/content/campaigns, approve, publish, retry jobs | ✓ | ✓ | ✓ | |
 | Send photos, generate content, view jobs/content | ✓ | ✓ | ✓ | ✓ |
@@ -109,14 +145,14 @@ Telegram-only users get the role of the invite they used (default OPERATOR).
 Telegram access is **invite-only**, via one-time `t.me/<bot>?start=<code>`
 links created with `/invite [editor|admin]` (only the SHA-256 of a code is
 stored; redemption is an atomic `uses < maxUses` update). The first OWNER
-claims the demo dealership with `BOOTSTRAP_CODE`, once (timing-safe compare,
+claims the demo organization with `BOOTSTRAP_CODE`, once (timing-safe compare,
 serialised by an advisory lock). Nobody can create an OWNER through Telegram.
 
 ## Data model
 
 Schema: `packages/database/prisma/schema.prisma`. Highlights:
 
-- **Traceability**: every `ContentAsset` links to dealership, vehicle and job
+- **Traceability**: every `ContentAsset` links to organization, vehicle and job
   (and through the job to the requesting user/Telegram account), plus
   `generationLogId` → provider, model, prompt id/version, latency, cost,
   timestamp; `status` and `qaReport` on the asset itself.
@@ -124,7 +160,7 @@ Schema: `packages/database/prisma/schema.prisma`. Highlights:
   `ContentJob.idempotencyKey`, `ContentAsset(contentJobId, format, version)`,
   `GenerationLog.idempotencyKey`, `Publication.idempotencyKey`. `Usage` is
   incremented only together with a new `GenerationLog` row.
-- **Money**: integer micro-USD (`BigInt`). Display currency is a per-dealership
+- **Money**: integer micro-USD (`BigInt`). Display currency is a per-organization
   setting; conversion only happens at the edges.
 - **Secrets**: `APIKeyReference` either names an env var (`source=ENV`) or
   holds AES-256-GCM ciphertext (`source=DATABASE`) bound to its owner via
@@ -132,16 +168,16 @@ Schema: `packages/database/prisma/schema.prisma`. Highlights:
   shown.
 - Actor columns (`…ById`) are plain UUIDs: users are disabled, never deleted.
 
-## Dealership settings → jobs
+## Organization settings → jobs
 
 ```
-DealershipSettings ─┐
+OrganizationSettings ─┐
 Subscription        ├─ buildSettingsSnapshot() ─► ContentJob.settingsSnapshot ─► workers
-Dealership          ┘
+Organization          ┘
 ```
 
-- Language: Telegram user override → dealership → `DEFAULT_LOCALE`.
-- Limits: `min(plan, dealership)` — a dealership can tighten, never loosen.
+- Language: Telegram user override → organization → `DEFAULT_LOCALE`.
+- Limits: `min(plan, organization)` — an organization can tighten, never loosen.
 - The snapshot is frozen at job creation so retries behave identically.
 - Exception: publishing re-reads live settings and applies the **stricter**
   publishing mode (`stricterPublishingMode`), so switching auto-publish off
@@ -163,7 +199,7 @@ JobWorker<P> { process(handler, { concurrency, onFinalFailure }); close() }
   `NonRetryableError` → `UnrecoverableError`; the final-failure handler runs
   inside the processor on the last attempt; stalled jobs are safe to re-run
   because every step checks the database first. Payloads shrink to
-  `{ contentJobId, dealershipId }`.
+  `{ contentJobId, organizationId }`.
 - "🔥 Todo" becomes a BullMQ flow: `finalize` parent with `copy` / `image` /
   `video` children; a failed child doesn't fail the parent (graceful
   degradation, `PARTIALLY_COMPLETED`).
@@ -172,7 +208,7 @@ JobWorker<P> { process(handler, { concurrency, onFinalFailure }); close() }
 
 Every provider implements `TestableProvider` (`name`, `kind`,
 `testConnection()` that never spends credit) and receives
-`ProviderCallOptions` (`jobId`, `dealershipId`, `idempotencyKey`, abort
+`ProviderCallOptions` (`jobId`, `organizationId`, `idempotencyKey`, abort
 `signal`, `logger`). Calls return `ProviderResult<T>` with **usage, not
 money**; `computeCostMicros(APIProvider.costConfig, usage)` prices it, so
 prices are configuration.
@@ -210,8 +246,8 @@ registry; throw the typed errors below; honour the abort signal; pass
 Other interfaces: `TextGenerationProvider.generateStructured(prompt, zodSchema)`,
 `ImageGenerationProvider.transform({ source, scene, preserve[] })`,
 `VideoGenerationProvider.submit / getStatus / parseWebhook` (async),
-`StorageProvider` (keys always `dealerships/{id}/…` via `storageKey()`),
-`SocialPublishingProvider` (Blotato first; per-dealership credentials; callers
+`StorageProvider` (keys always `organizations/{id}/…` via `storageKey()`),
+`SocialPublishingProvider` (Blotato first; per-organization credentials; callers
 enforce the publishing mode), `AnalyticsProvider`.
 
 ## API
@@ -238,7 +274,7 @@ templates reference them by id and are cross-checked at load.
 
 `createStorageProvider(config)`: S3-compatible (`STORAGE_*`, e.g. Cloudflare
 R2) when configured, otherwise local disk (`STORAGE_LOCAL_DIR`, reported as
-`durable: false`). Keys always start with `dealerships/{id}/`; objects are
+`durable: false`). Keys always start with `organizations/{id}/`; objects are
 private; access via short-lived signed URLs (HMAC-signed for local disk).
 Both adapters pass `describeStorageProviderContract()` (S3 is tested against
 an in-process S3 server).

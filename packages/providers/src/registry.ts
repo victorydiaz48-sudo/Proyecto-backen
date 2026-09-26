@@ -43,7 +43,7 @@ export class UnconfiguredVisionProvider implements VisionProvider {
 /**
  * The only place that decides which vision implementation is used.
  * Phase 2 moves this behind a database-backed registry that resolves
- * per-dealership overrides (APIProvider rows); callers don't change.
+ * per-organization overrides (APIProvider rows); callers don't change.
  */
 export function createVisionProvider(config: AppConfig): VisionProvider {
   if (config.MOCK_MODE) {

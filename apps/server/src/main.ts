@@ -147,7 +147,7 @@ async function main() {
     process.exit(1);
   }
   const seeded = await seed(prisma);
-  logger.info('database ready', { demoDealershipId: seeded.dealershipId });
+  logger.info('database ready', { demoOrganizationId: seeded.organizationId });
 
   const { storage, durable } = createStorageProvider(config);
   const storageStatus = await storage.testConnection();
@@ -178,7 +178,7 @@ async function main() {
       queue.process(processor.handler, { concurrency: config.WORKER_CONCURRENCY, onFinalFailure: processor.onFinalFailure });
       // Re-queue work accepted before a restart (the queue ignores ids it already has).
       const unfinished = await findUnfinishedJobs(prisma);
-      for (const j of unfinished) await queue.enqueue({ contentJobId: j.id, dealershipId: j.dealershipId }, { jobId: j.id });
+      for (const j of unfinished) await queue.enqueue({ contentJobId: j.id, organizationId: j.organizationId }, { jobId: j.id });
       logger.info('worker started', { backend: queue.backend, concurrency: config.WORKER_CONCURRENCY, requeued: unfinished.length });
     }
   }

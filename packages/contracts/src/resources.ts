@@ -9,20 +9,20 @@ export const loginBody = z.object({
 });
 export const me = z.object({
   user: z.object({ id: uuid, email: z.string(), name: z.string(), role }),
-  dealership: z.object({ id: uuid, name: z.string(), slug: z.string() }),
+  organization: z.object({ id: uuid, name: z.string(), slug: z.string() }),
 });
 
-// ───────────── Dealership & settings ─────────────
+// ───────────── Organization & settings ─────────────
 export const PUBLISHING_MODES = ['DRAFT_ONLY', 'AUTO_PUBLISH', 'SCHEDULED'] as const;
 
-export const dealership = z.object({
+export const organization = z.object({
   id: uuid,
   name: z.string(),
   slug: z.string(),
   status: z.enum(['ACTIVE', 'SUSPENDED', 'CLOSED']),
   createdAt: isoDate,
 });
-export const dealershipPatch = z.object({ name: z.string().min(2).max(120) }).partial();
+export const organizationPatch = z.object({ name: z.string().min(2).max(120) }).partial();
 
 export const settings = z.object({
   locale,
@@ -308,7 +308,7 @@ export const publicationCreate = z.object({
   publishingAccountId: uuid,
   primaryAssetId: uuid,
   mediaAssetIds: z.array(uuid).max(10).default([]),
-  /** Absent = now (only if the dealership allows auto-publish). */
+  /** Absent = now (only if the organization allows auto-publish). */
   scheduledAt: isoDate.optional(),
 });
 export const PUBLICATION_STATUSES = ['DRAFT', 'SCHEDULED', 'PUBLISHING', 'PUBLISHED', 'FAILED', 'CANCELLED'] as const;
@@ -342,7 +342,7 @@ export const integration = z.object({
   adapter: z.string(),
   kind: z.enum(PROVIDER_KINDS),
   displayName: z.string(),
-  scope: z.enum(['platform', 'dealership']),
+  scope: z.enum(['platform', 'organization']),
   enabled: z.boolean(),
   health: z.enum(['CONNECTED', 'NOT_CONFIGURED', 'ERROR']),
   healthDetail: z.string().nullable(),
@@ -394,7 +394,7 @@ export const usageSummary = z.object({
   successfulPublications: z.number().int(),
   costMicros: microsUsd,
   costCapMicros: microsUsd.nullable(),
-  /** Cost converted to the dealership's display currency. */
+  /** Cost converted to the organization's display currency. */
   costDisplay: z.string(),
 });
 export const auditLog = z.object({

@@ -1,14 +1,14 @@
 import { LOCALES, type Locale } from '@autocontent/shared';
 import { z } from 'zod';
-import type { Dealership, DealershipSettings, PrismaClient, Subscription } from './generated/client.js';
+import type { Organization, OrganizationSettings, PrismaClient, Subscription } from './generated/client.js';
 import type { PublishingMode } from './generated/enums.js';
 
 /**
- * Dealership settings: where they live and how they reach a job.
+ * Organization settings: where they live and how they reach a job.
  *
- *  DealershipSettings (typed row)  ─┐
+ *  OrganizationSettings (typed row)  ─┐
  *  Subscription (plan limits)       ├─► buildSettingsSnapshot() ─► ContentJob.settingsSnapshot
- *  Dealership (name)               ─┘                                  │
+ *  Organization (name)               ─┘                                  │
  *                                                            workers read only the snapshot
  *
  * The snapshot keeps retries deterministic even if settings change mid-job.
@@ -63,9 +63,9 @@ function minLimit<T extends number | bigint>(a: T | null | undefined, b: T | nul
   return a < b ? a : b;
 }
 
-/** Plan limits can only be tightened by the dealership, never loosened. */
+/** Plan limits can only be tightened by the organization, never loosened. */
 export function effectiveLimits(
-  settings: Pick<DealershipSettings, 'dailyJobLimit' | 'monthlyCostCapMicros'>,
+  settings: Pick<OrganizationSettings, 'dailyJobLimit' | 'monthlyCostCapMicros'>,
   subscription: Pick<
     Subscription,
     'dailyJobLimit' | 'monthlyVehicleLimit' | 'monthlyVideoLimit' | 'monthlyCostCapMicros'
@@ -79,13 +79,13 @@ export function effectiveLimits(
   };
 }
 
-/** Language precedence: Telegram user override → dealership → platform default. */
+/** Language precedence: Telegram user override → organization → platform default. */
 export function resolveLocale(opts: {
   telegramOverride?: Locale | null;
-  dealershipLocale?: Locale | null;
+  organizationLocale?: Locale | null;
   fallback: Locale;
 }): Locale {
-  return opts.telegramOverride ?? opts.dealershipLocale ?? opts.fallback;
+  return opts.telegramOverride ?? opts.organizationLocale ?? opts.fallback;
 }
 
 const STRICTNESS: Record<PublishingMode, number> = { DRAFT_ONLY: 0, SCHEDULED: 1, AUTO_PUBLISH: 2 };
@@ -95,13 +95,13 @@ export function stricterPublishingMode(a: PublishingMode, b: PublishingMode): Pu
   return STRICTNESS[a] <= STRICTNESS[b] ? a : b;
 }
 
-export interface DealershipContext {
-  dealership: Pick<Dealership, 'id' | 'name' | 'status'>;
-  settings: DealershipSettings;
+export interface OrganizationContext {
+  organization: Pick<Organization, 'id' | 'name' | 'status'>;
+  settings: OrganizationSettings;
   subscription: Subscription | null;
 }
 
-export function buildSettingsSnapshot(ctx: DealershipContext, now = new Date()): SettingsSnapshot {
+export function buildSettingsSnapshot(ctx: OrganizationContext, now = new Date()): SettingsSnapshot {
   const s = ctx.settings;
   const limits = effectiveLimits(s, ctx.subscription);
   return settingsSnapshotSchema.parse({
@@ -115,7 +115,7 @@ export function buildSettingsSnapshot(ctx: DealershipContext, now = new Date()):
     videoStyle: s.defaultVideoStyle,
     videoEnabled: s.videoEnabled,
     brand: {
-      name: s.brandName ?? ctx.dealership.name,
+      name: s.brandName ?? ctx.organization.name,
       phone: s.contactPhone,
       whatsapp: s.contactWhatsapp,
       email: s.contactEmail,
@@ -135,12 +135,12 @@ export function buildSettingsSnapshot(ctx: DealershipContext, now = new Date()):
 }
 
 /**
- * Loads a dealership's settings with a short in-process cache. Call
+ * Loads an organization's settings with a short in-process cache. Call
  * invalidate() after editing settings (the API does; Phase 2 also broadcasts
  * the invalidation to other processes).
  */
 export class SettingsService {
-  private readonly cache = new Map<string, { at: number; value: DealershipContext }>();
+  private readonly cache = new Map<string, { at: number; value: OrganizationContext }>();
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -148,26 +148,26 @@ export class SettingsService {
     private readonly now: () => number = Date.now,
   ) {}
 
-  async get(dealershipId: string): Promise<DealershipContext> {
-    const hit = this.cache.get(dealershipId);
+  async get(organizationId: string): Promise<OrganizationContext> {
+    const hit = this.cache.get(organizationId);
     if (hit && this.now() - hit.at < this.ttlMs) return hit.value;
 
-    const d = await this.prisma.dealership.findUniqueOrThrow({
-      where: { id: dealershipId },
+    const d = await this.prisma.organization.findUniqueOrThrow({
+      where: { id: organizationId },
       select: { id: true, name: true, status: true, settings: true, subscription: true },
     });
-    // Every dealership gets a settings row; create defaults lazily if missing.
-    const settings = d.settings ?? (await this.prisma.dealershipSettings.create({ data: { dealershipId } }));
-    const value: DealershipContext = {
-      dealership: { id: d.id, name: d.name, status: d.status },
+    // Every organization gets a settings row; create defaults lazily if missing.
+    const settings = d.settings ?? (await this.prisma.organizationSettings.create({ data: { organizationId } }));
+    const value: OrganizationContext = {
+      organization: { id: d.id, name: d.name, status: d.status },
       settings,
       subscription: d.subscription,
     };
-    this.cache.set(dealershipId, { at: this.now(), value });
+    this.cache.set(organizationId, { at: this.now(), value });
     return value;
   }
 
-  invalidate(dealershipId: string): void {
-    this.cache.delete(dealershipId);
+  invalidate(organizationId: string): void {
+    this.cache.delete(organizationId);
   }
 }

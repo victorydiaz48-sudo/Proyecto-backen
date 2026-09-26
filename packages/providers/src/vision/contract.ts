@@ -18,7 +18,7 @@ export function describeVisionProviderContract(label: string, factory: () => Vis
   };
   const opts = (signal = new AbortController().signal): ProviderCallOptions => ({
     jobId: 'contract-job',
-    dealershipId: '00000000-0000-4000-8000-000000000000',
+    organizationId: '00000000-0000-4000-8000-000000000000',
     idempotencyKey: 'contract-job:vision:1',
     signal,
     logger: silentLogger,

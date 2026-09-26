@@ -3,7 +3,7 @@ import type { Logger, UnitType } from '@autocontent/shared';
 /** Passed to every provider call. */
 export interface ProviderCallOptions {
   jobId: string;
-  dealershipId: string;
+  organizationId: string;
   /** Forwarded to the vendor when it supports idempotency keys. */
   idempotencyKey: string;
   /** Hard deadline set by the caller. Adapters must stop work when it aborts. */

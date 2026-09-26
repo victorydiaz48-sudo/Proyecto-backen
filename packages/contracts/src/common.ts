@@ -5,10 +5,10 @@ import { z } from 'zod';
  * Building blocks shared by every endpoint. Conventions:
  *  - ids are UUIDs; timestamps ISO-8601 strings
  *  - money is micro-USD as a decimal string (JSON has no bigint), plus a
- *    display value in the dealership's currency where useful
+ *    display value in the organization's currency where useful
  *  - lists use cursor pagination
  *  - errors: { error: { code, message, details? } }
- *  - dealershipId never appears in requests: it comes from the session
+ *  - organizationId never appears in requests: it comes from the session
  */
 export const uuid = z.uuid();
 /** http(s) only — rejects javascript:, data:, file: and friends. */

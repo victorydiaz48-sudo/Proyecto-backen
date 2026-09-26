@@ -9,7 +9,7 @@ const SOURCE_ICON: Record<FieldSource, string> = {
 };
 
 /**
- * Human-readable analysis for the dealership employee. Unlike public copy,
+ * Human-readable analysis for the organization employee. Unlike public copy,
  * this shows inferred values too, each clearly labelled with its source.
  */
 export function formatAnalysis(a: VehicleAnalysis, locale: Locale, opts: { mock: boolean }): string {
