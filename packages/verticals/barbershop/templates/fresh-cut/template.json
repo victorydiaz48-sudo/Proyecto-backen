@@ -1,0 +1,38 @@
+{
+  "slug": "fresh-cut",
+  "version": "1.0.0",
+  "locales": ["es", "pt", "en"],
+  "name": "Fresh Cut",
+  "description": "Quick, upbeat before/after-style post for a finished haircut.",
+  "tone": {
+    "voice": "friendly, energetic",
+    "adjectives": ["clean", "sharp", "fresh"],
+    "avoid": ["filler", "medical claims"]
+  },
+  "prompt": {
+    "copyGuidance": "Lead with the cut, one detail, a booking CTA.",
+    "imageGuidance": "Well-lit chair or studio shot, subject centered."
+  },
+  "copyStrategy": {
+    "hookStyle": "single exclamation",
+    "structure": ["style", "one visible detail", "CTA"],
+    "emojiPolicy": "light",
+    "hashtags": { "min": 1, "max": 4 }
+  },
+  "sceneStructure": [
+    { "id": "reveal", "setting": "barber chair", "shot": "static front", "purpose": "identity" },
+    { "id": "detail", "setting": "barber chair", "shot": "slow push on the lineup", "purpose": "one visible detail" }
+  ],
+  "ctaStrategy": {
+    "primary": "message",
+    "urgency": "medium",
+    "examples": {
+      "es": ["Reserva tu turno por mensaje."],
+      "pt": ["Marque seu horário por mensagem."],
+      "en": ["Book your next cut by message."]
+    }
+  },
+  "formats": ["instagram_caption", "story_image"],
+  "videoStyles": ["fresh-cut"],
+  "imageScenes": ["premium-studio"]
+}

@@ -1,5 +1,9 @@
-import { taggedSchema, FIELD_SOURCES, PHOTO_SUBJECTS, IMAGE_QUALITY_ISSUES } from '@autocontent/shared';
+import { taggedSchema, FIELD_SOURCES, IMAGE_QUALITY_ISSUES } from '@autocontent/shared';
 import { z } from 'zod';
+
+/** What the photo actually shows. Anything but `vehicle` stops the job before any further spend. */
+export const PHOTO_SUBJECTS = ['vehicle', 'not_vehicle', 'multiple_vehicles', 'unclear'] as const;
+export type PhotoSubject = (typeof PHOTO_SUBJECTS)[number];
 
 export const BODY_TYPES = [
   'sedan',

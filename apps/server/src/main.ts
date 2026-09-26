@@ -11,6 +11,8 @@ import { createQueue, type Queue } from '@autocontent/queue';
 import { CONTENT_JOBS_QUEUE, createLogger, redactSecrets, type ContentJobPayload, type Logger } from '@autocontent/shared';
 import { WEBHOOK_PATH, createBot, createHttpServer, createUnconfiguredBot } from '@autocontent/telegram';
 import type { HealthReport } from '@autocontent/telegram';
+import { barbershopModule } from '@autocontent/verticals-barbershop';
+import { VerticalRegistry } from '@autocontent/verticals-core';
 import { createDealershipVisionProvider, dealershipModule } from '@autocontent/verticals-dealership';
 import { createContentJobProcessor } from '@autocontent/worker';
 import { Api, type Bot } from 'grammy';
@@ -88,10 +90,13 @@ async function main() {
   const runBot = config.SERVICE === 'all' || config.SERVICE === 'telegram';
   const runWorker = config.SERVICE === 'all' || config.SERVICE === 'worker';
   const token = config.TELEGRAM_BOT_TOKEN;
-  // Every organization is enrolled in the dealership vertical for now (seed() does
-  // this); a future phase resolves the vertical per-organization through the
-  // VerticalRegistry instead of this single hardcoded module.
-  const vertical = dealershipModule;
+  // Both compiled-in modules go through the registry (proves it handles more
+  // than one real module with no collisions — Phase 3d), but every
+  // organization is still enrolled in dealership for now (seed() does this);
+  // a future phase resolves the vertical per-organization instead of this
+  // one hardcoded lookup.
+  const registry = new VerticalRegistry([dealershipModule, barbershopModule]);
+  const vertical = registry.get('dealership');
   const vision = createDealershipVisionProvider(config);
   const visionStatus = await vision.testConnection();
   const limits = { maxBytes: config.MAX_IMAGE_BYTES, minDimension: config.MIN_IMAGE_DIMENSION, maxDimension: config.MAX_IMAGE_DIMENSION };

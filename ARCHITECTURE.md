@@ -1,17 +1,15 @@
 # Architecture
 
-Status: **Phase 2 complete, Phase 3a/3b/3c complete.** The bot, database,
+Status: **Phase 2 complete, Phase 3 (3a–3d) complete.** The bot, database,
 queue, worker and storage are wired together (Phase 2). The tenant concept is
-`Organization` (renamed from `Dealership`) and dealership is now fully
+`Organization` (renamed from `Dealership`) and dealership is fully
 re-platformed as the first vertical module, with its own physically separate
-Prisma schema, on top of the `VerticalRegistry` (Phase 3a/3b/3c) — see
-[docs/phase-3-design.md](docs/phase-3-design.md) for the multi-vertical
-design this implements, and §14 (rollout plan) for what's covered versus
-what's still ahead (3d scaffolds a second vertical to prove genericity — no
-more core code is expected to change for that; a new module should just
-plug in). `apps/api` and the dashboard come in later phases.
+Prisma schema, on top of a `VerticalRegistry` now proven against two real
+modules (Phase 3a–3d) — see [docs/phase-3-design.md](docs/phase-3-design.md)
+for the multi-vertical design this implements, and §14 (rollout plan) for
+what's covered. `apps/api` and the dashboard come in later phases.
 
-## Vertical modules (Phase 3a skeleton + Phase 3b/3c dealership module)
+## Vertical modules (dealership + barbershop on packages/verticals/core)
 
 `packages/verticals/core` defines the module contract every vertical
 implements:
@@ -26,9 +24,13 @@ implements:
   vehicle-specific logic inline — the worker shell has no import of, or
   knowledge about, `Vehicle`/`VehicleImage` any more.
 - `VerticalRegistry` — holds the compiled-in modules, validated at
-  construction (no duplicate slugs, no i18n key collisions across modules),
-  dispatches by `Map` lookup only — never a `switch`/`if` keyed on a vertical
-  name.
+  construction (no duplicate slugs), dispatches by `Map` lookup only — never
+  a `switch`/`if` keyed on a vertical name. `apps/server/src/main.ts` builds
+  one with both `dealershipModule` and `barbershopModule`. (A 3a-era check
+  also rejected message-key collisions between modules' i18n fragments;
+  scaffolding barbershop in 3d proved that check wrong — fragments are never
+  merged across modules, each is looked up by its own module's code, so it
+  was removed rather than worked around. See `registry.ts`'s doc comment.)
 - `VerticalEnrollment` (table) + `loadBusinessProfile()`/`enrollOrganization()`
   — one vertical per organization, `vertical` is a plain string validated
   against the registry at write time (not a Prisma enum). `seed()` enrolls the
@@ -67,6 +69,40 @@ integrity there is app-enforced, not DB-enforced.
 `VerticalModule.routes` but not merged into a live core route table — no
 handler consumes any REST route yet, so there is nothing to wire up until a
 later phase adds one.
+
+### barbershop: a second vertical, scaffolded to prove genericity (Phase 3d)
+
+`packages/verticals/barbershop` (`@autocontent/verticals-barbershop`)
+mirrors dealership's shape at a smaller scale — a photo-in, caption-out
+pipeline for a finished haircut (`Haircut`/`HaircutPhoto`, its own Prisma
+schema fragment, its own i18n fragment, a trivial deterministic mock
+"analyzer" with no separate `VisionProvider` abstraction since
+`WorkflowHooks` never required one) — built specifically to find whatever in
+the design *wasn't* actually generic yet. It found two things, both fixed
+rather than worked around:
+
+1. **`PHOTO_SUBJECTS`** was promoted to `packages/shared` in Phase 3b on the
+   theory that "what the photo shows" was reusable shape. It wasn't — the
+   *values* (`'vehicle'`, `'not_vehicle'`, …) are domain content. Reverted:
+   each module now defines its own subject enum (dealership's own
+   `PHOTO_SUBJECTS` is back in
+   `packages/verticals/dealership/src/entities/vehicle-analysis.ts`);
+   `IMAGE_QUALITY_ISSUES` (`blurry`, `dark`, …) stayed in core — those values
+   really are generic.
+2. **The registry's message-key-collision check** (see above) — removed,
+   not renamed around, once building a second module hit an inevitable
+   `labels` clash that could never have caused a real bug.
+
+`apps/server/src/verticals.test.ts` is the concrete proof: both modules
+register with no collisions, each gets its own storage path segment and
+`subjectType` namespace, and — against real PostgreSQL —
+`enrollOrganization`/`loadBusinessProfile` and the full
+`onJobCreate`/`storeImage`/`onAnalysisComplete` cycle run against
+barbershop's own tables exactly as they do for dealership's. barbershop is
+not enrolled by any seeded organization and is not reachable from the
+Telegram bot today (`apps/server/src/main.ts` still resolves every
+organization to `dealership`) — proving the module boundary holds needed no
+running traffic through it.
 
 ## Phase 2 flow
 

@@ -47,6 +47,12 @@ importers:
       '@autocontent/telegram':
         specifier: workspace:*
         version: link:../telegram
+      '@autocontent/verticals-barbershop':
+        specifier: workspace:*
+        version: link:../../packages/verticals/barbershop
+      '@autocontent/verticals-core':
+        specifier: workspace:*
+        version: link:../../packages/verticals/core
       '@autocontent/verticals-dealership':
         specifier: workspace:*
         version: link:../../packages/verticals/dealership
@@ -177,6 +183,24 @@ importers:
       '@autocontent/shared':
         specifier: workspace:*
         version: link:../shared
+      zod:
+        specifier: ^4.1.0
+        version: 4.6.5
+
+  packages/verticals/barbershop:
+    dependencies:
+      '@autocontent/database':
+        specifier: workspace:*
+        version: link:../../database
+      '@autocontent/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@autocontent/templates':
+        specifier: workspace:*
+        version: link:../../templates
+      '@autocontent/verticals-core':
+        specifier: workspace:*
+        version: link:../core
       zod:
         specifier: ^4.1.0
         version: 4.6.5

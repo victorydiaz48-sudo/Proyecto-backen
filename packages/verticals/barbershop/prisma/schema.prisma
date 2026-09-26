@@ -1,0 +1,56 @@
+// The barbershop vertical module's own tables. Copied into
+// packages/database/prisma/barbershop.prisma by
+// packages/database/scripts/sync-vertical-schemas.ts and merged with the
+// core schema at generate/migrate time (Prisma 7.10 native multi-file
+// support) — this file is the single source of truth; never hand-edit the
+// copy. No `datasource`/`generator` block here: those come from the core
+// schema.prisma once merged.
+//
+// Deliberately mirrors the dealership module's Vehicle/VehicleImage shape
+// (Haircut/HaircutPhoto) — scaffolded in Phase 3d to prove that a second
+// vertical needs no core schema changes, just its own fragment referencing
+// Organization (core).
+
+model Haircut {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  style          String?
+  color          String?
+  /// { style: { source, confidence? }, … } — validated by haircutAnalysisSchema's own provenance shape
+  provenance     Json
+  primaryPhotoId String?   @unique @db.Uuid
+  createdById    String?   @db.Uuid
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  photos       HaircutPhoto[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, createdAt])
+}
+
+model HaircutPhoto {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  haircutId      String    @db.Uuid
+  /// organizations/{organizationId}/haircuts/{haircutId}/originals/{sha256}.{ext}
+  storageKey     String    @unique
+  mime           String
+  width          Int
+  height         Int
+  bytes          Int
+  sha256         String    @db.Char(64)
+  /// Validated HaircutAnalysis as returned by the provider.
+  analysis       Json?
+  analyzedBy     String?
+  analyzedAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  haircut      Haircut      @relation(fields: [haircutId], references: [id], onDelete: Cascade)
+
+  @@unique([id, organizationId])
+  @@index([organizationId, sha256])
+  @@index([haircutId])
+}

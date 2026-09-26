@@ -33,7 +33,6 @@ function stubModule(slug: string, messageKey: string): VerticalModule<{ greeting
 }
 
 const alpha = stubModule('alpha', 'greeting');
-const beta = stubModule('beta', 'greeting'); // same key as alpha → collision, used by the collision test only
 
 describe('VerticalRegistry', () => {
   it('registers modules and resolves them by slug', () => {
@@ -53,10 +52,11 @@ describe('VerticalRegistry', () => {
     expect(() => new VerticalRegistry([alpha, stubModule('alpha', 'other')])).toThrow(/Duplicate vertical slug "alpha"/);
   });
 
-  it('rejects a message key collision across modules, for the same locale only', () => {
-    expect(() => new VerticalRegistry([alpha, beta])).toThrow(/Message key "greeting" \(es\) is contributed by both "alpha" and "beta"/);
-    // Different keys, or the same key in a locale only one module declares, is fine.
-    expect(() => new VerticalRegistry([alpha, stubModule('gamma', 'unrelated')])).not.toThrow();
+  it('allows two modules to use the same message key — fragments are never merged (Phase 3d)', () => {
+    // A collision check here was removed after scaffolding a real second
+    // vertical (barbershop) proved it wrong: nothing ever merges two
+    // modules' fragments into one namespace, so this is unremarkable.
+    expect(() => new VerticalRegistry([alpha, stubModule('beta', 'greeting')])).not.toThrow();
   });
 
   it('rejects an invalid slug shape at module-definition time', () => {

@@ -19,6 +19,8 @@ export const TENANT_CONSTRAINTS = [
   'tenant_TelegramAccount_activeJob',
   'tenant_Vehicle_primaryImage',
   'tenant_VehicleImage_vehicle',
+  'tenant_Haircut_primaryPhoto',
+  'tenant_HaircutPhoto_haircut',
   'tenant_ContentJob_telegramAccount',
   'tenant_ContentJob_campaign',
   'tenant_ContentAsset_contentJob',

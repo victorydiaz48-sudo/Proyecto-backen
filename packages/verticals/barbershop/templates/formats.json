@@ -1,0 +1,6 @@
+{
+  "formats": [
+    { "id": "instagram_caption", "kind": "TEXT", "channel": "INSTAGRAM", "maxChars": 2200 },
+    { "id": "story_image", "kind": "IMAGE", "channel": "INSTAGRAM", "aspectRatio": "9:16" }
+  ]
+}

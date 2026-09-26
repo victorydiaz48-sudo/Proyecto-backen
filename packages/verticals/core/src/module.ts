@@ -16,9 +16,12 @@ export interface ContentTemplateSet {
 
 /**
  * Free-form message fragment a module contributes for one locale. Not
- * spliced into the core `Messages` type (that stays closed and generic);
- * module code looks its own fragment up directly. Validated only for key
- * collisions across modules (VerticalRegistry, at registration time).
+ * spliced into the core `Messages` type (that stays closed and generic) and
+ * never merged with another module's fragment either — each module's own
+ * code looks its own fragment up directly (e.g. `dealershipMessages(locale)`),
+ * so two modules using the same key name (`labels`, say) is unremarkable,
+ * not a collision (see VerticalRegistry's doc comment for how Phase 3d
+ * found this out the hard way).
  */
 export type MessageFragment = Record<string, unknown>;
 

@@ -1,4 +1,3 @@
-import { LOCALES, type Locale } from '@autocontent/shared';
 import { VerticalRegistryError } from './errors.js';
 import type { VerticalModule } from './module.js';
 
@@ -11,6 +10,16 @@ import type { VerticalModule } from './module.js';
  *
  * Dispatch is always a `Map` lookup by slug — never an `if`/`switch` keyed on
  * a vertical name (docs/phase-3-design.md §6.3).
+ *
+ * Phase 3a's construction-time check also rejected message-key collisions
+ * across modules' `messages` fragments. Scaffolding a real second vertical
+ * in Phase 3d proved that check wrong: a fragment is only ever looked up by
+ * its *own* module's code (`dealershipMessages(locale)`,
+ * `barbershopMessages(locale)`, …) — nothing merges fragments from different
+ * modules into one namespace, so two modules both having a top-level
+ * `labels` key (an entirely reasonable, unremarkable thing for unrelated
+ * modules to both want) can never actually collide at runtime. Removed as a
+ * documented correction rather than worked around per-module.
  */
 export class VerticalRegistry {
   private readonly bySlug = new Map<string, VerticalModule>();
@@ -22,7 +31,6 @@ export class VerticalRegistry {
       }
       this.bySlug.set(m.slug, m);
     }
-    this.validateNoMessageKeyCollisions();
   }
 
   has(slug: string): boolean {
@@ -50,24 +58,5 @@ export class VerticalRegistry {
     if (i <= 0) throw new VerticalRegistryError(`Malformed subjectType "${subjectType}" (expected "<vertical>.<entity>")`);
     const slug = subjectType.slice(0, i);
     return { module: this.get(slug), entityKind: subjectType.slice(i + 1) };
-  }
-
-  private validateNoMessageKeyCollisions(): void {
-    for (const locale of LOCALES) {
-      const seen = new Map<string, string>(); // message key -> owning module slug
-      for (const m of this.bySlug.values()) {
-        const fragment = m.messages[locale as Locale];
-        if (!fragment) continue;
-        for (const key of Object.keys(fragment)) {
-          const owner = seen.get(key);
-          if (owner) {
-            throw new VerticalRegistryError(
-              `Message key "${key}" (${locale}) is contributed by both "${owner}" and "${m.slug}"`,
-            );
-          }
-          seen.set(key, m.slug);
-        }
-      }
-    }
   }
 }

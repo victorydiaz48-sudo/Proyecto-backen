@@ -1,8 +1,7 @@
-import { ProviderResponseError } from '@autocontent/shared';
+import { ProviderResponseError, IMAGE_QUALITY_ISSUES } from '@autocontent/shared';
 import { VISION_POLICY, applyPolicy, clamp01, oneOf, text, year } from '@autocontent/providers';
-import { PHOTO_SUBJECTS, IMAGE_QUALITY_ISSUES } from '@autocontent/shared';
 import { z } from 'zod';
-import { BODY_TYPES, SEGMENTS, computeMissingInformation, vehicleAnalysisSchema, type VehicleAnalysis } from '../entities/vehicle-analysis.js';
+import { BODY_TYPES, PHOTO_SUBJECTS, SEGMENTS, computeMissingInformation, vehicleAnalysisSchema, type VehicleAnalysis } from '../entities/vehicle-analysis.js';
 
 /** Lenient shape an adapter maps the vendor's response into. */
 const rawTagged = z

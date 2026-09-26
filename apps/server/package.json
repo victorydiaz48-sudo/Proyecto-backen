@@ -16,6 +16,8 @@
     "@autocontent/queue": "workspace:*",
     "@autocontent/shared": "workspace:*",
     "@autocontent/telegram": "workspace:*",
+    "@autocontent/verticals-barbershop": "workspace:*",
+    "@autocontent/verticals-core": "workspace:*",
     "@autocontent/verticals-dealership": "workspace:*",
     "@autocontent/worker": "workspace:*",
     "grammy": "^1.38.0"

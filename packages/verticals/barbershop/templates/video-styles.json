@@ -1,0 +1,13 @@
+{
+  "styles": [
+    {
+      "id": "fresh-cut",
+      "name": "Fresh Cut",
+      "pacing": "quick",
+      "cameraMovements": ["static", "quick pan"],
+      "transitions": ["hard cut"],
+      "music": "upbeat, short loop",
+      "colorGrade": "clean, high contrast"
+    }
+  ]
+}

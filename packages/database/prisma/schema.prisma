@@ -230,12 +230,14 @@ model Organization {
   sessions           Session[]
   telegramAccounts   TelegramAccount[]
   telegramInvites    TelegramInvite[]
-  // Back-relations for the dealership module's own tables (declared in
-  // packages/verticals/dealership/prisma/schema.prisma) — Prisma's schema
-  // language requires the "one" side's list field even across merged files.
-  // Not used by any core code; only the dealership module reads/writes them.
+  // Back-relations for each vertical module's own tables (declared in that
+  // module's own prisma/schema.prisma) — Prisma's schema language requires
+  // the "one" side's list field even across merged files. Not used by any
+  // core code; only the owning module reads/writes them.
   vehicles           Vehicle[]
   vehicleImages      VehicleImage[]
+  haircuts           Haircut[]
+  haircutPhotos      HaircutPhoto[]
   contentJobs        ContentJob[]
   contentAssets      ContentAsset[]
   videoPlans         VideoPlan[]

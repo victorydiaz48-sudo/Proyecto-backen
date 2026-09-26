@@ -64,7 +64,11 @@ data-access layer.
    hand-edit the copy, and never commit it (`.gitignore`d). This package
    never imports a concrete vertical module (only the filesystem walk in
    `scripts/sync-vertical-schemas.ts` knows the `verticals/` folder exists) —
-   see `ARCHITECTURE.md`'s "Vertical modules" section.
+   see `ARCHITECTURE.md`'s "Vertical modules" section. `…_add_barbershop_
+   haircut` (Phase 3d) is a second worked example of adding a module's
+   tables: plain `CREATE TABLE`s Prisma's own diff proposed, plus its own
+   hand-written `tenant_Haircut_primaryPhoto`/`tenant_HaircutPhoto_haircut`
+   composite foreign keys (rule 3), listed in `migrations.test.ts`.
 
 ## Commands
 

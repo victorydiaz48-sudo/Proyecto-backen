@@ -14,6 +14,8 @@ export const TENANT_MODELS = [
   'TelegramInvite',
   'Vehicle',
   'VehicleImage',
+  'Haircut',
+  'HaircutPhoto',
   'ContentJob',
   'ContentAsset',
   'VideoPlan',
