@@ -1,0 +1,107 @@
+{
+  "$comment": "Content formats. Templates choose from these ids. kind/channel/aspect are used by the generators and by QA dimension checks.",
+  "formats": [
+    {
+      "id": "instagram_caption",
+      "kind": "TEXT",
+      "channel": "INSTAGRAM",
+      "maxChars": 2200
+    },
+    {
+      "id": "instagram_carousel",
+      "kind": "IMAGE",
+      "channel": "INSTAGRAM",
+      "aspectRatio": "4:5",
+      "slides": {
+        "min": 3,
+        "max": 10
+      }
+    },
+    {
+      "id": "instagram_post_image",
+      "kind": "IMAGE",
+      "channel": "INSTAGRAM",
+      "aspectRatio": "4:5"
+    },
+    {
+      "id": "reel_caption",
+      "kind": "TEXT",
+      "channel": "INSTAGRAM",
+      "maxChars": 2200
+    },
+    {
+      "id": "reel_video",
+      "kind": "VIDEO",
+      "channel": "INSTAGRAM",
+      "aspectRatio": "9:16",
+      "durationSec": {
+        "min": 8,
+        "max": 30
+      }
+    },
+    {
+      "id": "story_text",
+      "kind": "TEXT",
+      "channel": "INSTAGRAM",
+      "maxChars": 250
+    },
+    {
+      "id": "story_image",
+      "kind": "IMAGE",
+      "channel": "INSTAGRAM",
+      "aspectRatio": "9:16"
+    },
+    {
+      "id": "whatsapp_message",
+      "kind": "TEXT",
+      "channel": "WHATSAPP",
+      "maxChars": 1000
+    },
+    {
+      "id": "whatsapp_status",
+      "kind": "IMAGE",
+      "channel": "WHATSAPP",
+      "aspectRatio": "9:16"
+    },
+    {
+      "id": "facebook_post",
+      "kind": "TEXT",
+      "channel": "FACEBOOK",
+      "maxChars": 5000
+    },
+    {
+      "id": "marketplace_listing",
+      "kind": "TEXT",
+      "channel": "MARKETPLACE",
+      "maxChars": 5000
+    },
+    {
+      "id": "promo_video",
+      "kind": "VIDEO",
+      "channel": "GENERIC",
+      "aspectRatio": "9:16",
+      "durationSec": {
+        "min": 6,
+        "max": 20
+      }
+    },
+    {
+      "id": "website_description",
+      "kind": "TEXT",
+      "channel": "WEBSITE",
+      "maxChars": 3000
+    },
+    {
+      "id": "headline",
+      "kind": "TEXT",
+      "channel": "GENERIC",
+      "maxChars": 80
+    },
+    {
+      "id": "cta_variants",
+      "kind": "TEXT",
+      "channel": "GENERIC",
+      "maxChars": 400
+    }
+  ]
+}

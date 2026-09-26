@@ -1,0 +1,18 @@
+{
+  "name": "@autocontent/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@autocontent/database": "workspace:*",
+    "@autocontent/providers": "workspace:*",
+    "@autocontent/queue": "workspace:*",
+    "@autocontent/shared": "workspace:*",
+    "@autocontent/verticals-core": "workspace:*"
+  }
+}

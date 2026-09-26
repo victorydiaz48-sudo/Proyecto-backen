@@ -1,0 +1,25 @@
+{
+  "name": "@autocontent/verticals-dealership",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@autocontent/config": "workspace:*",
+    "@autocontent/contracts": "workspace:*",
+    "@autocontent/database": "workspace:*",
+    "@autocontent/providers": "workspace:*",
+    "@autocontent/shared": "workspace:*",
+    "@autocontent/templates": "workspace:*",
+    "@autocontent/verticals-core": "workspace:*",
+    "zod": "^4.1.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  }
+}

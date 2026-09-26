@@ -1,0 +1,23 @@
+{
+  "name": "@autocontent/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "build": "tsup",
+    "start": "node dist/main.mjs",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@autocontent/config": "workspace:*",
+    "@autocontent/database": "workspace:*",
+    "@autocontent/providers": "workspace:*",
+    "@autocontent/queue": "workspace:*",
+    "@autocontent/shared": "workspace:*",
+    "@autocontent/telegram": "workspace:*",
+    "@autocontent/verticals-dealership": "workspace:*",
+    "@autocontent/worker": "workspace:*",
+    "grammy": "^1.38.0"
+  }
+}

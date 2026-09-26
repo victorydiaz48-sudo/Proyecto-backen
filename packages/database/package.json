@@ -1,0 +1,25 @@
+{
+  "name": "@autocontent/database",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate:deploy": "prisma migrate deploy",
+    "migrate:dev": "prisma migrate dev",
+    "seed": "tsx src/seed-cli.ts",
+    "typecheck": "prisma generate >/dev/null && tsc -p tsconfig.json",
+    "postinstall": "prisma generate"
+  },
+  "dependencies": {
+    "@autocontent/shared": "workspace:*",
+    "@prisma/adapter-pg": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "zod": "^4.1.0"
+  },
+  "devDependencies": {
+    "prisma": "7.10.0"
+  }
+}

@@ -1,0 +1,106 @@
+{
+  "slug": "aggressive-sport",
+  "version": "1.0.0",
+  "locales": [
+    "es",
+    "pt",
+    "en"
+  ],
+  "name": "Aggressive Sport",
+  "description": "High-energy content for sport and performance-styled vehicles.",
+  "tone": {
+    "voice": "bold, energetic, punchy",
+    "adjectives": [
+      "bold",
+      "dynamic",
+      "striking"
+    ],
+    "avoid": [
+      "performance figures not provided",
+      "speed claims",
+      "unsafe driving"
+    ]
+  },
+  "prompt": {
+    "copyGuidance": "Energy comes from visible design (stance, wheels, aero). Never state power, acceleration or top speed unless the dealership provided them.",
+    "imageGuidance": "Urban night or highway with motion feel; low angles; the car's real proportions preserved."
+  },
+  "copyStrategy": {
+    "hookStyle": "punchy one-liner",
+    "structure": [
+      "hook",
+      "visible sporty details",
+      "CTA"
+    ],
+    "emojiPolicy": "rich",
+    "hashtags": {
+      "min": 4,
+      "max": 8
+    }
+  },
+  "sceneStructure": [
+    {
+      "id": "impact",
+      "setting": "urban night",
+      "shot": "low front angle push-in",
+      "purpose": "attention"
+    },
+    {
+      "id": "stance",
+      "setting": "highway",
+      "shot": "low side tracking",
+      "purpose": "presence"
+    },
+    {
+      "id": "details",
+      "setting": "urban night",
+      "shot": "wheel and light close-ups",
+      "purpose": "design"
+    },
+    {
+      "id": "closing",
+      "setting": "urban night",
+      "shot": "hero shot with light trails",
+      "purpose": "CTA"
+    }
+  ],
+  "ctaStrategy": {
+    "primary": "whatsapp",
+    "urgency": "medium",
+    "examples": {
+      "es": [
+        "Escríbenos por WhatsApp y ven a verlo.",
+        "Pregunta por este ahora."
+      ],
+      "pt": [
+        "Chama no WhatsApp e venha ver.",
+        "Pergunte por este agora."
+      ],
+      "en": [
+        "Message us on WhatsApp and come see it.",
+        "Ask about this one now."
+      ]
+    }
+  },
+  "formats": [
+    "instagram_caption",
+    "reel_caption",
+    "reel_video",
+    "story_text",
+    "story_image",
+    "whatsapp_message",
+    "whatsapp_status",
+    "facebook_post",
+    "headline",
+    "cta_variants"
+  ],
+  "videoStyles": [
+    "aggressive-sport",
+    "urban",
+    "night-luxury"
+  ],
+  "imageScenes": [
+    "urban-night",
+    "highway"
+  ]
+}

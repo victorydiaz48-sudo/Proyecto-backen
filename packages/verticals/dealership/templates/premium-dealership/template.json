@@ -1,0 +1,111 @@
+{
+  "slug": "premium-dealership",
+  "version": "1.0.0",
+  "locales": [
+    "es",
+    "pt",
+    "en"
+  ],
+  "name": "Premium Dealership",
+  "description": "Balanced, trustworthy dealership voice suitable for most inventory. Default template.",
+  "tone": {
+    "voice": "professional, warm, trustworthy",
+    "adjectives": [
+      "reliable",
+      "well-kept",
+      "ready"
+    ],
+    "avoid": [
+      "exaggeration",
+      "invented history or condition claims"
+    ]
+  },
+  "prompt": {
+    "copyGuidance": "Clear, helpful and honest. Lead with the vehicle's identity, then visible highlights, then practical next step. Mention only facts provided or detected.",
+    "imageGuidance": "Clean showroom or premium studio; neutral light; true-to-life color."
+  },
+  "copyStrategy": {
+    "hookStyle": "clear headline",
+    "structure": [
+      "identity",
+      "visible highlights",
+      "practical info if provided",
+      "CTA"
+    ],
+    "emojiPolicy": "light",
+    "hashtags": {
+      "min": 3,
+      "max": 6
+    }
+  },
+  "sceneStructure": [
+    {
+      "id": "hero",
+      "setting": "showroom",
+      "shot": "front three-quarter",
+      "purpose": "identity"
+    },
+    {
+      "id": "side",
+      "setting": "showroom",
+      "shot": "full side profile",
+      "purpose": "proportions"
+    },
+    {
+      "id": "details",
+      "setting": "premium studio",
+      "shot": "interior-facing and wheel details",
+      "purpose": "highlights"
+    },
+    {
+      "id": "closing",
+      "setting": "showroom",
+      "shot": "hero with dealership branding space",
+      "purpose": "CTA"
+    }
+  ],
+  "ctaStrategy": {
+    "primary": "message",
+    "urgency": "low",
+    "examples": {
+      "es": [
+        "Escríbenos para más información.",
+        "Te esperamos para una prueba."
+      ],
+      "pt": [
+        "Fale com a gente para mais informações.",
+        "Esperamos você para um test drive."
+      ],
+      "en": [
+        "Message us for more information.",
+        "Come in for a test drive."
+      ]
+    }
+  },
+  "formats": [
+    "instagram_caption",
+    "instagram_carousel",
+    "instagram_post_image",
+    "reel_caption",
+    "reel_video",
+    "story_text",
+    "story_image",
+    "whatsapp_message",
+    "whatsapp_status",
+    "facebook_post",
+    "marketplace_listing",
+    "promo_video",
+    "website_description",
+    "headline",
+    "cta_variants"
+  ],
+  "videoStyles": [
+    "premium-dealership",
+    "cinematic-luxury",
+    "minimalist"
+  ],
+  "imageScenes": [
+    "showroom",
+    "premium-studio"
+  ]
+}

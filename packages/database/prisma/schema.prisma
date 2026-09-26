@@ -1,0 +1,826 @@
+// Multi-tenant schema. Tenant = Organization. Every business table carries a
+// required organizationId; cross-tenant references are blocked at the database
+// level by composite (childId, organizationId) foreign keys added in the
+// migration SQL (see migrations/*_init/migration.sql, "TENANT BOUNDARY").
+//
+// Money: integer micro-USD (BigInt). Telegram ids: BigInt.
+// `…ById` actor columns are plain UUIDs on purpose: users are disabled, never
+// deleted, and history must survive.
+
+generator client {
+  provider            = "prisma-client"
+  output              = "../src/generated"
+  moduleFormat        = "esm"
+  importFileExtension = "js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────── Enums ─────────────
+enum Role {
+  OWNER
+  ADMIN
+  EDITOR
+  OPERATOR
+}
+
+enum UserStatus {
+  INVITED
+  ACTIVE
+  DISABLED
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+  CLOSED
+}
+
+enum Locale {
+  es
+  pt
+  en
+}
+
+enum PublishingMode {
+  DRAFT_ONLY
+  AUTO_PUBLISH
+  SCHEDULED
+}
+
+enum TelegramAccountStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum VehicleStatus {
+  DRAFT
+  AVAILABLE
+  RESERVED
+  SOLD
+  ARCHIVED
+}
+
+enum BodyType {
+  SEDAN
+  HATCHBACK
+  SUV
+  CROSSOVER
+  PICKUP
+  COUPE
+  CONVERTIBLE
+  WAGON
+  VAN
+  OTHER
+}
+
+enum Segment {
+  ECONOMY
+  MID_RANGE
+  PREMIUM
+  LUXURY
+  SPORT
+  UTILITY
+}
+
+enum JobSource {
+  TELEGRAM
+  DASHBOARD
+  API
+}
+
+enum JobStatus {
+  PENDING
+  PROCESSING
+  AWAITING_INPUT
+  RETRYING
+  COMPLETED
+  PARTIALLY_COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum JobStage {
+  INGEST
+  ANALYSIS
+  COLLECTING_INPUT
+  COPY
+  IMAGES
+  VIDEO
+  QA
+  DELIVERY
+  PUBLISHING
+  DONE
+}
+
+enum AssetKind {
+  TEXT
+  IMAGE
+  VIDEO
+  THUMBNAIL
+  METADATA
+}
+
+enum AssetStatus {
+  PENDING
+  GENERATING
+  QA_REVIEW
+  APPROVED
+  REJECTED
+  FAILED
+}
+
+enum Channel {
+  INSTAGRAM
+  FACEBOOK
+  TIKTOK
+  YOUTUBE
+  LINKEDIN
+  X
+  THREADS
+  PINTEREST
+  BLUESKY
+  WHATSAPP
+  MARKETPLACE
+  WEBSITE
+  GENERIC
+}
+
+enum VideoPlanStatus {
+  DRAFT
+  APPROVED
+  RENDERING
+  RENDERED
+  FAILED
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ENDED
+}
+
+enum ProviderKind {
+  TELEGRAM
+  VISION
+  TEXT_GENERATION
+  IMAGE_GENERATION
+  VIDEO_GENERATION
+  STORAGE
+  SOCIAL_PUBLISHING
+  ANALYTICS
+}
+
+enum ProviderHealth {
+  CONNECTED
+  NOT_CONFIGURED
+  ERROR
+}
+
+enum KeySource {
+  ENV
+  DATABASE
+}
+
+enum PublishingAccountStatus {
+  ACTIVE
+  DISCONNECTED
+  ERROR
+}
+
+enum PublicationStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+enum GenerationOperation {
+  VISION_ANALYZE
+  TEXT_GENERATE
+  IMAGE_GENERATE
+  VIDEO_GENERATE
+  QA_REVIEW
+  PUBLISH
+}
+
+enum CallStatus {
+  SUCCESS
+  ERROR
+  TIMEOUT
+  RATE_LIMITED
+}
+
+enum UsageMetric {
+  JOBS_CREATED
+  VEHICLES_PROCESSED
+  VISION_CALLS
+  TEXT_GENERATIONS
+  IMAGES_GENERATED
+  VIDEOS_GENERATED
+  VIDEO_SECONDS
+  PUBLICATIONS
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+enum ActorType {
+  USER
+  TELEGRAM
+  SYSTEM
+}
+
+// ───────────── Tenant root ─────────────
+model Organization {
+  id        String             @id @default(uuid()) @db.Uuid
+  name      String
+  slug      String             @unique
+  status    OrganizationStatus @default(ACTIVE)
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  settings           OrganizationSettings?
+  verticalEnrollment VerticalEnrollment?
+  subscription       Subscription?
+  users              User[]
+  sessions           Session[]
+  telegramAccounts   TelegramAccount[]
+  telegramInvites    TelegramInvite[]
+  vehicles           Vehicle[]
+  vehicleImages      VehicleImage[]
+  contentJobs        ContentJob[]
+  contentAssets      ContentAsset[]
+  videoPlans         VideoPlan[]
+  campaigns          Campaign[]
+  apiProviders       APIProvider[]
+  apiKeys            APIKeyReference[]
+  publishingAccounts PublishingAccount[]
+  publications       Publication[]
+  generationLogs     GenerationLog[]
+  usage              Usage[]
+  auditLogs          AuditLog[]
+}
+
+model OrganizationSettings {
+  organizationId         String         @id @db.Uuid
+  locale                 Locale         @default(es)
+  timezone               String         @default("UTC")
+  /// Display currency for prices and cost reports. Costs are tracked in USD.
+  currency               String         @default("USD") @db.Char(3)
+  publishingMode         PublishingMode @default(DRAFT_ONLY)
+  defaultTemplateSlug    String         @default("premium-dealership")
+  defaultVideoStyle      String?
+  brandName              String?
+  contactPhone           String?
+  contactWhatsapp        String?
+  contactEmail           String?
+  website                String?
+  addressLine            String?
+  city                   String?
+  defaultHashtags        String[]
+  videoEnabled           Boolean        @default(true)
+  /// Organization hard cap; effective cap = min(this, Subscription.monthlyCostCapMicros)
+  monthlyCostCapMicros   BigInt?
+  /// Effective limit = min(this, Subscription.dailyJobLimit)
+  dailyJobLimit          Int?
+  /// "Todo" runs that include video ask for confirmation above this estimate.
+  confirmCostAboveMicros BigInt         @default(0)
+  updatedById            String?        @db.Uuid
+  updatedAt              DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+/// Which vertical module an organization runs, and that module's own config.
+/// One enrollment per organization in Phase 3 (organizationId is the @id);
+/// multi-vertical organizations are an explicit future extension, not
+/// supported yet. `vertical` is a plain string (not an enum) validated
+/// against the running VerticalRegistry at write time, so a new vertical
+/// module needs no core migration to become enrollable.
+model VerticalEnrollment {
+  organizationId String   @id @db.Uuid
+  /// Module slug, e.g. "dealership". Checked against VerticalRegistry.has() before write.
+  vertical       String
+  /// Module-defined shape, validated by that module's own configSchema.
+  config         Json     @default("{}")
+  enrolledAt     DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+model Subscription {
+  id                     String             @id @default(uuid()) @db.Uuid
+  organizationId         String             @unique @db.Uuid
+  planCode               String
+  status                 SubscriptionStatus @default(TRIALING)
+  currentPeriodStart     DateTime
+  currentPeriodEnd       DateTime
+  monthlyVehicleLimit    Int?
+  monthlyVideoLimit      Int?
+  dailyJobLimit          Int?
+  monthlyCostCapMicros   BigInt?
+  externalCustomerId     String?
+  externalSubscriptionId String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+// ───────────── People & access ─────────────
+model User {
+  id             String     @id @default(uuid()) @db.Uuid
+  organizationId String     @db.Uuid
+  /// Stored lower-cased.
+  email          String     @unique
+  name           String
+  /// argon2id; null while INVITED
+  passwordHash   String?
+  role           Role       @default(OPERATOR)
+  status         UserStatus @default(INVITED)
+  lastLoginAt    DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  sessions        Session[]
+  telegramAccount TelegramAccount?
+
+  @@unique([id, organizationId])
+  @@index([organizationId])
+}
+
+model Session {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @db.Uuid
+  userId         String    @db.Uuid
+  /// sha256 of the cookie value; the raw token is never stored.
+  tokenHash      String    @unique
+  expiresAt      DateTime
+  lastUsedAt     DateTime  @default(now())
+  revokedAt      DateTime?
+  ip             String?
+  userAgent      String?
+  createdAt      DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([organizationId])
+}
+
+model TelegramAccount {
+  id                 String                @id @default(uuid()) @db.Uuid
+  organizationId     String                @db.Uuid
+  /// One Telegram user belongs to exactly one organization.
+  telegramUserId     BigInt                @unique
+  chatId             BigInt
+  username           String?
+  firstName          String?
+  /// Optional link to a dashboard user; the Telegram account inherits its role.
+  userId             String?               @unique @db.Uuid
+  /// Role for Telegram-only users (no dashboard account).
+  role               Role                  @default(OPERATOR)
+  status             TelegramAccountStatus @default(ACTIVE)
+  localeOverride     Locale?
+  activeContentJobId String?               @unique @db.Uuid
+  lastSeenAt         DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  activeJob    ContentJob?  @relation("ActiveJob", fields: [activeContentJobId], references: [id], onDelete: SetNull)
+  jobs         ContentJob[] @relation("JobTelegramAccount")
+
+  @@unique([id, organizationId])
+  @@index([organizationId])
+}
+
+model TelegramInvite {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @db.Uuid
+  /// sha256 of the deep-link code; the code itself is shown once and never stored.
+  codeHash       String   @unique
+  role           Role     @default(OPERATOR)
+  maxUses        Int      @default(1)
+  uses           Int      @default(0)
+  expiresAt      DateTime
+  createdById    String?  @db.Uuid
+  createdAt      DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+// ───────────── Inventory ─────────────
+model Vehicle {
+  id                   String        @id @default(uuid()) @db.Uuid
+  organizationId       String        @db.Uuid
+  status               VehicleStatus @default(DRAFT)
+  make                 String?
+  model                String?
+  version              String?
+  year                 Int?
+  color                String?
+  bodyType             BodyType?
+  segment              Segment?
+  /// { make: { source, confidence? }, … } — validated by provenanceSchema
+  provenance           Json
+  /// [{ value, source }] — validated by visualFeaturesSchema
+  visualFeatures       Json
+  /// Minor units (cents) in `currency`. User-provided only.
+  priceMinor           Int?
+  currency             String?       @db.Char(3)
+  mileageKm            Int?
+  city                 String?
+  financingNotes       String?
+  offerText            String?
+  contactPhoneOverride String?
+  vin                  String?
+  stockNumber          String?
+  primaryImageId       String?       @unique @db.Uuid
+  createdById          String?       @db.Uuid
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  images       VehicleImage[]
+  contentJobs  ContentJob[]
+  assets       ContentAsset[]
+  videoPlans   VideoPlan[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, make, model])
+}
+
+model VehicleImage {
+  id                   String    @id @default(uuid()) @db.Uuid
+  organizationId       String    @db.Uuid
+  vehicleId            String    @db.Uuid
+  /// organizations/{organizationId}/vehicles/{vehicleId}/originals/{sha256}.{ext}
+  storageKey           String    @unique
+  mime                 String
+  width                Int
+  height               Int
+  bytes                Int
+  sha256               String    @db.Char(64)
+  telegramFileUniqueId String?
+  /// Validated VehicleAnalysis as returned by the provider.
+  analysis             Json?
+  analyzedBy           String?
+  analyzedAt           DateTime?
+  createdAt            DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([id, organizationId])
+  @@index([organizationId, sha256])
+  @@index([vehicleId])
+}
+
+// ───────────── Content pipeline ─────────────
+model ContentJob {
+  /// Deterministic from idempotencyKey (see deterministicJobId).
+  id                  String    @id @db.Uuid
+  organizationId      String    @db.Uuid
+  vehicleId           String    @db.Uuid
+  /// Namespaced ("dealership.vehicle") + subjectId — the vertical module's own
+  /// entity, with no database foreign key (see VerticalModule/WorkflowHooks in
+  /// @autocontent/verticals-core). vehicleId above is kept alongside these
+  /// during the migration (docs/phase-3-design.md §3.2, §14 3b/3c).
+  subjectType         String?
+  subjectId           String?   @db.Uuid
+  idempotencyKey      String    @unique
+  source              JobSource
+  telegramAccountId   String?   @db.Uuid
+  telegramChatId      BigInt?
+  /// Telegram file to ingest (TELEGRAM source). Not secret; downloaded once, then stored.
+  telegramFileId      String?
+  telegramMessageId   Int?
+  progressMessageId   Int?
+  requestedById       String?   @db.Uuid
+  campaignId          String?   @db.Uuid
+  status              JobStatus @default(PENDING)
+  stage               JobStage  @default(INGEST)
+  requestedFormats    String[]
+  templateSlug        String?
+  videoStyle          String?
+  /// Frozen organization settings for this job — validated by settingsSnapshotSchema.
+  settingsSnapshot    Json
+  analysisDeliveredAt DateTime?
+  estimatedCostMicros BigInt    @default(0)
+  reservedCostMicros  BigInt    @default(0)
+  actualCostMicros    BigInt    @default(0)
+  costConfirmedAt     DateTime?
+  attempts            Int       @default(0)
+  lastError           Json?
+  startedAt           DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle         Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  telegramAccount TelegramAccount? @relation("JobTelegramAccount", fields: [telegramAccountId], references: [id], onDelete: SetNull)
+  activeFor       TelegramAccount? @relation("ActiveJob")
+  campaign        Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  assets          ContentAsset[]
+  videoPlans      VideoPlan[]
+  generationLogs  GenerationLog[]
+  publications    Publication[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, vehicleId])
+}
+
+model ContentAsset {
+  id              String      @id @default(uuid()) @db.Uuid
+  organizationId  String      @db.Uuid
+  contentJobId    String      @db.Uuid
+  vehicleId       String      @db.Uuid
+  subjectType     String?
+  subjectId       String?     @db.Uuid
+  kind            AssetKind
+  /// Template-defined format id (new formats need no migration).
+  format          String
+  channel         Channel
+  locale          Locale
+  status          AssetStatus @default(PENDING)
+  version         Int         @default(1)
+  isCurrent       Boolean     @default(true)
+  text            String?
+  data            Json?
+  storageKey      String?
+  mime            String?
+  width           Int?
+  height          Int?
+  durationMs      Int?
+  bytes           Int?
+  templateSlug    String?
+  templateVersion String?
+  provider        String?
+  generationLogId String?     @unique @db.Uuid
+  /// { approved, errors[], warnings[], confidence } — validated by qaReportSchema
+  qaReport        Json?
+  approvedById    String?     @db.Uuid
+  approvedAt      DateTime?
+  deliveredAt     DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentJob    ContentJob     @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
+  vehicle       Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  generationLog GenerationLog? @relation(fields: [generationLogId], references: [id], onDelete: SetNull)
+  videoPlan     VideoPlan?
+  publications  Publication[]
+
+  @@unique([id, organizationId])
+  @@unique([contentJobId, format, version])
+  @@index([organizationId, vehicleId])
+  @@index([organizationId, status])
+}
+
+model VideoPlan {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @db.Uuid
+  contentJobId   String          @db.Uuid
+  vehicleId      String          @db.Uuid
+  subjectType    String?
+  subjectId      String?         @db.Uuid
+  style          String
+  durationSec    Int
+  aspectRatio    String
+  /// VIDEO_PLAN — validated by videoPlanSchema
+  plan           Json
+  status         VideoPlanStatus @default(DRAFT)
+  videoAssetId   String?         @unique @db.Uuid
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentJob   ContentJob    @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  videoAsset   ContentAsset? @relation(fields: [videoAssetId], references: [id], onDelete: SetNull)
+
+  @@unique([contentJobId, style])
+  @@index([organizationId])
+}
+
+model Campaign {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  name           String
+  description    String?
+  status         CampaignStatus @default(DRAFT)
+  startsAt       DateTime?
+  endsAt         DateTime?
+  offerText      String?
+  templateSlug   String?
+  createdById    String?        @db.Uuid
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentJobs  ContentJob[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, status])
+}
+
+// ───────────── Providers, credentials, publishing ─────────────
+model APIProvider {
+  id             String         @id @default(uuid()) @db.Uuid
+  /// null = platform default; set = organization-specific override
+  organizationId String?        @db.Uuid
+  kind           ProviderKind
+  adapter        String
+  displayName    String
+  enabled        Boolean        @default(true)
+  isDefault      Boolean        @default(false)
+  /// Non-secret settings: model, base URL, timeouts.
+  config         Json
+  /// [{ unitType, costMicros }] — validated by costConfigSchema
+  costConfig     Json
+  health         ProviderHealth @default(NOT_CONFIGURED)
+  healthDetail   String?
+  lastCheckedAt  DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  organization       Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  keys               APIKeyReference[]
+  publishingAccounts PublishingAccount[]
+  generationLogs     GenerationLog[]
+
+  @@index([kind])
+  @@index([organizationId])
+}
+
+model APIKeyReference {
+  id                   String    @id @default(uuid()) @db.Uuid
+  organizationId       String?   @db.Uuid
+  providerId           String    @db.Uuid
+  label                String
+  source               KeySource
+  /// source=ENV: variable name only; the value stays in the host's environment.
+  envVarName           String?
+  /// source=DATABASE: AES-256-GCM
+  ciphertext           Bytes?
+  iv                   Bytes?
+  authTag              Bytes?
+  encryptionKeyVersion Int?
+  last4                String?
+  createdById          String?   @db.Uuid
+  createdAt            DateTime  @default(now())
+  rotatedAt            DateTime?
+  revokedAt            DateTime?
+
+  organization       Organization?       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider           APIProvider         @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  publishingAccounts PublishingAccount[]
+
+  @@index([providerId])
+  @@index([organizationId])
+}
+
+model PublishingAccount {
+  id                String                  @id @default(uuid()) @db.Uuid
+  organizationId    String                  @db.Uuid
+  providerId        String                  @db.Uuid
+  apiKeyRefId       String?                 @db.Uuid
+  platform          Channel
+  externalAccountId String
+  displayName       String
+  handle            String?
+  status            PublishingAccountStatus @default(ACTIVE)
+  lastSyncedAt      DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  provider     APIProvider      @relation(fields: [providerId], references: [id])
+  apiKeyRef    APIKeyReference? @relation(fields: [apiKeyRefId], references: [id], onDelete: SetNull)
+  publications Publication[]
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, providerId, platform, externalAccountId])
+}
+
+model Publication {
+  id                  String            @id @default(uuid()) @db.Uuid
+  organizationId      String            @db.Uuid
+  contentJobId        String            @db.Uuid
+  publishingAccountId String            @db.Uuid
+  primaryAssetId      String            @db.Uuid
+  mediaAssetIds       String[]          @db.Uuid
+  idempotencyKey      String            @unique
+  status              PublicationStatus @default(DRAFT)
+  scheduledAt         DateTime?
+  publishedAt         DateTime?
+  externalPostId      String?
+  externalUrl         String?
+  payloadSnapshot     Json?
+  lastError           Json?
+  requestedById       String?           @db.Uuid
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  organization      Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentJob        ContentJob        @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
+  publishingAccount PublishingAccount @relation(fields: [publishingAccountId], references: [id])
+  primaryAsset      ContentAsset      @relation(fields: [primaryAssetId], references: [id])
+
+  @@index([organizationId, status, scheduledAt])
+}
+
+// ───────────── Observability & cost ─────────────
+model GenerationLog {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @db.Uuid
+  contentJobId   String?             @db.Uuid
+  providerId     String?             @db.Uuid
+  adapter        String
+  operation      GenerationOperation
+  model          String?
+  promptTemplate String?
+  promptVersion  String?
+  /// Redacted and truncated.
+  promptText     String?
+  inputSummary   Json?
+  outputSummary  Json?
+  status         CallStatus
+  errorCode      String?
+  errorMessage   String?
+  attempt        Int
+  latencyMs      Int
+  inputTokens    Int?
+  outputTokens   Int?
+  units          Decimal?            @db.Decimal(14, 4)
+  unitType       String?
+  costMicros     BigInt              @default(0)
+  /// "{jobId}:{step}:{attempt}" — a retried call never logs or charges twice.
+  idempotencyKey String              @unique
+  createdAt      DateTime            @default(now())
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contentJob   ContentJob?   @relation(fields: [contentJobId], references: [id], onDelete: SetNull)
+  provider     APIProvider?  @relation(fields: [providerId], references: [id], onDelete: SetNull)
+  asset        ContentAsset?
+
+  @@unique([id, organizationId])
+  @@index([organizationId, createdAt])
+  @@index([contentJobId])
+}
+
+model Usage {
+  id              String      @id @default(uuid()) @db.Uuid
+  organizationId  String      @db.Uuid
+  /// Organization-local calendar day.
+  day             DateTime    @db.Date
+  metric          UsageMetric
+  /// "" for metrics not tied to a provider (avoids NULL-unique gaps).
+  providerAdapter String      @default("")
+  quantity        BigInt      @default(0)
+  costMicros      BigInt      @default(0)
+  updatedAt       DateTime    @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, day, metric, providerAdapter])
+}
+
+model AuditLog {
+  id                     String    @id @default(uuid()) @db.Uuid
+  organizationId         String    @db.Uuid
+  actorType              ActorType
+  actorUserId            String?   @db.Uuid
+  actorTelegramAccountId String?   @db.Uuid
+  action                 String
+  entityType             String
+  entityId               String?
+  /// Never contains secrets.
+  metadata               Json?
+  ip                     String?
+  createdAt              DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+}
