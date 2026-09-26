@@ -1,4 +1,4 @@
-import type { VehicleAnalysis } from '@autocontent/shared';
+import type { VehicleAnalysis } from '../entities/vehicle-analysis.js';
 import { describe, expect, it } from 'vitest';
 import { generateCaption } from './caption.js';
 

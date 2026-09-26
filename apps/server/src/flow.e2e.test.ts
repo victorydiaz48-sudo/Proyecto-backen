@@ -10,17 +10,12 @@ import {
   seed,
   type PrismaClient,
 } from '@autocontent/database';
-import {
-  LocalDiskStorageProvider,
-  MockVisionProvider,
-  createNotifier,
-  type TelegramFileFetcher,
-  type VisionProvider,
-} from '@autocontent/providers';
+import { LocalDiskStorageProvider, createNotifier, type TelegramFileFetcher, type VisionProvider } from '@autocontent/providers';
 import { BullMqQueue, InMemoryQueue, type JobQueue, type JobWorker } from '@autocontent/queue';
 import { silentLogger, type ContentJobPayload } from '@autocontent/shared';
 import { makePng } from '@autocontent/shared/testing';
 import { createBot } from '@autocontent/telegram';
+import { MockVisionProvider, dealershipModule, type VehicleAnalysis } from '@autocontent/verticals-dealership';
 import { createContentJobProcessor } from '@autocontent/worker';
 import { Api, type RawApi, type Transformer } from 'grammy';
 import type { Update, UserFromGetMe } from 'grammy/types';
@@ -45,7 +40,7 @@ interface Sent {
 
 let nextUser = Number(String(Date.now()).slice(-9)) * 10;
 
-function world(prisma: PrismaClient, opts: { slug: string; bootstrapCode: string; vision?: VisionProvider; files?: TelegramFileFetcher; queue?: JobQueue<ContentJobPayload> & JobWorker<ContentJobPayload>; storageRoot: string; startWorker?: boolean }) {
+function world(prisma: PrismaClient, opts: { slug: string; bootstrapCode: string; vision?: VisionProvider<VehicleAnalysis>; files?: TelegramFileFetcher; queue?: JobQueue<ContentJobPayload> & JobWorker<ContentJobPayload>; storageRoot: string; startWorker?: boolean }) {
   const sent: Sent[] = [];
   const recorder: Transformer<RawApi> = async (_prev, method, payload) => {
     const p = payload as { chat_id?: number; text?: string };
@@ -70,6 +65,7 @@ function world(prisma: PrismaClient, opts: { slug: string; bootstrapCode: string
     prisma,
     storage,
     vision: opts.vision ?? new MockVisionProvider(),
+    vertical: dealershipModule,
     notifier: createNotifier(api),
     files,
     limits,
@@ -195,7 +191,7 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     const d = await newOrganization();
     let visionCalls = 0;
     const mock = new MockVisionProvider();
-    const counting: VisionProvider = { ...mock, name: mock.name, kind: 'VISION', capabilities: () => mock.capabilities(), testConnection: () => mock.testConnection(), analyze: (i, o) => (visionCalls++, mock.analyze(i, o)) };
+    const counting: VisionProvider<VehicleAnalysis> = { ...mock, name: mock.name, kind: 'VISION', capabilities: () => mock.capabilities(), testConnection: () => mock.testConnection(), analyze: (i, o) => (visionCalls++, mock.analyze(i, o)) };
     const w = world(prisma, { slug: d.slug, bootstrapCode: 'bootstrap-code-inv', storageRoot, vision: counting });
     const owner = w.user();
     await owner.command('/start bootstrap-code-inv');
@@ -255,7 +251,7 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     const d = await newOrganization();
     let calls = 0;
     const mock = new MockVisionProvider();
-    const flaky: VisionProvider = {
+    const flaky: VisionProvider<VehicleAnalysis> = {
       name: mock.name,
       kind: 'VISION',
       capabilities: () => mock.capabilities(),

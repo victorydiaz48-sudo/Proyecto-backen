@@ -1,27 +1,14 @@
-import {
-  ANALYSIS_FIELDS,
-  FIELD_SOURCES,
-  costConfigSchema,
-  qaReportSchema,
-  videoPlanSchema,
-} from '@autocontent/shared';
+import { costConfigSchema, qaReportSchema, videoPlanSchema } from '@autocontent/shared';
 import { z } from 'zod';
 
 /**
  * Schemas for every Json column. Json columns are always written through
  * these (repositories call .parse) so malformed data never reaches the DB.
+ *
+ * Vehicle.provenance/visualFeatures moved to the dealership module
+ * (packages/verticals/dealership/src/entities/vehicle-analysis.ts) — Phase
+ * 3b, since they depend on vehicle-specific field names.
  */
-
-/** Vehicle.provenance: where each identity field came from. */
-export const provenanceSchema = z.partialRecord(
-  z.enum(ANALYSIS_FIELDS),
-  z.object({ source: z.enum(FIELD_SOURCES), confidence: z.number().min(0).max(1).optional() }),
-);
-
-/** Vehicle.visualFeatures */
-export const visualFeaturesSchema = z.array(
-  z.object({ value: z.string().min(1), source: z.enum(['detected', 'inferred']) }),
-);
 
 /** APIProvider.config: non-secret adapter settings. Secrets are rejected by key name. */
 export const providerConfigSchema = z

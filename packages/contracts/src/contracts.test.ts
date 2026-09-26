@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { roleAtLeast } from './common.js';
 import { buildOpenApiDocument } from './openapi.js';
-import { loginBody, settingsPatch, vehiclePatch } from './resources.js';
+import { loginBody, settingsPatch } from './resources.js';
 import { ROUTES, type RouteContract } from './routes.js';
 
 const routes = ROUTES as readonly RouteContract[];
@@ -49,8 +49,6 @@ describe('roles', () => {
 describe('input validation', () => {
   it('rejects malformed input', () => {
     expect(loginBody.safeParse({ email: 'not-an-email', password: 'x' }).success).toBe(false);
-    expect(vehiclePatch.safeParse({ mileageKm: -5 }).success).toBe(false);
-    expect(vehiclePatch.safeParse({ year: 1800 }).success).toBe(false);
     expect(settingsPatch.safeParse({ website: 'javascript:alert(1)' }).success).toBe(false);
     expect(settingsPatch.safeParse({ website: 'data:text/html,hi' }).success).toBe(false);
     expect(settingsPatch.safeParse({ website: 'https://autos-silva.com.br' }).success).toBe(true);

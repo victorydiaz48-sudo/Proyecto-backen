@@ -53,10 +53,8 @@ export const ROUTES = [
   route({ id: 'telegram.accounts.list', method: 'GET', path: '/telegram/accounts', auth: 'ADMIN', tag: 'Telegram', summary: 'Linked Telegram accounts', query: paginationQuery, response: page(r.telegramAccount) }),
   route({ id: 'telegram.accounts.update', method: 'PATCH', path: '/telegram/accounts/:id', auth: 'ADMIN', tag: 'Telegram', summary: 'Block/unblock, change role or language', params: idParams, body: r.telegramAccountPatch, response: r.telegramAccount }),
 
-  // Vehicles
-  route({ id: 'vehicles.list', method: 'GET', path: '/vehicles', auth: 'OPERATOR', tag: 'Vehicles', summary: 'List vehicles', query: r.vehicleListQuery, response: page(r.vehicle) }),
-  route({ id: 'vehicles.get', method: 'GET', path: '/vehicles/:id', auth: 'OPERATOR', tag: 'Vehicles', summary: 'Vehicle with per-field provenance', params: idParams, response: r.vehicle }),
-  route({ id: 'vehicles.update', method: 'PATCH', path: '/vehicles/:id', auth: 'EDITOR', tag: 'Vehicles', summary: 'Edit user-provided facts (tagged "user-provided")', params: idParams, body: r.vehiclePatch, response: r.vehicle }),
+  // Vehicles: moved to the dealership module's own route list
+  // (packages/verticals/dealership/src/contracts.ts) — Phase 3b.
 
   // Jobs
   route({ id: 'jobs.list', method: 'GET', path: '/jobs', auth: 'OPERATOR', tag: 'Jobs', summary: 'Generation jobs', query: r.jobListQuery, response: page(r.job) }),

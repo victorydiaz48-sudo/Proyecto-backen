@@ -48,6 +48,15 @@ export async function seed(prisma: PrismaClient, now = new Date()) {
     create: { organizationId: organization.id, locale: 'es', publishingMode: 'DRAFT_ONLY' },
   });
 
+  // Every organization created so far predates the multi-vertical platform
+  // (Phase 3) and only ever did dealership work — enroll the demo
+  // organization explicitly rather than leaving it without an enrollment.
+  await prisma.verticalEnrollment.upsert({
+    where: { organizationId: organization.id },
+    update: {},
+    create: { organizationId: organization.id, vertical: 'dealership', config: {} },
+  });
+
   const plan = PLANS.trial!;
   await prisma.subscription.upsert({
     where: { organizationId: organization.id },

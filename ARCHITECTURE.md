@@ -1,43 +1,59 @@
 # Architecture
 
-Status: **Phase 2 complete, Phase 3a complete.** The bot, database, queue,
-worker and storage are wired together (Phase 2). The tenant concept is
-`Organization` (renamed from `Dealership`) and a `VerticalRegistry` skeleton
-now exists in `packages/verticals/core` — see
-[docs/phase-3-design.md](docs/phase-3-design.md) for the multi-vertical
-design this implements, and §14 (rollout plan) for what 3a covers versus
-what's still ahead (3b re-platforms the dealership flow as the first
-vertical module; nothing in the running app calls the registry yet).
-`apps/api` and the dashboard come in later phases.
+Status: **Phase 2 complete, Phase 3a and 3b complete.** The bot, database,
+queue, worker and storage are wired together (Phase 2). The tenant concept is
+`Organization` (renamed from `Dealership`) and dealership is now re-platformed
+as the first vertical module on top of the `VerticalRegistry` (Phase 3a/3b) —
+see [docs/phase-3-design.md](docs/phase-3-design.md) for the multi-vertical
+design this implements, and §14 (rollout plan) for what's covered versus what's
+still ahead (3c drops the now-redundant `vehicleId` columns once every write
+path is proven on `subjectType`/`subjectId`; 3d scaffolds a second vertical to
+prove genericity). `apps/api` and the dashboard come in later phases.
 
-## Vertical modules (Phase 3a — skeleton only)
+## Vertical modules (Phase 3a skeleton + Phase 3b dealership module)
 
 `packages/verticals/core` defines the module contract every vertical
-implements, and nothing else imports it yet:
+implements:
 
 - `VerticalModule` — what a module registers: slug, config schema, entities,
-  `WorkflowHooks`, content templates, routes, i18n message fragments.
+  `WorkflowHooks`, content templates, routes, i18n message fragments, storage
+  path segment.
 - `WorkflowHooks<TAnalysis>` — the job-lifecycle contract
-  (`onJobCreate`/`analyze`/`onAnalysisComplete`/`generateCaption`/…) that will
-  replace the vehicle-specific calls inline in `apps/worker` once the
-  dealership module exists (Phase 3b).
+  (`onJobCreate`/`getStoredImage`/`storeImage`/`onAnalysisComplete`/
+  `isSubjectUsable`/`generateCaption`/`formatSubjectForDisplay`/…) that
+  `apps/worker/src/process-content-job.ts` now calls instead of any
+  vehicle-specific logic inline — the worker shell has no import of, or
+  knowledge about, `Vehicle`/`VehicleImage` any more.
 - `VerticalRegistry` — holds the compiled-in modules, validated at
   construction (no duplicate slugs, no i18n key collisions across modules),
   dispatches by `Map` lookup only — never a `switch`/`if` keyed on a vertical
   name.
-- `VerticalEnrollment` (new table) + `loadBusinessProfile()`/
-  `enrollOrganization()` — one vertical per organization, `vertical` is a
-  plain string validated against the registry at write time (not a Prisma
-  enum), so a new module needs no core migration to become enrollable.
-- `ContentJob`/`ContentAsset`/`VideoPlan` still reference `Vehicle` directly
-  (`vehicleId`) — the polymorphic `subjectType`/`subjectId` replacement is
-  Phase 3b, done together with moving `Vehicle` into the dealership module's
-  own schema fragment.
+- `VerticalEnrollment` (table) + `loadBusinessProfile()`/`enrollOrganization()`
+  — one vertical per organization, `vertical` is a plain string validated
+  against the registry at write time (not a Prisma enum). `seed()` enrolls the
+  demo organization in `dealership`.
 
-Prisma 7.10 merges multiple `.prisma` files in the schema folder natively
-(confirmed by spike before this phase started) — a module's schema fragment
-will be copied/symlinked into `packages/database/prisma/` rather than
-requiring a custom schema-assembly script.
+`packages/verticals/dealership` (`@autocontent/verticals-dealership`) is the
+first module: the vehicle-analysis schema, the mock/normalize/contract vision
+pieces, the content-engine (caption generation), the automotive template
+JSON, the module's own i18n fragment, and its `WorkflowHooks` implementation
+all moved out of core packages into it. `apps/server/src/main.ts` is the only
+place that imports it (core code only ever sees `VerticalModule`).
+
+**Deliberately deferred to a later sub-phase** (documented, not silent):
+- `Vehicle`/`VehicleImage` still live in the *core* `schema.prisma`, not a
+  separate module schema fragment merged at build time — Prisma 7.10's
+  native multi-file merge was spiked and confirmed working (3a), but the
+  physical split waits for 3c, once `vehicleId` is actually dropped.
+  `packages/database/src/ops/jobs.ts`'s `createTelegramContentJob()` still
+  creates the `Vehicle` row directly for this reason (with a comment marking
+  the spot `WorkflowHooks.onJobCreate` takes over in 3c).
+- `ContentJob`/`ContentAsset`/`VideoPlan` carry `subjectType`/`subjectId`
+  *alongside* `vehicleId` (additive migration, backfilled for existing rows)
+  — dropping `vehicleId` is 3c.
+- The vehicle REST contracts (`packages/verticals/dealership/src/
+  contracts.ts`) are declared on `VerticalModule.routes` but not merged into
+  the live core route table — no handler consumes any REST route yet.
 
 ## Phase 2 flow
 
@@ -54,13 +70,17 @@ Telegram ─update─▶ bot (apps/telegram)
                      ▼
                queue "content-jobs" (BullMQ on Redis, or in memory)
                      ▼
-worker (apps/worker) — each step checks the database first, so retries resume:
+worker (apps/worker) — each step checks the database first, so retries resume.
+The shell is generic; every step below calls into the dealership module's
+`WorkflowHooks` rather than touching `Vehicle`/`VehicleImage` directly:
   1 ingest    download from Telegram → validate bytes → StorageProvider
-              organizations/{d}/vehicles/{v}/originals/{sha256}.{ext} → VehicleImage
-  2 analyse   reuse analysis of an identical photo in the same organization (free),
-              else VisionProvider → GenerationLog + Usage + job cost (charged once)
-              → Vehicle columns + per-field provenance
-              subject ≠ vehicle → tell the user, archive vehicle, done
+              organizations/{d}/vehicles/{v}/originals/{sha256}.{ext} →
+              `workflow.storeImage()`
+  2 analyse   `workflow.storeImage()` reuses an identical photo's analysis in
+              the same organization (free), else VisionProvider →
+              GenerationLog + Usage + job cost (charged once) →
+              `workflow.onAnalysisComplete()` (Vehicle columns + provenance)
+              `workflow.isSubjectUsable()` false → tell the user, archive, done
   3 copy      ContentAsset (job, instagram_caption, v1)  status QA_REVIEW until Phase 8
   4 deliver   analysis + caption (analysisDeliveredAt / deliveredAt)
   5 complete  COMPLETED exactly once → Usage VEHICLES_PROCESSED

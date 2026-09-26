@@ -1,5 +1,6 @@
-import type { AnalysisField, Locale, Segment, Tagged, VehicleAnalysis } from '@autocontent/shared';
-import { messages } from '@autocontent/shared';
+import type { Locale, Tagged } from '@autocontent/shared';
+import { dealershipMessages } from '../i18n.js';
+import type { AnalysisField, Segment, VehicleAnalysis } from '../entities/vehicle-analysis.js';
 import { publishable } from './publishable.js';
 
 /**
@@ -93,7 +94,7 @@ export function generateCaption(a: VehicleAnalysis, locale: Locale): Caption {
   const segment = pick('estimated_segment', a.estimated_segment);
 
   const nameParts = [make, model, model ? version : null, year?.toString()].filter(Boolean);
-  if (!model && body) nameParts.push(messages(locale).bodyTypes[body]);
+  if (!model && body) nameParts.push(dealershipMessages(locale).bodyTypes[body]);
   const title = nameParts.length > 0 ? nameParts.join(' ') : pack.fallbackTitle;
 
   const lines = [`🚗 ${title}`, '', pack.hooks[segment ?? 'default'], ''];

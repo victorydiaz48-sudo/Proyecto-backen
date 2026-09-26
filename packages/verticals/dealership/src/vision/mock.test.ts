@@ -3,10 +3,10 @@ import { loadConfig } from '@autocontent/config';
 import { ProviderNotConfiguredError, silentLogger, type Locale } from '@autocontent/shared';
 import { makePng } from '@autocontent/shared/testing';
 import { describe, expect, it } from 'vitest';
-import { createVisionProvider } from '../registry.js';
+import type { VisionInput } from '@autocontent/providers';
 import { describeVisionProviderContract } from '../testing.js';
 import { MockVisionProvider } from './mock.js';
-import type { VisionInput } from './types.js';
+import { createDealershipVisionProvider } from './registry.js';
 
 describeVisionProviderContract('mock-vision', () => new MockVisionProvider());
 
@@ -54,13 +54,13 @@ describe('MockVisionProvider', () => {
   });
 });
 
-describe('createVisionProvider', () => {
+describe('createDealershipVisionProvider', () => {
   it('uses the mock in MOCK_MODE', () => {
-    expect(createVisionProvider(loadConfig({ MOCK_MODE: 'true' })).name).toBe('mock-vision');
+    expect(createDealershipVisionProvider(loadConfig({ MOCK_MODE: 'true' })).name).toBe('mock-vision');
   });
 
   it('reports NOT_CONFIGURED without crashing when no real provider is available', async () => {
-    const v = createVisionProvider(loadConfig({ MOCK_MODE: 'false' }));
+    const v = createDealershipVisionProvider(loadConfig({ MOCK_MODE: 'false' }));
     expect((await v.testConnection()).state).toBe('NOT_CONFIGURED');
     await expect(v.analyze(input(1), opts)).rejects.toBeInstanceOf(ProviderNotConfiguredError);
   });

@@ -1,19 +1,14 @@
 import { z } from 'zod';
-import aggressiveSport from '../automotive/aggressive-sport/template.json' with { type: 'json' };
-import cinematicLuxury from '../automotive/cinematic-luxury/template.json' with { type: 'json' };
-import fastSale from '../automotive/fast-sale/template.json' with { type: 'json' };
-import formatsFile from '../automotive/formats.json' with { type: 'json' };
-import minimalist from '../automotive/minimalist/template.json' with { type: 'json' };
-import premiumDealership from '../automotive/premium-dealership/template.json' with { type: 'json' };
-import videoStylesFile from '../automotive/video-styles.json' with { type: 'json' };
 import { formatSchema, templateSchema, videoStyleSchema, type ContentFormat, type ContentTemplate, type VideoStyle } from './schema.js';
 
 export * from './schema.js';
 
 /**
- * Templates live as JSON in packages/templates/automotive/<slug>/template.json
- * so they can be edited from GitHub's web editor. Everything is validated
- * here at startup, including cross-references (formats, video styles).
+ * Generic template-catalogue machinery: validates a set of templates (plus
+ * the formats/video styles they reference) at startup, including
+ * cross-references. Each vertical module ships its own JSON templates
+ * (e.g. `packages/verticals/dealership/templates/*`) and calls this to build
+ * its own catalogue — this package has no opinion on what a template is for.
  */
 export class TemplateCatalogError extends Error {
   override readonly name = 'TemplateCatalogError';
@@ -53,24 +48,4 @@ export function buildCatalog(raw: { templates: unknown[]; formats: unknown; vide
     catalog.templates.set(tpl.slug, tpl);
   }
   return catalog;
-}
-
-export const DEFAULT_TEMPLATE_SLUG = 'premium-dealership';
-
-let cached: TemplateCatalog | undefined;
-
-/** The built-in automotive catalogue (validated once, then cached). */
-export function automotiveCatalog(): TemplateCatalog {
-  cached ??= buildCatalog({
-    templates: [cinematicLuxury, aggressiveSport, premiumDealership, fastSale, minimalist],
-    formats: formatsFile,
-    videoStyles: videoStylesFile,
-  });
-  return cached;
-}
-
-export function getTemplate(slug: string): ContentTemplate {
-  const t = automotiveCatalog().templates.get(slug);
-  if (!t) throw new TemplateCatalogError(`Unknown template "${slug}"`);
-  return t;
 }

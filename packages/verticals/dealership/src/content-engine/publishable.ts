@@ -1,4 +1,5 @@
-import type { AnalysisField, Tagged } from '@autocontent/shared';
+import type { Tagged } from '@autocontent/shared';
+import type { AnalysisField } from '../entities/vehicle-analysis.js';
 
 /**
  * Publication policy: which analysed facts may appear in public marketing copy.

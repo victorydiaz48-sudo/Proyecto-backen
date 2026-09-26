@@ -1,5 +1,7 @@
-import type { FieldSource, Locale, Tagged, VehicleAnalysis } from '@autocontent/shared';
+import type { FieldSource, Locale, Tagged } from '@autocontent/shared';
 import { escapeHtml, messages } from '@autocontent/shared';
+import { dealershipMessages } from './i18n.js';
+import type { VehicleAnalysis } from './entities/vehicle-analysis.js';
 
 const SOURCE_ICON: Record<FieldSource, string> = {
   detected: '✅',
@@ -12,8 +14,9 @@ const SOURCE_ICON: Record<FieldSource, string> = {
  * Human-readable analysis for the organization employee. Unlike public copy,
  * this shows inferred values too, each clearly labelled with its source.
  */
-export function formatAnalysis(a: VehicleAnalysis, locale: Locale, opts: { mock: boolean }): string {
+export function formatSubjectForDisplay(a: VehicleAnalysis, locale: Locale, opts: { mock: boolean }): string {
   const m = messages(locale);
+  const dm = dealershipMessages(locale);
   const L = m.labels;
   const tag = (s: FieldSource) => `${SOURCE_ICON[s]} <i>${m.sources[s]}</i>`;
   const row = <T,>(label: string, f: Tagged<T>, render: (v: T) => string = (v) => String(v)) =>
@@ -26,8 +29,8 @@ export function formatAnalysis(a: VehicleAnalysis, locale: Locale, opts: { mock:
     row(L.version, a.version),
     row(L.year, a.year, (y) => (a.year.source === 'inferred' ? `${y} (${L.approx})` : String(y))),
     row(L.color, a.color),
-    row(L.bodyType, a.body_type, (b) => m.bodyTypes[b]),
-    row(L.segment, a.estimated_segment, (s) => m.segments[s]),
+    row(dm.labels.bodyType, a.body_type, (b) => dm.bodyTypes[b]),
+    row(dm.labels.segment, a.estimated_segment, (s) => dm.segments[s]),
     `<b>${L.confidence}:</b> ${Math.round(a.confidence * 100)}%`,
   ];
 
@@ -36,7 +39,7 @@ export function formatAnalysis(a: VehicleAnalysis, locale: Locale, opts: { mock:
     for (const f of a.visual_features) lines.push(`• ${escapeHtml(f.value)} ${SOURCE_ICON[f.source]}`);
   }
 
-  lines.push('', `<b>${L.missing}:</b> ${a.missing_information.map((k) => m.missingFields[k]).join(', ')}`);
+  lines.push('', `<b>${L.missing}:</b> ${a.missing_information.map((k) => dm.missingFields[k]).join(', ')}`);
   if (opts.mock) lines.push('', m.mockNotice);
 
   return lines.filter((l): l is string => l !== null).join('\n');

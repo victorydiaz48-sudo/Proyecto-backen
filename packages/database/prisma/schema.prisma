@@ -499,6 +499,12 @@ model ContentJob {
   id                  String    @id @db.Uuid
   organizationId      String    @db.Uuid
   vehicleId           String    @db.Uuid
+  /// Namespaced ("dealership.vehicle") + subjectId — the vertical module's own
+  /// entity, with no database foreign key (see VerticalModule/WorkflowHooks in
+  /// @autocontent/verticals-core). vehicleId above is kept alongside these
+  /// during the migration (docs/phase-3-design.md §3.2, §14 3b/3c).
+  subjectType         String?
+  subjectId           String?   @db.Uuid
   idempotencyKey      String    @unique
   source              JobSource
   telegramAccountId   String?   @db.Uuid
@@ -548,6 +554,8 @@ model ContentAsset {
   organizationId  String      @db.Uuid
   contentJobId    String      @db.Uuid
   vehicleId       String      @db.Uuid
+  subjectType     String?
+  subjectId       String?     @db.Uuid
   kind            AssetKind
   /// Template-defined format id (new formats need no migration).
   format          String
@@ -594,6 +602,8 @@ model VideoPlan {
   organizationId String          @db.Uuid
   contentJobId   String          @db.Uuid
   vehicleId      String          @db.Uuid
+  subjectType    String?
+  subjectId      String?         @db.Uuid
   style          String
   durationSec    Int
   aspectRatio    String

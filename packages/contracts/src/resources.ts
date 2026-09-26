@@ -1,4 +1,4 @@
-import { BODY_TYPES, FIELD_SOURCES, SEGMENTS, qaReportSchema, videoPlanSchema } from '@autocontent/shared';
+import { qaReportSchema, videoPlanSchema } from '@autocontent/shared';
 import { z } from 'zod';
 import { httpUrl, isoDate, locale, microsUsd, paginationQuery, role, uuid } from './common.js';
 
@@ -96,55 +96,11 @@ export const telegramAccountPatch = z
   .object({ status: z.enum(['ACTIVE', 'BLOCKED']), role, localeOverride: locale.nullable() })
   .partial();
 
-// ───────────── Vehicles ─────────────
-const provenanceEntry = z.object({ source: z.enum(FIELD_SOURCES), confidence: z.number().optional() });
-export const VEHICLE_STATUSES = ['DRAFT', 'AVAILABLE', 'RESERVED', 'SOLD', 'ARCHIVED'] as const;
-
-export const vehicle = z.object({
-  id: uuid,
-  status: z.enum(VEHICLE_STATUSES),
-  make: z.string().nullable(),
-  model: z.string().nullable(),
-  version: z.string().nullable(),
-  year: z.number().int().nullable(),
-  color: z.string().nullable(),
-  bodyType: z.enum(BODY_TYPES).nullable(),
-  segment: z.enum(SEGMENTS).nullable(),
-  provenance: z.record(z.string(), provenanceEntry),
-  visualFeatures: z.array(z.object({ value: z.string(), source: z.enum(['detected', 'inferred']) })),
-  priceMinor: z.number().int().nullable(),
-  currency: z.string().nullable(),
-  mileageKm: z.number().int().nullable(),
-  city: z.string().nullable(),
-  financingNotes: z.string().nullable(),
-  offerText: z.string().nullable(),
-  primaryImageUrl: httpUrl.nullable(),
-  createdAt: isoDate,
-  updatedAt: isoDate,
-});
-export const vehicleListQuery = paginationQuery.extend({
-  status: z.enum(VEHICLE_STATUSES).optional(),
-  q: z.string().max(100).optional(),
-});
-/** Only user-provided facts are editable; identity edits are tagged "user-provided". */
-export const vehiclePatch = z
-  .object({
-    status: z.enum(VEHICLE_STATUSES),
-    make: z.string().min(1).max(60),
-    model: z.string().min(1).max(60),
-    version: z.string().min(1).max(60),
-    year: z.number().int().min(1950).max(2100),
-    color: z.string().min(1).max(60),
-    priceMinor: z.number().int().min(0).max(1_000_000_000_00),
-    currency: z.string().regex(/^[A-Z]{3}$/),
-    mileageKm: z.number().int().min(0).max(5_000_000),
-    city: z.string().min(1).max(80),
-    financingNotes: z.string().max(500),
-    offerText: z.string().max(500),
-    vin: z.string().regex(/^[A-HJ-NPR-Z0-9]{11,17}$/i),
-    stockNumber: z.string().max(40),
-  })
-  .partial();
+// Vehicle resource schemas (vehicle/vehicleListQuery/vehiclePatch) moved to
+// the dealership module's own contracts (packages/verticals/dealership/src/
+// contracts.ts) — Phase 3b. `job`/`asset` below keep a generic `vehicleId`
+// field for now (the REST contract layer's own move to subjectType/subjectId
+// is deferred, unlike the worker's).
 
 // ───────────── Jobs ─────────────
 export const JOB_STATUSES = [

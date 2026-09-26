@@ -89,6 +89,13 @@ export async function createTelegramContentJob(
         id: jobId,
         organizationId: opts.organizationId,
         vehicleId: vehicle.id,
+        // Hardcoded here (rather than resolved through a VerticalModule) only
+        // because Vehicle is still a core-schema table (docs/phase-3-design.md
+        // §14 3b defers the physical schema split to 3c) — once it moves into
+        // the dealership module's own schema, this becomes
+        // `vertical.workflow.onJobCreate()`'s job.
+        subjectType: 'dealership.vehicle',
+        subjectId: vehicle.id,
         idempotencyKey: opts.idempotencyKey,
         source: 'TELEGRAM',
         telegramAccountId: opts.telegramAccountId,

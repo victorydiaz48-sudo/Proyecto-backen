@@ -1,16 +1,8 @@
 import { createHash } from 'node:crypto';
-import {
-  ProviderResponseError,
-  type BodyType,
-  type Locale,
-  type Segment,
-  type Tagged,
-  type VehicleAnalysis,
-} from '@autocontent/shared';
-import type { ProviderStatus } from '../status.js';
-import { abortableDelay, throwIfAborted, type ProviderCallOptions, type ProviderResult } from '../types.js';
+import { ProviderResponseError, type Locale, type Tagged } from '@autocontent/shared';
+import { abortableDelay, throwIfAborted, type ProviderCallOptions, type ProviderResult, type ProviderStatus, type VisionCapabilities, type VisionInput, type VisionProvider } from '@autocontent/providers';
+import type { BodyType, Segment, VehicleAnalysis } from '../entities/vehicle-analysis.js';
 import { normalizeVisionOutput } from './normalize.js';
-import type { VisionCapabilities, VisionInput, VisionProvider } from './types.js';
 
 type L10n = Record<Locale, string>;
 
@@ -30,9 +22,9 @@ interface MockSample {
 const unknown = { value: null, source: 'unknown' } as const;
 
 /**
- * Fixed catalogue of plausible results. The same photo always maps to the same
- * sample (hash of the bytes), so a demo is repeatable. One sample deliberately
- * leaves fields unknown to exercise the "never invent facts" path.
+ * Fixed catalogue of plausible results. The same photo always maps to the
+ * same sample (hash of the bytes), so a demo is repeatable. One sample
+ * deliberately leaves fields unknown to exercise the "never invent facts" path.
  */
 const SAMPLES: MockSample[] = [
   {
@@ -98,7 +90,7 @@ const SAMPLES: MockSample[] = [
   },
 ];
 
-export class MockVisionProvider implements VisionProvider {
+export class MockVisionProvider implements VisionProvider<VehicleAnalysis> {
   readonly name = 'mock-vision';
   readonly kind = 'VISION' as const;
 

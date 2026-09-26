@@ -1,17 +1,18 @@
 import { createHash } from 'node:crypto';
-import { USER_ONLY_FIELDS, silentLogger, vehicleAnalysisSchema, type Locale } from '@autocontent/shared';
+import { silentLogger, type Locale } from '@autocontent/shared';
 import { makePng } from '@autocontent/shared/testing';
+import type { ProviderCallOptions, VisionImage, VisionProvider } from '@autocontent/providers';
 import { describe, expect, it } from 'vitest';
-import type { ProviderCallOptions } from '../types.js';
-import type { VisionImage, VisionProvider } from './types.js';
+import { USER_ONLY_FIELDS, vehicleAnalysisSchema, type VehicleAnalysis } from '../entities/vehicle-analysis.js';
 
 /**
- * Conformance suite every VisionProvider adapter must pass. Real adapters run
- * it against recorded vendor responses (and live, when a key is present).
+ * Conformance suite every dealership VisionProvider adapter must pass. Real
+ * adapters run it against recorded vendor responses (and live, when a key is
+ * present).
  *
  *   describeVisionProviderContract('my-adapter', () => new MyVisionProvider(...))
  */
-export function describeVisionProviderContract(label: string, factory: () => VisionProvider): void {
+export function describeVisionProviderContract(label: string, factory: () => VisionProvider<VehicleAnalysis>): void {
   const image = (seed = 1): VisionImage => {
     const bytes = makePng(1080, 810, seed);
     return { bytes, mime: 'image/png', width: 1080, height: 810, sha256: createHash('sha256').update(bytes).digest('hex') };

@@ -47,6 +47,9 @@ importers:
       '@autocontent/telegram':
         specifier: workspace:*
         version: link:../telegram
+      '@autocontent/verticals-dealership':
+        specifier: workspace:*
+        version: link:../../packages/verticals/dealership
       '@autocontent/worker':
         specifier: workspace:*
         version: link:../worker
@@ -71,9 +74,6 @@ importers:
 
   apps/worker:
     dependencies:
-      '@autocontent/content-engine':
-        specifier: workspace:*
-        version: link:../../packages/content-engine
       '@autocontent/database':
         specifier: workspace:*
         version: link:../../packages/database
@@ -86,6 +86,9 @@ importers:
       '@autocontent/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@autocontent/verticals-core':
+        specifier: workspace:*
+        version: link:../../packages/verticals/core
 
   packages/config:
     dependencies:
@@ -95,12 +98,6 @@ importers:
       zod:
         specifier: ^4.1.0
         version: 4.6.5
-
-  packages/content-engine:
-    dependencies:
-      '@autocontent/shared':
-        specifier: workspace:*
-        version: link:../shared
 
   packages/contracts:
     dependencies:
@@ -198,6 +195,33 @@ importers:
       '@autocontent/templates':
         specifier: workspace:*
         version: link:../../templates
+      zod:
+        specifier: ^4.1.0
+        version: 4.6.5
+
+  packages/verticals/dealership:
+    dependencies:
+      '@autocontent/config':
+        specifier: workspace:*
+        version: link:../../config
+      '@autocontent/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@autocontent/database':
+        specifier: workspace:*
+        version: link:../../database
+      '@autocontent/providers':
+        specifier: workspace:*
+        version: link:../../providers
+      '@autocontent/shared':
+        specifier: workspace:*
+        version: link:../../shared
+      '@autocontent/templates':
+        specifier: workspace:*
+        version: link:../../templates
+      '@autocontent/verticals-core':
+        specifier: workspace:*
+        version: link:../core
       zod:
         specifier: ^4.1.0
         version: 4.6.5

@@ -5,15 +5,15 @@ import { randomBytes } from 'node:crypto';
 import { LocalDiskStorageProvider } from './storage/local-disk.js';
 import { S3StorageProvider } from './storage/s3.js';
 import type { StorageProvider } from './storage/types.js';
-import { MockVisionProvider } from './vision/mock.js';
 import type { VisionCapabilities, VisionProvider } from './vision/types.js';
 
 /**
- * Placeholder used when no real provider is configured: the app keeps running,
- * the status page shows NOT_CONFIGURED, and jobs fail fast with a clear,
+ * Placeholder used when no real provider is configured (or, since Phase 3b,
+ * when the current vertical has none of its own): the app keeps running, the
+ * status page shows NOT_CONFIGURED, and jobs fail fast with a clear,
  * non-retryable error instead of crashing.
  */
-export class UnconfiguredVisionProvider implements VisionProvider {
+export class UnconfiguredVisionProvider implements VisionProvider<never> {
   readonly kind = 'VISION' as const;
 
   constructor(
@@ -38,24 +38,6 @@ export class UnconfiguredVisionProvider implements VisionProvider {
   async testConnection(): Promise<ProviderStatus> {
     return { provider: this.name, state: 'NOT_CONFIGURED', detail: this.reason };
   }
-}
-
-/**
- * The only place that decides which vision implementation is used.
- * Phase 2 moves this behind a database-backed registry that resolves
- * per-organization overrides (APIProvider rows); callers don't change.
- */
-export function createVisionProvider(config: AppConfig): VisionProvider {
-  if (config.MOCK_MODE) {
-    return new MockVisionProvider({ latencyMs: config.MOCK_LATENCY_MS });
-  }
-  // Phase 4 plugs the real vision adapter in here when AI_API_KEY is set.
-  return new UnconfiguredVisionProvider(
-    'vision',
-    config.AI_API_KEY
-      ? 'Real vision provider not implemented yet (Phase 4). Set MOCK_MODE=true.'
-      : 'AI_API_KEY is not set',
-  );
 }
 
 /**

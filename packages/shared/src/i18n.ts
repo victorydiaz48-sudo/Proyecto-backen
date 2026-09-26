@@ -1,4 +1,4 @@
-import type { BodyType, FieldSource, MissingField, Segment } from './vehicle.js';
+import type { FieldSource } from './tagged-value.js';
 
 export const LOCALES = ['es', 'pt', 'en'] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -18,9 +18,6 @@ export interface Messages {
   imageTooBigDimensions: (maxPx: number) => string;
   imageInvalid: string;
   visionNotConfigured: string;
-  notAVehicle: string;
-  multipleVehicles: string;
-  unclearPhoto: string;
   jobFailed: string;
   access: {
     needInvite: string;
@@ -45,17 +42,12 @@ export interface Messages {
     year: string;
     approx: string;
     color: string;
-    bodyType: string;
-    segment: string;
     confidence: string;
     features: string;
     missing: string;
     unidentified: string;
   };
   sources: Record<FieldSource, string>;
-  bodyTypes: Record<BodyType, string>;
-  segments: Record<Segment, string>;
-  missingFields: Record<MissingField, string>;
 }
 
 const es: Messages = {
@@ -73,9 +65,6 @@ const es: Messages = {
   imageTooBigDimensions: (px) => `⚠️ La imagen tiene dimensiones demasiado grandes. Máximo ${px}px por lado.`,
   imageInvalid: '⚠️ No pude leer la imagen. Prueba a enviarla de nuevo.',
   visionNotConfigured: '⚠️ El análisis de imágenes no está configurado todavía. Avisa al administrador.',
-  notAVehicle: '🤔 No veo ningún vehículo en esta foto. Envía una foto del coche, por favor.',
-  multipleVehicles: '🚗🚗 Veo varios vehículos. Envía una foto con un solo coche, por favor.',
-  unclearPhoto: '📷 No puedo ver bien el vehículo. Prueba con una foto más clara, con buena luz y el coche completo.',
   jobFailed: '❌ No pude procesar la foto. Inténtalo de nuevo en unos minutos.',
   access: {
     needInvite: '🔒 Este bot es privado. Pide a tu concesionario un enlace de invitación y ábrelo para empezar.',
@@ -101,48 +90,12 @@ const es: Messages = {
     year: 'Año',
     approx: 'aprox.',
     color: 'Color',
-    bodyType: 'Carrocería',
-    segment: 'Segmento',
     confidence: 'Confianza',
     features: 'Detalles visibles',
     missing: 'Me falta',
     unidentified: 'Vehículo no identificado',
   },
   sources: { detected: 'detectado', inferred: 'inferido', 'user-provided': 'indicado por ti', unknown: 'desconocido' },
-  bodyTypes: {
-    sedan: 'Sedán',
-    hatchback: 'Hatchback',
-    suv: 'SUV',
-    crossover: 'Crossover',
-    pickup: 'Pickup',
-    coupe: 'Coupé',
-    convertible: 'Descapotable',
-    wagon: 'Familiar',
-    van: 'Furgoneta',
-    other: 'Otro',
-  },
-  segments: {
-    economy: 'Económico',
-    'mid-range': 'Gama media',
-    premium: 'Premium',
-    luxury: 'Lujo',
-    sport: 'Deportivo',
-    utility: 'Utilitario',
-  },
-  missingFields: {
-    make: 'marca',
-    model: 'modelo',
-    version: 'versión',
-    year: 'año',
-    color: 'color',
-    body_type: 'carrocería',
-    estimated_segment: 'segmento',
-    price: 'precio',
-    mileage: 'kilometraje',
-    location: 'ciudad',
-    contact: 'contacto',
-    financing: 'financiación (opcional)',
-  },
 };
 
 const pt: Messages = {
@@ -159,9 +112,6 @@ const pt: Messages = {
   imageTooBigDimensions: (px) => `⚠️ As dimensões da imagem são grandes demais. Máximo ${px}px por lado.`,
   imageInvalid: '⚠️ Não consegui ler a imagem. Tente enviar de novo.',
   visionNotConfigured: '⚠️ A análise de imagens ainda não está configurada. Avise o administrador.',
-  notAVehicle: '🤔 Não vejo nenhum veículo nesta foto. Envie uma foto do carro, por favor.',
-  multipleVehicles: '🚗🚗 Vejo vários veículos. Envie uma foto com um só carro, por favor.',
-  unclearPhoto: '📷 Não consigo ver bem o veículo. Tente uma foto mais nítida, com boa luz e o carro inteiro.',
   jobFailed: '❌ Não consegui processar a foto. Tente novamente em alguns minutos.',
   access: {
     needInvite: '🔒 Este bot é privado. Peça à sua concessionária um link de convite e abra-o para começar.',
@@ -187,48 +137,12 @@ const pt: Messages = {
     year: 'Ano',
     approx: 'aprox.',
     color: 'Cor',
-    bodyType: 'Carroceria',
-    segment: 'Segmento',
     confidence: 'Confiança',
     features: 'Detalhes visíveis',
     missing: 'Falta',
     unidentified: 'Veículo não identificado',
   },
   sources: { detected: 'detectado', inferred: 'inferido', 'user-provided': 'informado por você', unknown: 'desconhecido' },
-  bodyTypes: {
-    sedan: 'Sedã',
-    hatchback: 'Hatch',
-    suv: 'SUV',
-    crossover: 'Crossover',
-    pickup: 'Picape',
-    coupe: 'Cupê',
-    convertible: 'Conversível',
-    wagon: 'Perua',
-    van: 'Van',
-    other: 'Outro',
-  },
-  segments: {
-    economy: 'Econômico',
-    'mid-range': 'Intermediário',
-    premium: 'Premium',
-    luxury: 'Luxo',
-    sport: 'Esportivo',
-    utility: 'Utilitário',
-  },
-  missingFields: {
-    make: 'marca',
-    model: 'modelo',
-    version: 'versão',
-    year: 'ano',
-    color: 'cor',
-    body_type: 'carroceria',
-    estimated_segment: 'segmento',
-    price: 'preço',
-    mileage: 'quilometragem',
-    location: 'cidade',
-    contact: 'contato',
-    financing: 'financiamento (opcional)',
-  },
 };
 
 const en: Messages = {
@@ -245,9 +159,6 @@ const en: Messages = {
   imageTooBigDimensions: (px) => `⚠️ The image dimensions are too large. Maximum ${px}px per side.`,
   imageInvalid: '⚠️ I could not read the image. Please send it again.',
   visionNotConfigured: '⚠️ Image analysis is not configured yet. Please tell your administrator.',
-  notAVehicle: '🤔 I can’t see a vehicle in this photo. Please send a photo of the car.',
-  multipleVehicles: '🚗🚗 I can see several vehicles. Please send a photo with just one car.',
-  unclearPhoto: '📷 I can’t see the vehicle clearly. Try a sharper photo, with good light and the whole car in view.',
   jobFailed: '❌ I could not process the photo. Please try again in a few minutes.',
   access: {
     needInvite: '🔒 This bot is private. Ask your organization for an invite link and open it to get started.',
@@ -273,48 +184,12 @@ const en: Messages = {
     year: 'Year',
     approx: 'approx.',
     color: 'Color',
-    bodyType: 'Body',
-    segment: 'Segment',
     confidence: 'Confidence',
     features: 'Visible details',
     missing: 'Still needed',
     unidentified: 'Vehicle not identified',
   },
   sources: { detected: 'detected', inferred: 'inferred', 'user-provided': 'provided by you', unknown: 'unknown' },
-  bodyTypes: {
-    sedan: 'Sedan',
-    hatchback: 'Hatchback',
-    suv: 'SUV',
-    crossover: 'Crossover',
-    pickup: 'Pickup',
-    coupe: 'Coupe',
-    convertible: 'Convertible',
-    wagon: 'Wagon',
-    van: 'Van',
-    other: 'Other',
-  },
-  segments: {
-    economy: 'Economy',
-    'mid-range': 'Mid-range',
-    premium: 'Premium',
-    luxury: 'Luxury',
-    sport: 'Sport',
-    utility: 'Utility',
-  },
-  missingFields: {
-    make: 'make',
-    model: 'model',
-    version: 'trim',
-    year: 'year',
-    color: 'color',
-    body_type: 'body type',
-    estimated_segment: 'segment',
-    price: 'price',
-    mileage: 'mileage',
-    location: 'city',
-    contact: 'contact',
-    financing: 'financing (optional)',
-  },
 };
 
 const MESSAGES: Record<Locale, Messages> = { es, pt, en };

@@ -1,4 +1,4 @@
-import type { Prisma } from '@autocontent/database';
+import type { Prisma, PrismaClient } from '@autocontent/database';
 import type { ProviderCallOptions, ProviderResult, VisionInput } from '@autocontent/providers';
 import type { Locale } from '@autocontent/shared';
 
@@ -25,6 +25,17 @@ export interface JobSubjectRef {
  * `TAnalysis` is the module's own AI-output shape (e.g. dealership's
  * VehicleAnalysis) — core never needs to know its fields.
  */
+/** A stored original photo, in the module's own image cache/table. */
+export interface SubjectImage<TAnalysis> {
+  imageId: string;
+  storageKey: string;
+  mime: string;
+  width: number;
+  height: number;
+  sha256: string;
+  analysis: TAnalysis | null;
+}
+
 export interface WorkflowHooks<TAnalysis = unknown> {
   /**
    * Create (or find) the module's own entity for a brand-new job, inside the
@@ -37,14 +48,60 @@ export interface WorkflowHooks<TAnalysis = unknown> {
    * The module's analyzer, if it has one (a vertical with no photo-analysis
    * step, e.g. a scheduling-only module, omits this). Same call shape as
    * VisionProvider.analyze(), generic over the module's own output type.
+   * Not currently called by the worker shell — vision stays its own injected
+   * dependency (see apps/worker) — kept here for a future step that resolves
+   * the analyzer through the module instead.
    */
   analyze?(input: VisionInput, opts: ProviderCallOptions): Promise<ProviderResult<TAnalysis>>;
 
   /**
-   * Persist analysis results onto the module's own entity. Replaces today's
-   * vehicleUpdateFromAnalysis(); must never overwrite a user-provided fact.
+   * Resume support: the original photo already stored for this subject, if
+   * any (a retried or stalled job). Replaces today's direct
+   * `db.vehicleImage.findFirst({ vehicleId })`.
    */
-  onAnalysisComplete(ctx: { subject: JobSubjectRef; analysis: TAnalysis; tx: Prisma.TransactionClient }): Promise<void>;
+  getStoredImage(ctx: { subject: JobSubjectRef; organizationId: string; prisma: PrismaClient }): Promise<SubjectImage<TAnalysis> | null>;
+
+  /**
+   * Records a freshly downloaded+validated+stored photo on the module's own
+   * table. If an identical photo (by hash) was already analysed for this
+   * organization by the same provider, returns that analysis for reuse so
+   * the caller can skip a provider call — replaces today's
+   * `db.vehicleImage.findFirst({ sha256, analyzedAt: { not: null } })`.
+   */
+  storeImage(ctx: {
+    subject: JobSubjectRef;
+    organizationId: string;
+    storageKey: string;
+    mime: string;
+    width: number;
+    height: number;
+    bytes: number;
+    sha256: string;
+    providerName: string;
+    prisma: PrismaClient;
+  }): Promise<{ imageId: string; reusedAnalysis: TAnalysis | null }>;
+
+  /**
+   * Persist a freshly computed (or reused) analysis onto the module's stored
+   * image and its own entity. Replaces today's vehicleUpdateFromAnalysis()
+   * and the VehicleImage.analysis write; must never overwrite a
+   * user-provided fact.
+   */
+  onAnalysisComplete(ctx: { subject: JobSubjectRef; imageId: string; analysis: TAnalysis; providerName: string; tx: Prisma.TransactionClient }): Promise<void>;
+
+  /**
+   * Whether this analysis is usable at all (e.g. dealership: the photo shows
+   * a single vehicle). Absent = always usable. On `usable: false`, core tells
+   * the user `reasonKey` (a key into the module's own message fragment) and
+   * stops the job before generating anything.
+   */
+  isSubjectUsable?(analysis: TAnalysis): { usable: true } | { usable: false; reasonKey: string };
+
+  /** User-facing text for an `isSubjectUsable` rejection reasonKey, in the module's own locales. */
+  describeUnusableReason?(reasonKey: string, locale: Locale): string;
+
+  /** Called once when `isSubjectUsable` says no, so the module can archive/close its own entity. Absent = no-op. */
+  markSubjectUnusable?(ctx: { subject: JobSubjectRef; prisma: PrismaClient }): Promise<void>;
 
   /** What's still missing after analysis, in the module's own vocabulary. */
   computeMissingInformation(analysis: TAnalysis): string[];
@@ -54,4 +111,7 @@ export interface WorkflowHooks<TAnalysis = unknown> {
 
   /** Ready-to-post copy. Replaces content-engine's generateCaption() call site. */
   generateCaption(analysis: TAnalysis, locale: Locale): { text: string; usedFields: string[] };
+
+  /** Small, secret-free summary for GenerationLog.outputSummary and structured logs. Absent = {}. */
+  describeAnalysisForLog?(analysis: TAnalysis): Record<string, unknown>;
 }

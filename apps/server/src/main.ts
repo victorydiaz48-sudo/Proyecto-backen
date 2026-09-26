@@ -5,13 +5,13 @@ import {
   createFileFetcher,
   createNotifier,
   createStorageProvider,
-  createVisionProvider,
   type ProviderStatus,
 } from '@autocontent/providers';
 import { createQueue, type Queue } from '@autocontent/queue';
 import { CONTENT_JOBS_QUEUE, createLogger, redactSecrets, type ContentJobPayload, type Logger } from '@autocontent/shared';
 import { WEBHOOK_PATH, createBot, createHttpServer, createUnconfiguredBot } from '@autocontent/telegram';
 import type { HealthReport } from '@autocontent/telegram';
+import { createDealershipVisionProvider, dealershipModule } from '@autocontent/verticals-dealership';
 import { createContentJobProcessor } from '@autocontent/worker';
 import { Api, type Bot } from 'grammy';
 
@@ -88,7 +88,11 @@ async function main() {
   const runBot = config.SERVICE === 'all' || config.SERVICE === 'telegram';
   const runWorker = config.SERVICE === 'all' || config.SERVICE === 'worker';
   const token = config.TELEGRAM_BOT_TOKEN;
-  const vision = createVisionProvider(config);
+  // Every organization is enrolled in the dealership vertical for now (seed() does
+  // this); a future phase resolves the vertical per-organization through the
+  // VerticalRegistry instead of this single hardcoded module.
+  const vertical = dealershipModule;
+  const vision = createDealershipVisionProvider(config);
   const visionStatus = await vision.testConnection();
   const limits = { maxBytes: config.MAX_IMAGE_BYTES, minDimension: config.MIN_IMAGE_DIMENSION, maxDimension: config.MAX_IMAGE_DIMENSION };
   const commands = [
@@ -170,6 +174,7 @@ async function main() {
         prisma,
         storage,
         vision,
+        vertical,
         notifier: createNotifier(api),
         files: createFileFetcher(api, token),
         limits,

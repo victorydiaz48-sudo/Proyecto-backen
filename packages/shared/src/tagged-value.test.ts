@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { deterministicJobId } from './ids.js';
-import { taggedSchema } from './vehicle.js';
+import { taggedSchema } from './tagged-value.js';
 import { z } from 'zod';
 
 describe('tagged fields', () => {

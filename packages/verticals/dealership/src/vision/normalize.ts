@@ -1,30 +1,8 @@
-import {
-  BODY_TYPES,
-  IMAGE_QUALITY_ISSUES,
-  PHOTO_SUBJECTS,
-  ProviderResponseError,
-  SEGMENTS,
-  computeMissingInformation,
-  vehicleAnalysisSchema,
-  type FieldSource,
-  type Tagged,
-  type VehicleAnalysis,
-} from '@autocontent/shared';
+import { ProviderResponseError } from '@autocontent/shared';
+import { VISION_POLICY, applyPolicy, clamp01, oneOf, text, year } from '@autocontent/providers';
+import { PHOTO_SUBJECTS, IMAGE_QUALITY_ISSUES } from '@autocontent/shared';
 import { z } from 'zod';
-
-/**
- * Shared confidence policy applied to every vision provider's output, so
- * swapping providers never changes what counts as "detected".
- */
-export const VISION_POLICY = {
-  /** Below this, a "detected" field is downgraded to "inferred". */
-  minDetectedConfidence: 0.6,
-  /** Below this, an "inferred" field is dropped to "unknown". */
-  minInferredConfidence: 0.4,
-  minYear: 1950,
-  maxFeatures: 12,
-  maxDetails: 12,
-} as const;
+import { BODY_TYPES, SEGMENTS, computeMissingInformation, vehicleAnalysisSchema, type VehicleAnalysis } from '../entities/vehicle-analysis.js';
 
 /** Lenient shape an adapter maps the vendor's response into. */
 const rawTagged = z
@@ -51,45 +29,6 @@ export const visionCandidateSchema = z.object({
 });
 export type VisionCandidate = z.input<typeof visionCandidateSchema>;
 
-const clamp01 = (n: number | undefined) => (n === undefined || Number.isNaN(n) ? undefined : Math.min(1, Math.max(0, n)));
-
-const unknownField = <T>(): Tagged<T> => ({ value: null, source: 'unknown' });
-
-function applyPolicy<T>(value: T | null, rawSource: string | undefined, rawConfidence: number | undefined): Tagged<T> {
-  if (value === null) return unknownField();
-  const confidence = clamp01(rawConfidence);
-  // A vision model can only see or guess; it can never claim "user-provided".
-  let source: FieldSource = rawSource === 'detected' ? 'detected' : rawSource === 'unknown' ? 'unknown' : 'inferred';
-  if (source === 'unknown') return unknownField();
-  if (source === 'detected' && confidence !== undefined && confidence < VISION_POLICY.minDetectedConfidence) {
-    source = 'inferred';
-  }
-  if (source === 'inferred' && confidence !== undefined && confidence < VISION_POLICY.minInferredConfidence) {
-    return unknownField();
-  }
-  return confidence === undefined ? { value, source } : { value, source, confidence };
-}
-
-function text(v: unknown): string | null {
-  if (typeof v !== 'string') return null;
-  const t = v.trim().replace(/\s+/g, ' ');
-  return t.length > 0 && t.length <= 120 ? t : null;
-}
-
-function oneOf<T extends string>(allowed: readonly T[], v: unknown): T | null {
-  if (typeof v !== 'string') return null;
-  const k = v.trim().toLowerCase().replace(/[\s_]+/g, '-');
-  const hit = allowed.find((a) => a === k || a.replace(/-/g, '') === k.replace(/-/g, ''));
-  return hit ?? null;
-}
-
-function year(v: unknown): number | null {
-  const n = typeof v === 'string' ? Number.parseInt(v, 10) : v;
-  if (typeof n !== 'number' || !Number.isInteger(n)) return null;
-  const max = new Date().getUTCFullYear() + 1;
-  return n >= VISION_POLICY.minYear && n <= max ? n : null;
-}
-
 /**
  * Turn an adapter's mapped vendor output into a contract-valid
  * VehicleAnalysis: applies the confidence policy, drops invalid values to
@@ -104,7 +43,7 @@ export function normalizeVisionOutput(raw: unknown, provider: string): VehicleAn
     throw new ProviderResponseError(provider, `Output is not a vehicle analysis: ${parsed.error.issues[0]?.message}`);
   }
   const c = parsed.data;
-  const field = <T>(f: (typeof c)['make'], coerce: (v: unknown) => T | null): Tagged<T> =>
+  const field = <T>(f: (typeof c)['make'], coerce: (v: unknown) => T | null) =>
     applyPolicy(coerce(f?.value), f?.source, f?.confidence);
 
   const subject = oneOf(PHOTO_SUBJECTS.map((s) => s.replace(/_/g, '-')), c.subject)?.replace(/-/g, '_') as

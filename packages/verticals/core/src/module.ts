@@ -36,6 +36,8 @@ export interface VerticalModule<TConfig = unknown, TAnalysis = unknown> {
 
   readonly entities: EntitySchema[];
   readonly workflow: WorkflowHooks<TAnalysis>;
+  /** Storage key path segment for this module's subject photos, e.g. "vehicles" (see storageKey() in @autocontent/providers). */
+  readonly storagePathSegment: string;
   /** Absent for verticals with no AI-driven copy generation step. */
   readonly prompts?: PromptProvider;
   readonly contentTemplates: ContentTemplateSet;

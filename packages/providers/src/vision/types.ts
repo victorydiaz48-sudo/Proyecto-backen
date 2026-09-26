@@ -1,4 +1,4 @@
-import type { Locale, VehicleAnalysis } from '@autocontent/shared';
+import type { Locale } from '@autocontent/shared';
 import type { TestableProvider } from '../status.js';
 import type { ProviderCallOptions, ProviderResult } from '../types.js';
 
@@ -32,20 +32,23 @@ export interface VisionInput {
    * Facts the user already gave. Only for consistency (e.g. to flag a mismatch);
    * the provider must not copy them into its output as if it saw them.
    */
-  knownFacts?: Partial<{ make: string; model: string; version: string; year: number }>;
+  knownFacts?: Record<string, string | number>;
 }
 
 /**
- * Vehicle recognition contract. What an implementation MUST do:
+ * Photo-recognition contract, generic over the vertical's own analysis shape
+ * `TOutput` (dealership's is `VehicleAnalysis`; core has no opinion on it).
+ * What an implementation MUST do:
  *
- *  1. Return `data` that passes `vehicleAnalysisSchema`: every field tagged
- *     detected / inferred / unknown, and `unknown` exactly when value is null.
- *     Build the result with `normalizeVisionOutput()` so every adapter applies
- *     the same confidence policy and missing-information rules.
+ *  1. Return `data` that passes the vertical's own analysis schema: every
+ *     field tagged detected / inferred / unknown, and `unknown` exactly when
+ *     value is null. Build the result with the vertical's own normalizer so
+ *     every adapter applies the same confidence policy (see
+ *     `@autocontent/providers`'s `VISION_POLICY`/`applyPolicy`) and
+ *     missing-information rules.
  *  2. Never populate user-only facts (price, mileage, history, engine power,
- *     warranty, specs). The schema has no fields for them; do not smuggle them
- *     into visual_features or visible_details.
- *  3. Set `subject` honestly ('not_vehicle', 'multiple_vehicles', 'unclear'):
+ *     warranty, specs). Do not smuggle them into free-text fields.
+ *  3. Set the subject honestly (not-the-expected-thing, multiple, unclear):
  *     the pipeline stops there, before any further spend.
  *  4. Take prompts from the versioned prompt registry, never inline strings.
  *  5. Throw the typed errors from @autocontent/shared:
@@ -60,11 +63,11 @@ export interface VisionInput {
  *  8. Receive credentials through its constructor only; never log them or
  *     return them.
  *
- * Every adapter must pass `describeVisionProviderContract()` from
- * `@autocontent/providers/testing`.
+ * Every adapter must pass its vertical's `describeVisionProviderContract()`
+ * (dealership's lives in `@autocontent/verticals-dealership/testing`).
  */
-export interface VisionProvider extends TestableProvider {
+export interface VisionProvider<TOutput = unknown> extends TestableProvider {
   readonly kind: 'VISION';
   capabilities(): VisionCapabilities;
-  analyze(input: VisionInput, opts: ProviderCallOptions): Promise<ProviderResult<VehicleAnalysis>>;
+  analyze(input: VisionInput, opts: ProviderCallOptions): Promise<ProviderResult<TOutput>>;
 }

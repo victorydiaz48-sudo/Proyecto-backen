@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { generateCaption } from '@autocontent/content-engine';
 import {
   Prisma,
   forOrganization,
@@ -7,9 +6,7 @@ import {
   incrementUsage,
   recordProviderCall,
   settingsSnapshotSchema,
-  type BodyType as DbBodyType,
   type PrismaClient,
-  type Segment as DbSegment,
   type SettingsSnapshot,
 } from '@autocontent/database';
 import {
@@ -22,6 +19,7 @@ import {
   type VisionProvider,
 } from '@autocontent/providers';
 import type { FinalFailureHandler, JobContext, JobHandler } from '@autocontent/queue';
+import type { JobSubjectRef, VerticalModule } from '@autocontent/verticals-core';
 import {
   ImageValidationError,
   LogEvent,
@@ -30,21 +28,19 @@ import {
   escapeHtml,
   messages,
   validateImage,
-  vehicleAnalysisSchema,
   type ContentJobPayload,
   type ImageLimits,
   type Locale,
-  type VehicleAnalysis,
 } from '@autocontent/shared';
-import { formatAnalysis } from './format.js';
 
 export { CONTENT_JOBS_QUEUE, type ContentJobPayload } from '@autocontent/shared';
 export const CAPTION_FORMAT = 'instagram_caption';
 
-export interface WorkerDeps {
+export interface WorkerDeps<TAnalysis = unknown> {
   prisma: PrismaClient;
   storage: StorageProvider;
-  vision: VisionProvider;
+  vision: VisionProvider<TAnalysis>;
+  vertical: VerticalModule<unknown, TAnalysis>;
   notifier: ChatNotifier;
   files: TelegramFileFetcher;
   limits: ImageLimits;
@@ -56,36 +52,6 @@ export interface WorkerDeps {
 const FINISHED = ['COMPLETED', 'PARTIALLY_COMPLETED', 'CANCELLED', 'FAILED'] as const;
 
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
-
-const toDbEnum = (v: string) => v.toUpperCase().replace(/-/g, '_');
-
-/** Vehicle columns + provenance from an analysis. Never overwrites user-provided facts. */
-function vehicleUpdateFromAnalysis(a: VehicleAnalysis, currentProvenance: unknown): Prisma.VehicleUpdateInput {
-  const prov = (currentProvenance ?? {}) as Record<string, { source: string } | undefined>;
-  const userProvided = (k: string) => prov[k]?.source === 'user-provided';
-  const data: Prisma.VehicleUpdateInput = {};
-  const nextProv: Record<string, unknown> = { ...prov };
-  const set = <K extends 'make' | 'model' | 'version' | 'year' | 'color' | 'body_type' | 'estimated_segment'>(
-    field: K,
-    column: 'make' | 'model' | 'version' | 'year' | 'color' | 'bodyType' | 'segment',
-    map: (v: NonNullable<VehicleAnalysis[K]['value']>) => unknown = (v) => v,
-  ) => {
-    if (userProvided(field)) return;
-    const f = a[field];
-    (data as Record<string, unknown>)[column] = f.value === null ? null : map(f.value as NonNullable<VehicleAnalysis[K]['value']>);
-    nextProv[field] = f.confidence === undefined ? { source: f.source } : { source: f.source, confidence: f.confidence };
-  };
-  set('make', 'make');
-  set('model', 'model');
-  set('version', 'version');
-  set('year', 'year');
-  set('color', 'color');
-  set('body_type', 'bodyType', (v) => toDbEnum(v) as DbBodyType);
-  set('estimated_segment', 'segment', (v) => toDbEnum(v) as DbSegment);
-  data.provenance = nextProv as Prisma.InputJsonObject;
-  data.visualFeatures = a.visual_features as unknown as Prisma.InputJsonArray;
-  return data;
-}
 
 function failureText(err: unknown, locale: Locale, limits: ImageLimits): string {
   const m = messages(locale);
@@ -112,29 +78,38 @@ function failureText(err: unknown, locale: Locale, limits: ImageLimits): string 
  *
  * Every step checks the database before acting, so a retried or stalled job
  * resumes where it stopped:
- *  - ingest: skipped if the vehicle already has its original image stored
+ *  - ingest: skipped if the subject already has its original image stored
+ *    (`WorkflowHooks.getStoredImage`)
  *  - analysis: skipped if the image was analysed; an identical photo analysed
  *    before in the same organization is reused without calling (or paying) the
- *    provider again; provider calls are logged/charged once per attempt key
+ *    provider again (`WorkflowHooks.storeImage`'s `reusedAnalysis`); provider
+ *    calls are logged/charged once per attempt key
  *  - caption: one ContentAsset per (job, format, version)
  *  - delivery: analysisDeliveredAt / deliveredAt mark what was sent
  *    (at-least-once: a crash between sending and marking can repeat a message)
+ *
+ * This shell knows nothing about any particular vertical's own tables — every
+ * step that used to touch `db.vehicle.*`/`db.vehicleImage.*` directly now
+ * goes through `deps.vertical.workflow` (docs/phase-3-design.md §7.2, §14 3b).
  */
-export function createContentJobProcessor(deps: WorkerDeps): {
+export function createContentJobProcessor<TAnalysis = unknown>(deps: WorkerDeps<TAnalysis>): {
   handler: JobHandler<ContentJobPayload>;
   onFinalFailure: FinalFailureHandler<ContentJobPayload>;
 } {
   const now = deps.now ?? (() => new Date());
+  const workflow = deps.vertical.workflow;
 
   const handler = async (p: ContentJobPayload, ctx: JobContext) => {
     const log = ctx.logger.child({ organizationId: p.organizationId });
     const db = forOrganization(deps.prisma, p.organizationId);
-    const job = await db.contentJob.findUnique({ where: { id: p.contentJobId }, include: { vehicle: true } });
+    const job = await db.contentJob.findUnique({ where: { id: p.contentJobId } });
     if (!job) {
       log.warn('content job not found (deleted?)');
       return;
     }
     if ((FINISHED as readonly string[]).includes(job.status)) return;
+    if (!job.subjectType || !job.subjectId) throw new NonRetryableError('Job has no subject reference');
+    const subject: JobSubjectRef = { subjectType: job.subjectType, subjectId: job.subjectId };
 
     const snap: SettingsSnapshot = settingsSnapshotSchema.parse(job.settingsSnapshot);
     const locale = snap.locale;
@@ -148,154 +123,152 @@ export function createContentJobProcessor(deps: WorkerDeps): {
 
     try {
       // ── 1. Ingest the original photo ────────────────────────────────────
-      let image = await db.vehicleImage.findFirst({ where: { vehicleId: job.vehicleId }, orderBy: { createdAt: 'asc' } });
+      const stored = await workflow.getStoredImage({ subject, organizationId: p.organizationId, prisma: deps.prisma });
+      let imageId: string;
+      let storedKey: string;
+      let mime: string;
+      let width: number;
+      let height: number;
+      let sha256: string;
       let bytes: Uint8Array;
-      if (!image) {
+      let analysis: TAnalysis | null;
+
+      if (stored) {
+        imageId = stored.imageId;
+        storedKey = stored.storageKey;
+        mime = stored.mime;
+        width = stored.width;
+        height = stored.height;
+        sha256 = stored.sha256;
+        analysis = stored.analysis;
+        bytes = await deps.storage.get(storedKey);
+      } else {
         if (!job.telegramFileId) throw new NonRetryableError('Job has no source image');
         bytes = await deps.files.download(job.telegramFileId, deps.limits.maxBytes);
         const v = validateImage(bytes, deps.limits);
-        const sha256 = createHash('sha256').update(bytes).digest('hex');
-        const key = storageKey(p.organizationId, 'vehicles', job.vehicleId, 'originals', `${sha256}.${EXT[v.mime]}`);
-        await deps.storage.put(key, bytes, { mime: v.mime, sha256 });
-        image = await db.vehicleImage.upsert({
-          where: { storageKey: key },
-          create: {
-            organizationId: p.organizationId,
-            vehicleId: job.vehicleId,
-            storageKey: key,
-            mime: v.mime,
-            width: v.width,
-            height: v.height,
-            bytes: v.bytes,
-            sha256,
-          },
-          update: {},
+        sha256 = createHash('sha256').update(bytes).digest('hex');
+        storedKey = storageKey(p.organizationId, deps.vertical.storagePathSegment, subject.subjectId, 'originals', `${sha256}.${EXT[v.mime]}`);
+        await deps.storage.put(storedKey, bytes, { mime: v.mime, sha256 });
+        mime = v.mime;
+        width = v.width;
+        height = v.height;
+        const res = await workflow.storeImage({
+          subject,
+          organizationId: p.organizationId,
+          storageKey: storedKey,
+          mime: v.mime,
+          width: v.width,
+          height: v.height,
+          bytes: v.bytes,
+          sha256,
+          providerName: deps.vision.name,
+          prisma: deps.prisma,
         });
-        await db.vehicle.update({ where: { id: job.vehicleId }, data: { primaryImageId: image.id } });
+        imageId = res.imageId;
+        analysis = res.reusedAnalysis;
+        if (analysis) log.info('analysis reused from an identical photo; no provider call', { event: LogEvent.IMAGE_ANALYZED });
         log.info('image stored', { event: LogEvent.IMAGE_RECEIVED, mime: v.mime, width: v.width, height: v.height, bytes: v.bytes });
-      } else {
-        bytes = await deps.storage.get(image.storageKey);
       }
 
       // ── 2. Analyse ──────────────────────────────────────────────────────
       await db.contentJob.update({ where: { id: job.id }, data: { stage: 'ANALYSIS' } });
-      let analysis: VehicleAnalysis | null = image.analysis ? vehicleAnalysisSchema.parse(image.analysis) : null;
 
       if (!analysis) {
-        const prior = await db.vehicleImage.findFirst({
-          where: { sha256: image.sha256, id: { not: image.id }, analyzedAt: { not: null } },
-          orderBy: { analyzedAt: 'desc' },
-        });
-        const priorAnalysis = prior?.analysis ? vehicleAnalysisSchema.safeParse(prior.analysis) : null;
-        if (priorAnalysis?.success && priorAnalysis.data.provider === deps.vision.name) {
-          analysis = priorAnalysis.data;
-          log.info('analysis reused from an identical photo; no provider call', { event: LogEvent.IMAGE_ANALYZED, reusedFrom: prior!.id });
-        } else {
-          const t0 = Date.now();
-          const attemptKey = `${job.id}:vision:${ctx.attempt}`;
-          const provider = await deps.prisma.aPIProvider.findFirst({ where: { organizationId: null, adapter: deps.vision.name } });
-          try {
-            const res = await deps.vision.analyze(
-              {
-                images: [{ bytes, mime: image.mime as 'image/jpeg' | 'image/png' | 'image/webp', width: image.width, height: image.height, sha256: image.sha256 }],
-                locale,
-              },
-              {
-                jobId: job.id,
-                organizationId: p.organizationId,
-                idempotencyKey: attemptKey,
-                signal: AbortSignal.timeout(deps.visionTimeoutMs ?? 60_000),
-                logger: log,
-              },
-            );
-            analysis = res.data;
-            const cost = provider ? computeCostMicros(costConfigSchema.parse(provider.costConfig), res.usage) : { totalMicros: 0n, unpriced: res.usage };
-            if (cost.unpriced.length > 0) log.warn('provider usage has no configured price', { adapter: deps.vision.name, unpriced: cost.unpriced });
-            const units = res.usage.reduce((s, u) => s + u.units, 0);
-            await deps.prisma.$transaction(async (tx) => {
-              await recordProviderCall(tx, {
+        const t0 = Date.now();
+        const attemptKey = `${job.id}:vision:${ctx.attempt}`;
+        const provider = await deps.prisma.aPIProvider.findFirst({ where: { organizationId: null, adapter: deps.vision.name } });
+        try {
+          const res = await deps.vision.analyze(
+            {
+              images: [{ bytes, mime: mime as 'image/jpeg' | 'image/png' | 'image/webp', width, height, sha256 }],
+              locale,
+            },
+            {
+              jobId: job.id,
+              organizationId: p.organizationId,
+              idempotencyKey: attemptKey,
+              signal: AbortSignal.timeout(deps.visionTimeoutMs ?? 60_000),
+              logger: log,
+            },
+          );
+          analysis = res.data;
+          const cost = provider ? computeCostMicros(costConfigSchema.parse(provider.costConfig), res.usage) : { totalMicros: 0n, unpriced: res.usage };
+          if (cost.unpriced.length > 0) log.warn('provider usage has no configured price', { adapter: deps.vision.name, unpriced: cost.unpriced });
+          const units = res.usage.reduce((s, u) => s + u.units, 0);
+          await deps.prisma.$transaction(async (tx) => {
+            await recordProviderCall(tx, {
+              organizationId: p.organizationId,
+              contentJobId: job.id,
+              providerId: provider?.id,
+              adapter: deps.vision.name,
+              operation: 'VISION_ANALYZE',
+              model: res.model,
+              status: 'SUCCESS',
+              attempt: ctx.attempt,
+              latencyMs: res.latencyMs,
+              units,
+              unitType: res.usage[0]?.unitType,
+              costMicros: cost.totalMicros,
+              outputSummary: (workflow.describeAnalysisForLog?.(res.data) ?? {}) as Prisma.InputJsonValue,
+              idempotencyKey: attemptKey,
+              usageMetric: 'VISION_CALLS',
+              timezone: snap.timezone,
+              now: now(),
+            });
+          });
+          log.info('image analyzed', {
+            event: LogEvent.IMAGE_ANALYZED,
+            provider: deps.vision.name,
+            model: res.model,
+            durationMs: Date.now() - t0,
+            costMicros: cost.totalMicros.toString(),
+            ...workflow.describeAnalysisForLog?.(res.data),
+          });
+        } catch (err) {
+          await deps.prisma
+            .$transaction((tx) =>
+              recordProviderCall(tx, {
                 organizationId: p.organizationId,
                 contentJobId: job.id,
                 providerId: provider?.id,
                 adapter: deps.vision.name,
                 operation: 'VISION_ANALYZE',
-                model: res.model,
-                status: 'SUCCESS',
+                status: (err as Error)?.name === 'ProviderTimeoutError' || (err as Error)?.name === 'TimeoutError' ? 'TIMEOUT' : (err as Error)?.name === 'ProviderRateLimitError' ? 'RATE_LIMITED' : 'ERROR',
+                errorCode: (err as Error)?.name,
+                errorMessage: (err as Error)?.message,
                 attempt: ctx.attempt,
-                latencyMs: res.latencyMs,
-                units,
-                unitType: res.usage[0]?.unitType,
-                costMicros: cost.totalMicros,
-                outputSummary: { subject: res.data.subject, confidence: res.data.confidence, make: res.data.make.value, model: res.data.model.value },
+                latencyMs: Date.now() - t0,
+                costMicros: 0n,
                 idempotencyKey: attemptKey,
-                usageMetric: 'VISION_CALLS',
                 timezone: snap.timezone,
-                now: now(),
-              });
-              await tx.vehicleImage.update({
-                where: { id: image!.id },
-                data: { analysis: res.data as unknown as Prisma.InputJsonObject, analyzedBy: deps.vision.name, analyzedAt: now() },
-              });
-            });
-            log.info('image analyzed', {
-              event: LogEvent.IMAGE_ANALYZED,
-              provider: deps.vision.name,
-              model: res.model,
-              durationMs: Date.now() - t0,
-              costMicros: cost.totalMicros.toString(),
-              subject: res.data.subject,
-              confidence: res.data.confidence,
-            });
-          } catch (err) {
-            await deps.prisma
-              .$transaction((tx) =>
-                recordProviderCall(tx, {
-                  organizationId: p.organizationId,
-                  contentJobId: job.id,
-                  providerId: provider?.id,
-                  adapter: deps.vision.name,
-                  operation: 'VISION_ANALYZE',
-                  status: (err as Error)?.name === 'ProviderTimeoutError' || (err as Error)?.name === 'TimeoutError' ? 'TIMEOUT' : (err as Error)?.name === 'ProviderRateLimitError' ? 'RATE_LIMITED' : 'ERROR',
-                  errorCode: (err as Error)?.name,
-                  errorMessage: (err as Error)?.message,
-                  attempt: ctx.attempt,
-                  latencyMs: Date.now() - t0,
-                  costMicros: 0n,
-                  idempotencyKey: attemptKey,
-                  timezone: snap.timezone,
-                }),
-              )
-              .catch((logErr: unknown) => log.warn('could not record failed provider call', { err: logErr }));
-            throw err;
-          }
-        }
-        if (!image.analysis) {
-          await db.vehicleImage.update({
-            where: { id: image.id },
-            data: { analysis: analysis as unknown as Prisma.InputJsonObject, analyzedBy: analysis.provider, analyzedAt: now() },
-          });
+              }),
+            )
+            .catch((logErr: unknown) => log.warn('could not record failed provider call', { err: logErr }));
+          throw err;
         }
       }
-      // Always (re)applied: idempotent, never overwrites user-provided facts, and
-      // repairs a vehicle left without identity if a previous attempt crashed
-      // right after the analysis was saved.
-      await db.vehicle.update({ where: { id: job.vehicleId }, data: vehicleUpdateFromAnalysis(analysis, job.vehicle.provenance) });
 
-      // Not a usable vehicle photo: tell the user and stop before generating anything.
-      if (analysis.subject !== 'vehicle') {
+      // Always (re)applied: idempotent, never overwrites user-provided facts, and
+      // repairs a subject left without identity if a previous attempt crashed
+      // right after the analysis was saved.
+      await deps.prisma.$transaction((tx) => workflow.onAnalysisComplete({ subject, imageId, analysis: analysis as TAnalysis, providerName: deps.vision.name, tx }));
+
+      // Not a usable photo for this vertical: tell the user and stop before generating anything.
+      const usable = workflow.isSubjectUsable?.(analysis) ?? { usable: true as const };
+      if (!usable.usable) {
         if (!job.analysisDeliveredAt && chatId !== null) {
-          const text = analysis.subject === 'not_vehicle' ? m.notAVehicle : analysis.subject === 'multiple_vehicles' ? m.multipleVehicles : m.unclearPhoto;
+          const text = workflow.describeUnusableReason?.(usable.reasonKey, locale) ?? m.jobFailed;
           await deps.notifier.sendText(chatId, text);
           await db.contentJob.update({ where: { id: job.id }, data: { analysisDeliveredAt: now() } });
         }
-        await db.vehicle.update({ where: { id: job.vehicleId }, data: { status: 'ARCHIVED' } });
+        await workflow.markSubjectUnusable?.({ subject, prisma: deps.prisma });
         await complete(job.id);
         return;
       }
 
       // ── 3. Copy ─────────────────────────────────────────────────────────
       await db.contentJob.update({ where: { id: job.id }, data: { stage: 'COPY' } });
-      const caption = generateCaption(analysis, locale);
+      const caption = workflow.generateCaption(analysis, locale);
       const asset = await db.contentAsset.upsert({
         where: { contentJobId_format_version: { contentJobId: job.id, format: CAPTION_FORMAT, version: 1 } },
         create: {
@@ -321,7 +294,7 @@ export function createContentJobProcessor(deps: WorkerDeps): {
       await db.contentJob.update({ where: { id: job.id }, data: { stage: 'DELIVERY' } });
       if (chatId !== null) {
         if (!job.analysisDeliveredAt) {
-          await deps.notifier.sendHtml(chatId, formatAnalysis(analysis, locale, { mock: deps.mockMode }));
+          await deps.notifier.sendHtml(chatId, workflow.formatSubjectForDisplay(analysis, locale, { mock: deps.mockMode }));
           await db.contentJob.update({ where: { id: job.id }, data: { analysisDeliveredAt: now() } });
         }
         if (!asset.deliveredAt) {
@@ -341,7 +314,7 @@ export function createContentJobProcessor(deps: WorkerDeps): {
       throw err;
     }
 
-    /** Marks the job done exactly once (and counts the vehicle only then). */
+    /** Marks the job done exactly once (and counts the subject only then). */
     async function complete(jobId: string) {
       await deps.prisma.$transaction(async (tx) => {
         const res = await tx.contentJob.updateMany({

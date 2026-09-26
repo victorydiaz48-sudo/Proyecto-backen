@@ -16,8 +16,11 @@ function stubModule(slug: string, messageKey: string): VerticalModule<{ greeting
     displayName: slug,
     configSchema: z.object({ greeting: z.string().optional() }),
     entities: [],
+    storagePathSegment: `${slug}s`,
     workflow: {
       onJobCreate: async () => ({ subjectType: `${slug}.thing`, subjectId: '00000000-0000-4000-8000-000000000001' }),
+      getStoredImage: async (): Promise<null> => null,
+      storeImage: async () => ({ imageId: '00000000-0000-4000-8000-000000000002', reusedAnalysis: null }),
       onAnalysisComplete: async () => {},
       computeMissingInformation: () => [],
       formatSubjectForDisplay: () => `stub:${slug}`,

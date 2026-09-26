@@ -1,5 +1,6 @@
+import { buildCatalog, TemplateCatalogError } from '@autocontent/templates';
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_TEMPLATE_SLUG, TemplateCatalogError, automotiveCatalog, buildCatalog, getTemplate } from './index.js';
+import { DEFAULT_TEMPLATE_SLUG, automotiveCatalog, getTemplate } from './templates.js';
 
 describe('automotive template catalogue', () => {
   const catalog = automotiveCatalog();
