@@ -5,7 +5,7 @@ import type { SettingsSnapshot } from '../settings.js';
 import { localDay, startOfLocalDay, startOfLocalMonth } from './time.js';
 
 export type CreateJobResult =
-  | { status: 'created'; jobId: string; vehicleId: string }
+  | { status: 'created'; jobId: string; subjectType: string; subjectId: string }
   | { status: 'duplicate'; jobId: string; jobStatus: string }
   | { status: 'limit_reached'; limit: 'daily_jobs' | 'monthly_vehicles' };
 
@@ -36,12 +36,16 @@ export async function incrementUsage(
 }
 
 /**
- * Creates the Vehicle(DRAFT) + ContentJob for one Telegram photo.
+ * Creates the vertical module's own subject entity (e.g. dealership's
+ * Vehicle) + ContentJob for one Telegram photo.
  *
  *  - idempotent: the same idempotencyKey returns the existing job
- *  - limits: daily jobs and monthly vehicles are checked in the organization's
+ *  - limits: daily jobs and monthly subjects are checked in the organization's
  *    time zone, under a per-organization advisory lock so parallel photos can't
- *    both slip under the limit
+ *    both slip under the limit. The monthly count is ContentJob rows, not the
+ *    module's own subject table — every job creates exactly one new subject
+ *    (`createSubject` below), so the two counts are always equal, and this
+ *    keeps packages/database generic (it never queries a module's own table).
  *  - counts JOBS_CREATED usage and marks the job as the sender's active job
  */
 export async function createTelegramContentJob(
@@ -55,6 +59,8 @@ export async function createTelegramContentJob(
     telegramMessageId: number;
     snapshot: SettingsSnapshot;
     now?: Date;
+    /** Resolved from the organization's enrolled VerticalModule — see @autocontent/verticals-core's WorkflowHooks.onJobCreate. */
+    createSubject: (tx: Prisma.TransactionClient) => Promise<{ subjectType: string; subjectId: string }>;
   },
 ): Promise<CreateJobResult> {
   const now = opts.now ?? new Date();
@@ -75,27 +81,19 @@ export async function createTelegramContentJob(
       if (today >= dailyJobLimit) return { status: 'limit_reached', limit: 'daily_jobs' };
     }
     if (monthlyVehicleLimit !== null) {
-      const month = await tx.vehicle.count({
+      const month = await tx.contentJob.count({
         where: { organizationId: opts.organizationId, createdAt: { gte: startOfLocalMonth(now, tz) } },
       });
       if (month >= monthlyVehicleLimit) return { status: 'limit_reached', limit: 'monthly_vehicles' };
     }
 
-    const vehicle = await tx.vehicle.create({
-      data: { organizationId: opts.organizationId, provenance: {}, visualFeatures: [] },
-    });
+    const { subjectType, subjectId } = await opts.createSubject(tx);
     await tx.contentJob.create({
       data: {
         id: jobId,
         organizationId: opts.organizationId,
-        vehicleId: vehicle.id,
-        // Hardcoded here (rather than resolved through a VerticalModule) only
-        // because Vehicle is still a core-schema table (docs/phase-3-design.md
-        // §14 3b defers the physical schema split to 3c) — once it moves into
-        // the dealership module's own schema, this becomes
-        // `vertical.workflow.onJobCreate()`'s job.
-        subjectType: 'dealership.vehicle',
-        subjectId: vehicle.id,
+        subjectType,
+        subjectId,
         idempotencyKey: opts.idempotencyKey,
         source: 'TELEGRAM',
         telegramAccountId: opts.telegramAccountId,
@@ -112,7 +110,7 @@ export async function createTelegramContentJob(
       data: { activeContentJobId: jobId, lastSeenAt: now },
     });
     await incrementUsage(tx, { organizationId: opts.organizationId, day: localDay(now, tz), metric: 'JOBS_CREATED' });
-    return { status: 'created', jobId, vehicleId: vehicle.id };
+    return { status: 'created', jobId, subjectType, subjectId };
   });
 }
 

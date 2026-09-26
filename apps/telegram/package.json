@@ -10,6 +10,7 @@
     "@autocontent/database": "workspace:*",
     "@autocontent/queue": "workspace:*",
     "@autocontent/shared": "workspace:*",
+    "@autocontent/verticals-core": "workspace:*",
     "grammy": "^1.38.0"
   },
   "main": "./src/index.ts",

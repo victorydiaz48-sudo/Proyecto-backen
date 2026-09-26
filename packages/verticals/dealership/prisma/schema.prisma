@@ -1,0 +1,107 @@
+// The dealership vertical module's own tables. Copied into
+// packages/database/prisma/dealership.prisma by
+// packages/database/scripts/sync-vertical-schemas.ts and merged with the
+// core schema at generate/migrate time (Prisma 7.10 native multi-file
+// support) — this file is the single source of truth; never hand-edit the
+// copy. No `datasource`/`generator` block here: those come from the core
+// schema.prisma once merged.
+//
+// References Organization (core) — fine across merged files. Nothing in
+// packages/database or any other core package references Vehicle/
+// VehicleImage/BodyType/Segment/VehicleStatus any more (Phase 3c): the only
+// link back to core is ContentJob/ContentAsset/VideoPlan's loose
+// subjectType/subjectId (see @autocontent/verticals-core's WorkflowHooks).
+
+enum VehicleStatus {
+  DRAFT
+  AVAILABLE
+  RESERVED
+  SOLD
+  ARCHIVED
+}
+
+enum BodyType {
+  SEDAN
+  HATCHBACK
+  SUV
+  CROSSOVER
+  PICKUP
+  COUPE
+  CONVERTIBLE
+  WAGON
+  VAN
+  OTHER
+}
+
+enum Segment {
+  ECONOMY
+  MID_RANGE
+  PREMIUM
+  LUXURY
+  SPORT
+  UTILITY
+}
+
+model Vehicle {
+  id                   String        @id @default(uuid()) @db.Uuid
+  organizationId       String        @db.Uuid
+  status               VehicleStatus @default(DRAFT)
+  make                 String?
+  model                String?
+  version              String?
+  year                 Int?
+  color                String?
+  bodyType             BodyType?
+  segment              Segment?
+  /// { make: { source, confidence? }, … } — validated by provenanceSchema
+  provenance           Json
+  /// [{ value, source }] — validated by visualFeaturesSchema
+  visualFeatures       Json
+  /// Minor units (cents) in `currency`. User-provided only.
+  priceMinor           Int?
+  currency             String?       @db.Char(3)
+  mileageKm            Int?
+  city                 String?
+  financingNotes       String?
+  offerText            String?
+  contactPhoneOverride String?
+  vin                  String?
+  stockNumber          String?
+  primaryImageId       String?       @unique @db.Uuid
+  createdById          String?       @db.Uuid
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  images       VehicleImage[]
+
+  @@unique([id, organizationId])
+  @@index([organizationId, status, createdAt])
+  @@index([organizationId, make, model])
+}
+
+model VehicleImage {
+  id                   String    @id @default(uuid()) @db.Uuid
+  organizationId       String    @db.Uuid
+  vehicleId            String    @db.Uuid
+  /// organizations/{organizationId}/vehicles/{vehicleId}/originals/{sha256}.{ext}
+  storageKey           String    @unique
+  mime                 String
+  width                Int
+  height               Int
+  bytes                Int
+  sha256               String    @db.Char(64)
+  telegramFileUniqueId String?
+  /// Validated VehicleAnalysis as returned by the provider.
+  analysis             Json?
+  analyzedBy           String?
+  analyzedAt           DateTime?
+  createdAt            DateTime  @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([id, organizationId])
+  @@index([organizationId, sha256])
+  @@index([vehicleId])
+}

@@ -66,19 +66,9 @@ describe.skipIf(!hasDb)('tenant isolation (real PostgreSQL)', () => {
   });
 
   it('the database itself rejects cross-tenant links, even from the raw client', async () => {
-    // Job in organization A pointing at organization B's vehicle.
-    await expect(
-      prisma.contentJob.create({
-        data: {
-          id: randomUUID(),
-          organizationId: A,
-          vehicleId: vehicleB,
-          idempotencyKey: randomUUID(),
-          source: 'TELEGRAM',
-          settingsSnapshot: {},
-        },
-      }),
-    ).rejects.toThrow(/tenant_ContentJob_vehicle|foreign key/i);
+    // ContentJob's subjectType/subjectId is a loose (no-FK) reference by design
+    // (docs/phase-3-design.md §3.2) — there is nothing for the database to
+    // reject there; VehicleImage.vehicleId is still a real, tenant-checked FK.
     await expect(
       prisma.vehicleImage.create({
         data: {
@@ -97,7 +87,7 @@ describe.skipIf(!hasDb)('tenant isolation (real PostgreSQL)', () => {
 
   it('ON DELETE SET NULL (col) clears only the link, keeping the tenant id', async () => {
     const job = await tA.contentJob.create({
-      data: { id: randomUUID(), organizationId: A, vehicleId: vehicleA, idempotencyKey: randomUUID(), source: 'TELEGRAM', settingsSnapshot: {} },
+      data: { id: randomUUID(), organizationId: A, subjectType: 'dealership.vehicle', subjectId: vehicleA, idempotencyKey: randomUUID(), source: 'TELEGRAM', settingsSnapshot: {} },
     });
     const acct = await tA.telegramAccount.create({
       data: { organizationId: A, telegramUserId: BigInt(Date.now()), chatId: 1n, activeContentJobId: job.id },
@@ -110,7 +100,7 @@ describe.skipIf(!hasDb)('tenant isolation (real PostgreSQL)', () => {
 
   it('idempotency keys make retried steps unable to duplicate work or charges', async () => {
     const job = await tA.contentJob.create({
-      data: { id: randomUUID(), organizationId: A, vehicleId: vehicleA, idempotencyKey: randomUUID(), source: 'TELEGRAM', settingsSnapshot: {} },
+      data: { id: randomUUID(), organizationId: A, subjectType: 'dealership.vehicle', subjectId: vehicleA, idempotencyKey: randomUUID(), source: 'TELEGRAM', settingsSnapshot: {} },
     });
     const log = {
       adapter: 'mock-vision',
@@ -125,7 +115,7 @@ describe.skipIf(!hasDb)('tenant isolation (real PostgreSQL)', () => {
     await tA.generationLog.create({ data: log });
     await expect(tA.generationLog.create({ data: log })).rejects.toThrow(/Unique constraint|unique/i);
 
-    const asset = { organizationId: A, contentJobId: job.id, vehicleId: vehicleA, kind: 'TEXT' as const, format: 'instagram_caption', channel: 'INSTAGRAM' as const, locale: 'es' as const };
+    const asset = { organizationId: A, contentJobId: job.id, subjectType: 'dealership.vehicle', subjectId: vehicleA, kind: 'TEXT' as const, format: 'instagram_caption', channel: 'INSTAGRAM' as const, locale: 'es' as const };
     await tA.contentAsset.create({ data: asset });
     await expect(tA.contentAsset.create({ data: asset })).rejects.toThrow(/Unique constraint|unique/i);
     await expect(tA.contentAsset.create({ data: { ...asset, version: 2 } })).resolves.toBeTruthy();

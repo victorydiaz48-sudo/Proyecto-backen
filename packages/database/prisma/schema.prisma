@@ -55,35 +55,9 @@ enum TelegramAccountStatus {
   BLOCKED
 }
 
-enum VehicleStatus {
-  DRAFT
-  AVAILABLE
-  RESERVED
-  SOLD
-  ARCHIVED
-}
-
-enum BodyType {
-  SEDAN
-  HATCHBACK
-  SUV
-  CROSSOVER
-  PICKUP
-  COUPE
-  CONVERTIBLE
-  WAGON
-  VAN
-  OTHER
-}
-
-enum Segment {
-  ECONOMY
-  MID_RANGE
-  PREMIUM
-  LUXURY
-  SPORT
-  UTILITY
-}
+// VehicleStatus/BodyType/Segment and the Vehicle/VehicleImage models moved to
+// packages/verticals/dealership/prisma/schema.prisma (Phase 3c) — merged in
+// by sync-vertical-schemas.ts, see packages/database/README.md.
 
 enum JobSource {
   TELEGRAM
@@ -256,6 +230,10 @@ model Organization {
   sessions           Session[]
   telegramAccounts   TelegramAccount[]
   telegramInvites    TelegramInvite[]
+  // Back-relations for the dealership module's own tables (declared in
+  // packages/verticals/dealership/prisma/schema.prisma) — Prisma's schema
+  // language requires the "one" side's list field even across merged files.
+  // Not used by any core code; only the dealership module reads/writes them.
   vehicles           Vehicle[]
   vehicleImages      VehicleImage[]
   contentJobs        ContentJob[]
@@ -425,86 +403,18 @@ model TelegramInvite {
   @@index([organizationId])
 }
 
-// ───────────── Inventory ─────────────
-model Vehicle {
-  id                   String        @id @default(uuid()) @db.Uuid
-  organizationId       String        @db.Uuid
-  status               VehicleStatus @default(DRAFT)
-  make                 String?
-  model                String?
-  version              String?
-  year                 Int?
-  color                String?
-  bodyType             BodyType?
-  segment              Segment?
-  /// { make: { source, confidence? }, … } — validated by provenanceSchema
-  provenance           Json
-  /// [{ value, source }] — validated by visualFeaturesSchema
-  visualFeatures       Json
-  /// Minor units (cents) in `currency`. User-provided only.
-  priceMinor           Int?
-  currency             String?       @db.Char(3)
-  mileageKm            Int?
-  city                 String?
-  financingNotes       String?
-  offerText            String?
-  contactPhoneOverride String?
-  vin                  String?
-  stockNumber          String?
-  primaryImageId       String?       @unique @db.Uuid
-  createdById          String?       @db.Uuid
-  createdAt            DateTime      @default(now())
-  updatedAt            DateTime      @updatedAt
-
-  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  images       VehicleImage[]
-  contentJobs  ContentJob[]
-  assets       ContentAsset[]
-  videoPlans   VideoPlan[]
-
-  @@unique([id, organizationId])
-  @@index([organizationId, status, createdAt])
-  @@index([organizationId, make, model])
-}
-
-model VehicleImage {
-  id                   String    @id @default(uuid()) @db.Uuid
-  organizationId       String    @db.Uuid
-  vehicleId            String    @db.Uuid
-  /// organizations/{organizationId}/vehicles/{vehicleId}/originals/{sha256}.{ext}
-  storageKey           String    @unique
-  mime                 String
-  width                Int
-  height               Int
-  bytes                Int
-  sha256               String    @db.Char(64)
-  telegramFileUniqueId String?
-  /// Validated VehicleAnalysis as returned by the provider.
-  analysis             Json?
-  analyzedBy           String?
-  analyzedAt           DateTime?
-  createdAt            DateTime  @default(now())
-
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-
-  @@unique([id, organizationId])
-  @@index([organizationId, sha256])
-  @@index([vehicleId])
-}
+// Vehicle/VehicleImage moved to packages/verticals/dealership/prisma/schema.prisma (Phase 3c).
 
 // ───────────── Content pipeline ─────────────
 model ContentJob {
   /// Deterministic from idempotencyKey (see deterministicJobId).
   id                  String    @id @db.Uuid
   organizationId      String    @db.Uuid
-  vehicleId           String    @db.Uuid
   /// Namespaced ("dealership.vehicle") + subjectId — the vertical module's own
   /// entity, with no database foreign key (see VerticalModule/WorkflowHooks in
-  /// @autocontent/verticals-core). vehicleId above is kept alongside these
-  /// during the migration (docs/phase-3-design.md §3.2, §14 3b/3c).
-  subjectType         String?
-  subjectId           String?   @db.Uuid
+  /// @autocontent/verticals-core). docs/phase-3-design.md §3.2.
+  subjectType         String
+  subjectId           String    @db.Uuid
   idempotencyKey      String    @unique
   source              JobSource
   telegramAccountId   String?   @db.Uuid
@@ -535,7 +445,6 @@ model ContentJob {
   updatedAt           DateTime  @updatedAt
 
   organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  vehicle         Vehicle          @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   telegramAccount TelegramAccount? @relation("JobTelegramAccount", fields: [telegramAccountId], references: [id], onDelete: SetNull)
   activeFor       TelegramAccount? @relation("ActiveJob")
   campaign        Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
@@ -546,16 +455,15 @@ model ContentJob {
 
   @@unique([id, organizationId])
   @@index([organizationId, status, createdAt])
-  @@index([organizationId, vehicleId])
+  @@index([organizationId, subjectType, subjectId])
 }
 
 model ContentAsset {
   id              String      @id @default(uuid()) @db.Uuid
   organizationId  String      @db.Uuid
   contentJobId    String      @db.Uuid
-  vehicleId       String      @db.Uuid
-  subjectType     String?
-  subjectId       String?     @db.Uuid
+  subjectType     String
+  subjectId       String      @db.Uuid
   kind            AssetKind
   /// Template-defined format id (new formats need no migration).
   format          String
@@ -586,14 +494,13 @@ model ContentAsset {
 
   organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   contentJob    ContentJob     @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
-  vehicle       Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   generationLog GenerationLog? @relation(fields: [generationLogId], references: [id], onDelete: SetNull)
   videoPlan     VideoPlan?
   publications  Publication[]
 
   @@unique([id, organizationId])
   @@unique([contentJobId, format, version])
-  @@index([organizationId, vehicleId])
+  @@index([organizationId, subjectType, subjectId])
   @@index([organizationId, status])
 }
 
@@ -601,9 +508,8 @@ model VideoPlan {
   id             String          @id @default(uuid()) @db.Uuid
   organizationId String          @db.Uuid
   contentJobId   String          @db.Uuid
-  vehicleId      String          @db.Uuid
-  subjectType    String?
-  subjectId      String?         @db.Uuid
+  subjectType    String
+  subjectId      String          @db.Uuid
   style          String
   durationSec    Int
   aspectRatio    String
@@ -616,7 +522,6 @@ model VideoPlan {
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   contentJob   ContentJob    @relation(fields: [contentJobId], references: [id], onDelete: Cascade)
-  vehicle      Vehicle       @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
   videoAsset   ContentAsset? @relation(fields: [videoAssetId], references: [id], onDelete: SetNull)
 
   @@unique([contentJobId, style])

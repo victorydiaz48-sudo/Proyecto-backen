@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { TENANT_MODELS } from './tenant.js';
@@ -19,14 +19,11 @@ export const TENANT_CONSTRAINTS = [
   'tenant_TelegramAccount_activeJob',
   'tenant_Vehicle_primaryImage',
   'tenant_VehicleImage_vehicle',
-  'tenant_ContentJob_vehicle',
   'tenant_ContentJob_telegramAccount',
   'tenant_ContentJob_campaign',
   'tenant_ContentAsset_contentJob',
-  'tenant_ContentAsset_vehicle',
   'tenant_ContentAsset_generationLog',
   'tenant_VideoPlan_contentJob',
-  'tenant_VideoPlan_vehicle',
   'tenant_VideoPlan_videoAsset',
   'tenant_PublishingAccount_apiKeyRef',
   'tenant_Publication_contentJob',
@@ -42,16 +39,28 @@ export const TENANT_CONSTRAINTS = [
 const TENANT_INDEXES = ['tenant_APIProvider_platform_adapter', 'tenant_APIProvider_organization_adapter'];
 /** Hand-written objects without the tenant_ prefix (target of a composite foreign key). */
 const OTHER_HAND_WRITTEN = ['APIKeyReference_id_organizationId_key'];
+/**
+ * The one sanctioned exception to "never drop a tenant_* constraint": these
+ * guarded `vehicleId` on ContentJob/ContentAsset/VideoPlan, which Phase 3c
+ * drops in favour of the polymorphic subjectType/subjectId (no FK, by
+ * design — see docs/phase-3-design.md §3.2) now that every write path goes
+ * through it. Dropped explicitly, by name, in
+ * `..._drop_vehicle_id_complete_subject_reference`.
+ */
+const RETIRED_TENANT_CONSTRAINTS = ['tenant_ContentJob_vehicle', 'tenant_ContentAsset_vehicle', 'tenant_VideoPlan_vehicle'];
 
 describe('migrations', () => {
   it('create every tenant-boundary constraint', () => {
     const all = migrations.map(sql).join('\n');
-    for (const name of [...TENANT_CONSTRAINTS, ...TENANT_INDEXES]) expect(all).toContain(`"${name}"`);
+    for (const name of [...TENANT_CONSTRAINTS, ...TENANT_INDEXES, ...RETIRED_TENANT_CONSTRAINTS]) expect(all).toContain(`"${name}"`);
   });
 
-  it('never drop a tenant-boundary constraint (Prisma generates such drops — delete them by hand)', () => {
+  it('never drops a tenant-boundary constraint except the documented vehicleId retirement (Phase 3c)', () => {
     for (const m of migrations) {
-      expect(sql(m), `migration ${m} drops a tenant_* object`).not.toMatch(/DROP\s+(CONSTRAINT|INDEX)\s+(IF EXISTS\s+)?"tenant_/i);
+      const drops = [...sql(m).matchAll(/DROP\s+(?:CONSTRAINT|INDEX)\s+(?:IF EXISTS\s+)?"(tenant_[^"]+)"/gi)].map((x) => x[1]);
+      for (const name of drops) {
+        expect(RETIRED_TENANT_CONSTRAINTS, `migration ${m} drops ${name}`).toContain(name);
+      }
       for (const name of OTHER_HAND_WRITTEN) {
         expect(sql(m), `migration ${m} drops ${name}`).not.toMatch(new RegExp(`DROP\\s+(CONSTRAINT|INDEX)\\s+(IF EXISTS\\s+)?"${name}"`, 'i'));
       }
@@ -59,7 +68,15 @@ describe('migrations', () => {
   });
 
   it('TENANT_MODELS lists every model with a organizationId column', () => {
-    const schema = readFileSync(join(root, 'schema.prisma'), 'utf8');
+    // Scans the core schema plus every vertical module's own schema fragment
+    // (its source, not the synced copy — this test doesn't depend on
+    // sync-verticals having run) so a module-owned tenant table is covered too.
+    const verticalsDir = join(root, '..', '..', 'verticals');
+    const verticalSchemas = readdirSync(verticalsDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => join(verticalsDir, d.name, 'prisma', 'schema.prisma'))
+      .filter((p) => existsSync(p));
+    const schema = [join(root, 'schema.prisma'), ...verticalSchemas].map((p) => readFileSync(p, 'utf8')).join('\n');
     const withTenant = [...schema.matchAll(/^model (\w+) \{([\s\S]*?)^\}/gm)]
       .filter(([, , body]) => /^\s+organizationId\s/m.test(body!))
       .map(([, name]) => name);

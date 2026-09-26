@@ -1,16 +1,17 @@
 # Architecture
 
-Status: **Phase 2 complete, Phase 3a and 3b complete.** The bot, database,
+Status: **Phase 2 complete, Phase 3a/3b/3c complete.** The bot, database,
 queue, worker and storage are wired together (Phase 2). The tenant concept is
-`Organization` (renamed from `Dealership`) and dealership is now re-platformed
-as the first vertical module on top of the `VerticalRegistry` (Phase 3a/3b) —
-see [docs/phase-3-design.md](docs/phase-3-design.md) for the multi-vertical
-design this implements, and §14 (rollout plan) for what's covered versus what's
-still ahead (3c drops the now-redundant `vehicleId` columns once every write
-path is proven on `subjectType`/`subjectId`; 3d scaffolds a second vertical to
-prove genericity). `apps/api` and the dashboard come in later phases.
+`Organization` (renamed from `Dealership`) and dealership is now fully
+re-platformed as the first vertical module, with its own physically separate
+Prisma schema, on top of the `VerticalRegistry` (Phase 3a/3b/3c) — see
+[docs/phase-3-design.md](docs/phase-3-design.md) for the multi-vertical
+design this implements, and §14 (rollout plan) for what's covered versus
+what's still ahead (3d scaffolds a second vertical to prove genericity — no
+more core code is expected to change for that; a new module should just
+plug in). `apps/api` and the dashboard come in later phases.
 
-## Vertical modules (Phase 3a skeleton + Phase 3b dealership module)
+## Vertical modules (Phase 3a skeleton + Phase 3b/3c dealership module)
 
 `packages/verticals/core` defines the module contract every vertical
 implements:
@@ -36,24 +37,36 @@ implements:
 `packages/verticals/dealership` (`@autocontent/verticals-dealership`) is the
 first module: the vehicle-analysis schema, the mock/normalize/contract vision
 pieces, the content-engine (caption generation), the automotive template
-JSON, the module's own i18n fragment, and its `WorkflowHooks` implementation
-all moved out of core packages into it. `apps/server/src/main.ts` is the only
-place that imports it (core code only ever sees `VerticalModule`).
+JSON, the module's own i18n fragment, its own Prisma schema fragment
+(`prisma/schema.prisma` — `Vehicle`/`VehicleImage`/`BodyType`/`Segment`/
+`VehicleStatus`), and its `WorkflowHooks` implementation all moved out of core
+packages into it. `apps/server/src/main.ts` is the only place that imports it
+(core code only ever sees `VerticalModule`); `apps/telegram`'s `createBot()`
+and `packages/database`'s `createTelegramContentJob()` take the module's
+`workflow.onJobCreate` as an injected `createSubject` callback instead
+(`packages/database` never imports a concrete module).
 
-**Deliberately deferred to a later sub-phase** (documented, not silent):
-- `Vehicle`/`VehicleImage` still live in the *core* `schema.prisma`, not a
-  separate module schema fragment merged at build time — Prisma 7.10's
-  native multi-file merge was spiked and confirmed working (3a), but the
-  physical split waits for 3c, once `vehicleId` is actually dropped.
-  `packages/database/src/ops/jobs.ts`'s `createTelegramContentJob()` still
-  creates the `Vehicle` row directly for this reason (with a comment marking
-  the spot `WorkflowHooks.onJobCreate` takes over in 3c).
-- `ContentJob`/`ContentAsset`/`VideoPlan` carry `subjectType`/`subjectId`
-  *alongside* `vehicleId` (additive migration, backfilled for existing rows)
-  — dropping `vehicleId` is 3c.
-- The vehicle REST contracts (`packages/verticals/dealership/src/
-  contracts.ts`) are declared on `VerticalModule.routes` but not merged into
-  the live core route table — no handler consumes any REST route yet.
+`packages/database/prisma.config.ts`'s `schema` points at the `prisma/`
+folder (Prisma 7.10's native multi-file merge, spiked in 3a); each vertical's
+own schema fragment is copied in by `pnpm --filter @autocontent/database
+sync-verticals` (wired into `generate`/`migrate:dev`/`migrate:deploy`/
+`postinstall` — see `packages/database/README.md` rule 8) purely by walking
+the `packages/verticals/*` folder, never by importing a module.
+
+`ContentJob`/`ContentAsset`/`VideoPlan.vehicleId` is gone (Phase 3c;
+migration `…_drop_vehicle_id_complete_subject_reference` — the one sanctioned
+exception to "never drop a `tenant_*` constraint", since `tenant_ContentJob_
+vehicle`/`tenant_ContentAsset_vehicle`/`tenant_VideoPlan_vehicle` guarded a
+column that no longer exists). `subjectType`/`subjectId` are the only
+reference now, required (not nullable), and — by design
+(docs/phase-3-design.md §3.2) — carry no database foreign key: referential
+integrity there is app-enforced, not DB-enforced.
+
+**Still deliberately deferred**: the dealership module's REST contracts
+(`packages/verticals/dealership/src/contracts.ts`) are declared on
+`VerticalModule.routes` but not merged into a live core route table — no
+handler consumes any REST route yet, so there is nothing to wire up until a
+later phase adds one.
 
 ## Phase 2 flow
 

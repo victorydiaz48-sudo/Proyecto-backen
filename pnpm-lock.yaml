@@ -68,6 +68,9 @@ importers:
       '@autocontent/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@autocontent/verticals-core':
+        specifier: workspace:*
+        version: link:../../packages/verticals/core
       grammy:
         specifier: ^1.38.0
         version: 1.46.0

@@ -108,7 +108,6 @@ export function createContentJobProcessor<TAnalysis = unknown>(deps: WorkerDeps<
       return;
     }
     if ((FINISHED as readonly string[]).includes(job.status)) return;
-    if (!job.subjectType || !job.subjectId) throw new NonRetryableError('Job has no subject reference');
     const subject: JobSubjectRef = { subjectType: job.subjectType, subjectId: job.subjectId };
 
     const snap: SettingsSnapshot = settingsSnapshotSchema.parse(job.settingsSnapshot);
@@ -274,7 +273,8 @@ export function createContentJobProcessor<TAnalysis = unknown>(deps: WorkerDeps<
         create: {
           organizationId: p.organizationId,
           contentJobId: job.id,
-          vehicleId: job.vehicleId,
+          subjectType: subject.subjectType,
+          subjectId: subject.subjectId,
           kind: 'TEXT',
           format: CAPTION_FORMAT,
           channel: 'INSTAGRAM',

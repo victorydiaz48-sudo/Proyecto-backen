@@ -78,6 +78,7 @@ function world(prisma: PrismaClient, opts: { slug: string; bootstrapCode: string
     prisma,
     settings: new SettingsService(prisma, 0),
     queue,
+    vertical: dealershipModule,
     logger: silentLogger,
     limits,
     defaultLocale: 'es',
@@ -169,14 +170,15 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     expect(texts.some((t) => t.includes('Texto para publicar'))).toBe(true);
 
     const db = forOrganization(prisma, d.id);
-    const job = await db.contentJob.findFirstOrThrow({ include: { vehicle: { include: { images: true } }, assets: true } });
+    const job = await db.contentJob.findFirstOrThrow({ include: { assets: true } });
     expect(job.status).toBe('COMPLETED');
     expect(job.stage).toBe('DONE');
-    expect(job.vehicle.make).not.toBeNull();
-    expect(job.vehicle.provenance).toHaveProperty('make');
-    expect(job.vehicle.images).toHaveLength(1);
-    const img = job.vehicle.images[0]!;
-    expect(img.storageKey.startsWith(`organizations/${d.id}/vehicles/${job.vehicleId}/originals/`)).toBe(true);
+    const vehicle = await db.vehicle.findUniqueOrThrow({ where: { id: job.subjectId }, include: { images: true } });
+    expect(vehicle.make).not.toBeNull();
+    expect(vehicle.provenance).toHaveProperty('make');
+    expect(vehicle.images).toHaveLength(1);
+    const img = vehicle.images[0]!;
+    expect(img.storageKey.startsWith(`organizations/${d.id}/vehicles/${job.subjectId}/originals/`)).toBe(true);
     expect((await w.storage.head(img.storageKey))?.bytes).toBe(img.bytes);
     expect(job.assets).toHaveLength(1);
     expect(job.assets[0]!.deliveredAt).not.toBeNull();
@@ -334,11 +336,11 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     const db = forOrganization(prisma, d.id);
     const job = await db.contentJob.findFirstOrThrow();
     // Simulate the crash window: analysis saved, vehicle identity not yet written, job unfinished.
-    await db.vehicle.update({ where: { id: job.vehicleId }, data: { make: null, model: null, provenance: {} } });
+    await db.vehicle.update({ where: { id: job.subjectId }, data: { make: null, model: null, provenance: {} } });
     await db.contentJob.update({ where: { id: job.id }, data: { status: 'RETRYING' } });
     await w.queue.enqueue({ contentJobId: job.id, organizationId: d.id }, { jobId: `${job.id}-retry` });
     await w.settle();
-    const v = await db.vehicle.findUniqueOrThrow({ where: { id: job.vehicleId } });
+    const v = await db.vehicle.findUniqueOrThrow({ where: { id: job.subjectId } });
     expect(v.make).not.toBeNull();
     expect(v.provenance).toHaveProperty('make');
     expect(await db.generationLog.count()).toBe(1); // no second provider call

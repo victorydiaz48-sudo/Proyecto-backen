@@ -40,13 +40,31 @@ data-access layer.
    SHADOW_DATABASE_URL=postgresql://app:app@localhost:5432/<shadow> \
      DATABASE_URL=postgresql://app:app@localhost:5432/<clone> \
      pnpm --filter @autocontent/database exec prisma migrate diff \
-       --from-config-datasource --to-schema prisma/schema.prisma --script
+       --from-config-datasource --to-schema prisma --script
    ```
    An empty diff (or only the already-known `tenant_*`/`APIKeyReference_id_…_key`
    noise from rule 2) means the rename is exactly right. `prisma.config.ts`'s
    `shadowDatabaseUrl` only needs `SHADOW_DATABASE_URL` set when you run this;
    it's unused otherwise. See migration `…_rename_dealership_to_organization`
-   for a worked example (Phase 3a).
+   for a worked example (Phase 3a). The same clone-and-diff recipe applies to
+   a genuine structural drop too (unlike a rename, Prisma's own proposed SQL
+   *is* trustworthy there) — see `…_drop_vehicle_id_complete_subject_reference`
+   (Phase 3c) for a worked example, including the one sanctioned exception to
+   rule 2: that migration explicitly drops `tenant_ContentJob_vehicle`,
+   `tenant_ContentAsset_vehicle` and `tenant_VideoPlan_vehicle`, since the
+   `vehicleId` column they guarded no longer exists. `migrations.test.ts`
+   allows only those three names to be dropped, by name.
+8. **A vertical module owns its own tables.** `prisma.config.ts`'s `schema`
+   points at the `prisma/` *folder*, not a single file — Prisma 7.10 natively
+   merges every `.prisma` file in it. A module keeps its own schema fragment
+   under its own package (e.g.
+   `packages/verticals/dealership/prisma/schema.prisma`); `pnpm run
+   sync-verticals` (wired into `generate`/`migrate:dev`/`migrate:deploy`/
+   `postinstall`) copies each one into `prisma/<slug>.prisma` here — never
+   hand-edit the copy, and never commit it (`.gitignore`d). This package
+   never imports a concrete vertical module (only the filesystem walk in
+   `scripts/sync-vertical-schemas.ts` knows the `verticals/` folder exists) —
+   see `ARCHITECTURE.md`'s "Vertical modules" section.
 
 ## Commands
 

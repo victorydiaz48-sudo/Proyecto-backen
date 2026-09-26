@@ -194,6 +194,7 @@ async function main() {
       prisma,
       settings: new SettingsService(prisma),
       queue,
+      vertical,
       logger,
       limits,
       defaultLocale: config.DEFAULT_LOCALE,

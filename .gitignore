@@ -7,4 +7,8 @@ coverage/
 !.env.example
 .DS_Store
 packages/database/src/generated/
+# Copied from each vertical module's own prisma/schema.prisma by
+# sync-vertical-schemas.ts — never the source of truth, never committed.
+packages/database/prisma/*.prisma
+!packages/database/prisma/schema.prisma
 *.rdb

@@ -23,6 +23,7 @@ import {
   type Locale,
   type Logger,
 } from '@autocontent/shared';
+import type { VerticalModule } from '@autocontent/verticals-core';
 import { Bot, type Context } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
 import { FixedWindowRateLimiter } from './rate-limit.js';
@@ -32,6 +33,8 @@ export interface BotDeps {
   prisma: PrismaClient;
   settings: SettingsService;
   queue: JobQueue<ContentJobPayload>;
+  /** Every organization is enrolled in this vertical for now (see apps/server/src/main.ts). */
+  vertical: VerticalModule;
   logger: Logger;
   limits: ImageLimits;
   defaultLocale: Locale;
@@ -198,6 +201,7 @@ export function createBot(deps: BotDeps): Bot {
       telegramChatId: BigInt(ctx.chat!.id),
       telegramMessageId: ctx.msg!.message_id,
       snapshot,
+      createSubject: (tx) => deps.vertical.workflow.onJobCreate({ organizationId: r.account.organizationId, tx }),
     });
 
     switch (result.status) {

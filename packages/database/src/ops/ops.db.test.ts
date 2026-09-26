@@ -130,7 +130,8 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
     await prisma.organizationSettings.create({ data: { organizationId: d.id, dailyJobLimit: 3, timezone: 'America/Sao_Paulo' } });
     const acct = await prisma.telegramAccount.create({ data: { organizationId: d.id, ...identity() } });
     const snap = await snapshot(d.id);
-    const base = { organizationId: d.id, telegramAccountId: acct.id, telegramFileId: 'f', telegramChatId: 1n, snapshot: snap };
+    const createSubject = async () => ({ subjectType: 'test.thing', subjectId: randomUUID() });
+    const base = { organizationId: d.id, telegramAccountId: acct.id, telegramFileId: 'f', telegramChatId: 1n, snapshot: snap, createSubject };
 
     const first = await createTelegramContentJob(prisma, { ...base, idempotencyKey: `k-${randomUUID()}`, telegramMessageId: 1 });
     expect(first.status).toBe('created');
@@ -166,6 +167,7 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
       telegramChatId: 1n,
       telegramMessageId: 1,
       snapshot: snap,
+      createSubject: async () => ({ subjectType: 'test.thing', subjectId: randomUUID() }),
     });
     if (job.status !== 'created') throw new Error('expected a job');
 
