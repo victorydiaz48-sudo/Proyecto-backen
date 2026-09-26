@@ -7,6 +7,7 @@ import {
   createPrismaClient,
   findUnfinishedJobs,
   forOrganization,
+  localDay,
   seed,
   type PrismaClient,
 } from '@autocontent/database';
@@ -304,6 +305,21 @@ describe.skipIf(!DB)('Phase 2 flow (real PostgreSQL)', () => {
     await w.settle();
     expect(owner.inbox().filter((t) => t.includes('límite diario'))).toHaveLength(1);
     expect(await forOrganization(prisma, d.id).contentJob.count()).toBe(1);
+  });
+
+  it('enforces the organization’s monthly cost cap once real spend reaches it', async () => {
+    const d = await newOrganization();
+    await prisma.organizationSettings.update({ where: { organizationId: d.id }, data: { monthlyCostCapMicros: 1_000_000n } });
+    await prisma.usage.create({
+      data: { organizationId: d.id, day: localDay(new Date(), 'America/Sao_Paulo'), metric: 'VISION_CALLS', costMicros: 1_000_000n },
+    });
+    const w = world(prisma, { slug: d.slug, bootstrapCode: 'bootstrap-code-cost', storageRoot });
+    const owner = w.user();
+    await owner.command('/start bootstrap-code-cost');
+    await owner.photo();
+    await w.settle();
+    expect(owner.inbox().some((t) => t.includes('límite mensual de gasto'))).toBe(true);
+    expect(await forOrganization(prisma, d.id).contentJob.count()).toBe(0);
   });
 
   it('jobs accepted before a restart are finished after it', async () => {

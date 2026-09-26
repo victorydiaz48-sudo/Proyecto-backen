@@ -154,6 +154,33 @@ describe.skipIf(!hasDb)('Telegram access and job creation (real PostgreSQL)', ()
     await prisma.organization.delete({ where: { id: d.id } });
   });
 
+  it('refuses a new job once the organization’s monthly cost cap is reached', async () => {
+    const d = await makeOrganization(prisma);
+    await prisma.organizationSettings.create({
+      data: { organizationId: d.id, monthlyCostCapMicros: 1_000_000n, timezone: 'America/Sao_Paulo' },
+    });
+    const acct = await prisma.telegramAccount.create({ data: { organizationId: d.id, ...identity() } });
+    const snap = await snapshot(d.id);
+    expect(snap.limits.monthlyCostCapMicros).toBe('1000000');
+    const createSubject = async () => ({ subjectType: 'test.thing', subjectId: randomUUID() });
+    const base = { organizationId: d.id, telegramAccountId: acct.id, telegramFileId: 'f', telegramChatId: 1n, snapshot: snap, createSubject };
+
+    // Under the cap: job is created normally.
+    const ok = await createTelegramContentJob(prisma, { ...base, idempotencyKey: `k-${randomUUID()}`, telegramMessageId: 1 });
+    expect(ok.status).toBe('created');
+
+    // Simulate real provider spend this local month reaching the cap.
+    await prisma.usage.create({
+      data: { organizationId: d.id, day: localDay(new Date(), 'America/Sao_Paulo'), metric: 'VISION_CALLS', costMicros: 1_000_000n },
+    });
+
+    const refused = await createTelegramContentJob(prisma, { ...base, idempotencyKey: `k-${randomUUID()}`, telegramMessageId: 2 });
+    expect(refused).toEqual({ status: 'limit_reached', limit: 'monthly_cost_cap' });
+    expect(await prisma.contentJob.count({ where: { organizationId: d.id } })).toBe(1);
+
+    await prisma.organization.delete({ where: { id: d.id } });
+  });
+
   it('records a provider call once: a replayed step never charges twice', async () => {
     const d = await makeOrganization(prisma);
     await prisma.organizationSettings.create({ data: { organizationId: d.id } });

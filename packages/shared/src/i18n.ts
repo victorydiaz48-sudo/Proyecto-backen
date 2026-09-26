@@ -30,6 +30,7 @@ export interface Messages {
     notConfigured: string;
     dailyLimit: string;
     monthlyLimit: string;
+    monthlyCostCap: string;
     inviteForbidden: string;
     inviteUsage: string;
     inviteCreated: (link: string, role: string, hours: number) => string;
@@ -77,6 +78,7 @@ const es: Messages = {
     notConfigured: '🛠️ El sistema aún no está configurado (falta la base de datos). Avisa al administrador.',
     dailyLimit: '⏳ Se alcanzó el límite diario de vehículos de tu concesionario. Inténtalo mañana.',
     monthlyLimit: '⏳ Se alcanzó el límite mensual de vehículos de tu plan.',
+    monthlyCostCap: '⏳ Se alcanzó el límite mensual de gasto de tu plan. Contacta al administrador.',
     inviteForbidden: '⛔ No tienes permiso para crear esa invitación.',
     inviteUsage: 'Uso: /invite [operador|editor|admin]',
     inviteCreated: (link, role, hours) =>
@@ -124,6 +126,7 @@ const pt: Messages = {
     notConfigured: '🛠️ O sistema ainda não está configurado (falta o banco de dados). Avise o administrador.',
     dailyLimit: '⏳ O limite diário de veículos da sua concessionária foi atingido. Tente amanhã.',
     monthlyLimit: '⏳ O limite mensal de veículos do seu plano foi atingido.',
+    monthlyCostCap: '⏳ O limite mensal de gastos do seu plano foi atingido. Fale com o administrador.',
     inviteForbidden: '⛔ Você não tem permissão para criar esse convite.',
     inviteUsage: 'Uso: /invite [operador|editor|admin]',
     inviteCreated: (link, role, hours) =>
@@ -171,6 +174,7 @@ const en: Messages = {
     notConfigured: '🛠️ The system is not configured yet (database missing). Please tell your administrator.',
     dailyLimit: '⏳ Your organization reached its daily vehicle limit. Please try tomorrow.',
     monthlyLimit: '⏳ Your plan reached its monthly vehicle limit.',
+    monthlyCostCap: '⏳ Your plan reached its monthly spending limit. Please contact your administrator.',
     inviteForbidden: '⛔ You are not allowed to create that invite.',
     inviteUsage: 'Usage: /invite [operator|editor|admin]',
     inviteCreated: (link, role, hours) =>

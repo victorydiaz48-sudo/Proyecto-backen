@@ -7,7 +7,7 @@ import { localDay, startOfLocalDay, startOfLocalMonth } from './time.js';
 export type CreateJobResult =
   | { status: 'created'; jobId: string; subjectType: string; subjectId: string }
   | { status: 'duplicate'; jobId: string; jobStatus: string }
-  | { status: 'limit_reached'; limit: 'daily_jobs' | 'monthly_vehicles' };
+  | { status: 'limit_reached'; limit: 'daily_jobs' | 'monthly_vehicles' | 'monthly_cost_cap' };
 
 export async function incrementUsage(
   tx: Prisma.TransactionClient,
@@ -40,12 +40,18 @@ export async function incrementUsage(
  * Vehicle) + ContentJob for one Telegram photo.
  *
  *  - idempotent: the same idempotencyKey returns the existing job
- *  - limits: daily jobs and monthly subjects are checked in the organization's
- *    time zone, under a per-organization advisory lock so parallel photos can't
- *    both slip under the limit. The monthly count is ContentJob rows, not the
- *    module's own subject table — every job creates exactly one new subject
+ *  - limits: daily jobs, monthly subjects, and the organization's monthly
+ *    cost cap are all checked in the organization's time zone, under a
+ *    per-organization advisory lock so parallel photos can't both slip under
+ *    a limit. The monthly subject count is ContentJob rows, not the module's
+ *    own subject table — every job creates exactly one new subject
  *    (`createSubject` below), so the two counts are always equal, and this
  *    keeps packages/database generic (it never queries a module's own table).
+ *    The cost cap compares against Usage.costMicros summed for the local
+ *    calendar month — real provider spend recorded by recordProviderCall(),
+ *    not the (currently unused) ContentJob.estimatedCostMicros/
+ *    reservedCostMicros columns, which stay for a future pre-spend
+ *    confirmation flow this phase does not build.
  *  - counts JOBS_CREATED usage and marks the job as the sender's active job
  */
 export async function createTelegramContentJob(
@@ -73,7 +79,7 @@ export async function createTelegramContentJob(
     const existing = await tx.contentJob.findUnique({ where: { idempotencyKey: opts.idempotencyKey } });
     if (existing) return { status: 'duplicate', jobId: existing.id, jobStatus: existing.status };
 
-    const { dailyJobLimit, monthlyVehicleLimit } = opts.snapshot.limits;
+    const { dailyJobLimit, monthlyVehicleLimit, monthlyCostCapMicros } = opts.snapshot.limits;
     if (dailyJobLimit !== null) {
       const today = await tx.contentJob.count({
         where: { organizationId: opts.organizationId, createdAt: { gte: startOfLocalDay(now, tz) } },
@@ -85,6 +91,19 @@ export async function createTelegramContentJob(
         where: { organizationId: opts.organizationId, createdAt: { gte: startOfLocalMonth(now, tz) } },
       });
       if (month >= monthlyVehicleLimit) return { status: 'limit_reached', limit: 'monthly_vehicles' };
+    }
+    if (monthlyCostCapMicros !== null) {
+      // Usage.day is the naive UTC-midnight encoding of a local calendar day
+      // (see localDay()) — re-derive the month's start in that same space
+      // rather than comparing it against startOfLocalMonth()'s real UTC instant.
+      const monthStart = localDay(startOfLocalMonth(now, tz), tz);
+      const spent = await tx.usage.aggregate({
+        where: { organizationId: opts.organizationId, day: { gte: monthStart } },
+        _sum: { costMicros: true },
+      });
+      if ((spent._sum.costMicros ?? 0n) >= BigInt(monthlyCostCapMicros)) {
+        return { status: 'limit_reached', limit: 'monthly_cost_cap' };
+      }
     }
 
     const { subjectType, subjectId } = await opts.createSubject(tx);

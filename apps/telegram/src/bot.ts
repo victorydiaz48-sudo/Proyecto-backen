@@ -207,7 +207,15 @@ export function createBot(deps: BotDeps): Bot {
     switch (result.status) {
       case 'limit_reached':
         log.info('job refused: limit reached', { organizationId: r.account.organizationId, limit: result.limit });
-        return void (await ctx.reply(result.limit === 'daily_jobs' ? m.access.dailyLimit : m.access.monthlyLimit));
+        return void (
+          await ctx.reply(
+            result.limit === 'daily_jobs'
+              ? m.access.dailyLimit
+              : result.limit === 'monthly_cost_cap'
+                ? m.access.monthlyCostCap
+                : m.access.monthlyLimit,
+          )
+        );
       case 'duplicate':
         // Re-enqueue in case the first enqueue was lost; the queue dedupes by id.
         if (result.jobStatus === 'PENDING') {
